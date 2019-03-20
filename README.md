@@ -22,6 +22,10 @@ Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complet
 * Animated textures (e.g. water)
 
 ## Implementation Details
+### Language and Compiler
+This project was written using C++11 using Microsoft Visual Studio 2013
+For hardware graphics (modern) OpenGL 4.5 has been used
+It was developed for Windows 8.1 and Windows 10 and tested using Nvidia GeForce graphics hardware
 ### Libraries and Dependencies
 * Assimp 3.2
 * DevIL 1.7.8

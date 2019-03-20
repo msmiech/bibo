@@ -1,0 +1,54 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.40629.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BIBO", "BIBO\BIBO.vcxproj", "{B44CFC18-86D0-4398-813C-FFC265EED888}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Shader", "Shader", "{E9A47EC8-6D5C-4128-8676-0372E53A777A}"
+	ProjectSection(SolutionItems) = preProject
+		Shader\alternative_blur_shader.frag = Shader\alternative_blur_shader.frag
+		Shader\alternative_blur_shader.vert = Shader\alternative_blur_shader.vert
+		Shader\basic.frag = Shader\basic.frag
+		Shader\basic.vert = Shader\basic.vert
+		Shader\debug_depth_shader.frag = Shader\debug_depth_shader.frag
+		Shader\debug_depth_shader.vert = Shader\debug_depth_shader.vert
+		Shader\depth_shader.frag = Shader\depth_shader.frag
+		Shader\depth_shader.vert = Shader\depth_shader.vert
+		Shader\gaussian_blur_shader.frag = Shader\gaussian_blur_shader.frag
+		Shader\gaussian_blur_shader.vert = Shader\gaussian_blur_shader.vert
+		Shader\light_source_shader.frag = Shader\light_source_shader.frag
+		Shader\light_source_shader.vert = Shader\light_source_shader.vert
+		Shader\main_shader.frag = Shader\main_shader.frag
+		Shader\main_shader.vert = Shader\main_shader.vert
+		Shader\normals.frag = Shader\normals.frag
+		Shader\normals.vert = Shader\normals.vert
+		Shader\post_processing_shader.frag = Shader\post_processing_shader.frag
+		Shader\post_processing_shader.vert = Shader\post_processing_shader.vert
+		Shader\text_shader.frag = Shader\text_shader.frag
+		Shader\text_shader.vert = Shader\text_shader.vert
+		Shader\texture.frag = Shader\texture.frag
+		Shader\texture.vert = Shader\texture.vert
+		Shader\texture_light_view.frag = Shader\texture_light_view.frag
+		Shader\texture_light_view.vert = Shader\texture_light_view.vert
+		Shader\texture_light_world.frag = Shader\texture_light_world.frag
+		Shader\texture_light_world.vert = Shader\texture_light_world.vert
+		Shader\vbo_vao.frag = Shader\vbo_vao.frag
+		Shader\vbo_vao.vert = Shader\vbo_vao.vert
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B44CFC18-86D0-4398-813C-FFC265EED888}.Debug|Win32.ActiveCfg = Debug|Win32
+		{B44CFC18-86D0-4398-813C-FFC265EED888}.Debug|Win32.Build.0 = Debug|Win32
+		{B44CFC18-86D0-4398-813C-FFC265EED888}.Release|Win32.ActiveCfg = Release|Win32
+		{B44CFC18-86D0-4398-813C-FFC265EED888}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

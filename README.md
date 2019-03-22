@@ -1,6 +1,8 @@
 # Bear-In Bear-Out
 Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complete a lap as fast as possible and avoiding obstacles
 
+![alt text](Screenshots/bibo_screenshot.PNG)
+
 ## Features
 * Freely movable camera
 ** Locked mode = following the player's character (default)

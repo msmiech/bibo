@@ -1,15 +1,12 @@
-﻿#pragma once
+#pragma once
 #include "Material.hpp"
 #include "Texture.hpp"
-#include "Model.hpp"
-#ifndef GLM_INCLUDED
-#define GLM_INCLUDED
+#include "Shader.hpp"
+#include <assimp/mesh.h>
+#include <assimp/matrix4x4.h>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.inl>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/detail/type_vec3.hpp>
-#include <glm/detail/type_vec2.hpp>
-#endif
 
 using namespace std;
 using namespace glm;
@@ -28,19 +25,20 @@ namespace bibo
 		* Adapted for our project.
 		*/
 		class Mesh {
-			const enum BUFFERS {
+			enum BUFFERS {
 				POS_BUFFER = 0,
 				NORMAL_BUFFER = 1,
 				UV_BUFFER = 2,
 				INDEX_BUFFER = 3,
 				TANGENT_BUFFER = 4,
-				BITANGENT_BUFFER = 5
+				BITANGENT_BUFFER = 5,
+				BUFFER_COUNT = 6
 			};
 
 			const unsigned int MAX_FACES = 16777216;
 
 			GLuint vao;
-			GLuint vbo[4];
+			GLuint vbo[BUFFER_COUNT];
 
 			Shader* shader;
 
@@ -50,17 +48,19 @@ namespace bibo
 		public:
 			Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, aiMatrix4x4 transformation);
 			~Mesh();
+			Mesh(const Mesh&) = delete;
+			Mesh& operator=(const Mesh&) = delete;
 			void draw(Shader* shader);
 
 			aiMesh* source;
 			unsigned int numVertices;
 			unsigned int numFaces;
-			float* vertices;
-			float* normals;
-			float* texCoords;
-			float* tangents;
-			float* bitangents;
-			unsigned int* indices;
+			float* vertices = nullptr;
+			float* normals = nullptr;
+			float* texCoords = nullptr;
+			float* tangents = nullptr;
+			float* bitangents = nullptr;
+			unsigned int* indices = nullptr;
 
 			void setTexture(Texture* texture);
 			Texture* getTexture();

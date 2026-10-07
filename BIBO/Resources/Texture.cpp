@@ -1,34 +1,54 @@
 #include "Texture.hpp"
 
-#include "../Util/Util.hpp"
+#include <iostream>
+#include <random>
+#include <vector>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 using namespace std;
 using namespace bibo;
-using namespace util;
 
 bool texSettings::bilinear = true;
 unsigned int texSettings::mipMappingQuality = 2;
 
-Texture::Texture(const wstring& path, int unit, bool repeat) : Texture(path, unit)
+Texture::Texture(const string& path, int unit, bool repeat) : Texture(path, unit)
 {
 	this->repeat = repeat;
 }
 
-Texture::Texture(const wstring& path, int unit) : textureUnit(unit)
+Texture::Texture(const string& path, int unit) : textureUnit(unit)
+{
+	int width, height, channels;
+	//Always converted to RGBA, so that all image formats can be uploaded the same way
+	unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
+	if (data)
+	{
+		upload(width, height, data);
+		stbi_image_free(data);
+	}
+	else
+	{
+		cerr << "WARNING: Could not load texture " << path << " (" << stbi_failure_reason() << "), using a placeholder" << endl;
+		const unsigned char magenta[] = { 255, 0, 255, 255 };
+		upload(1, 1, magenta);
+	}
+}
+
+Texture::Texture(int width, int height, const unsigned char* rgbaPixels, int unit, bool repeat) : textureUnit(unit)
+{
+	this->repeat = repeat;
+	upload(width, height, rgbaPixels);
+}
+
+void Texture::upload(int width, int height, const unsigned char* rgbaPixels)
 {
 	glGenTextures(1, &handle);
 
 	glBindTexture(GL_TEXTURE_2D, handle);
 
-
-	unsigned int width, height, format, type;
-	auto data = reinterpret_cast<GLuint*>(LoadTexture(path, width, height, format, type));
-
-	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-	if (format != GL_RGBA)
-	{
-		ilConvertImage(IL_RGBA, IL_UNSIGNED_BYTE);
-	}
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgbaPixels);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -38,6 +58,45 @@ Texture::Texture(const wstring& path, int unit) : textureUnit(unit)
 
 Texture::~Texture() {
 	glDeleteTextures(1, &handle);
+}
+
+unique_ptr<Texture> Texture::createCheckerboard(int size, int squares, int unit)
+{
+	vector<unsigned char> pixels(size * size * 4);
+	int squareSize = size / squares;
+	for (int y = 0; y < size; ++y)
+	{
+		for (int x = 0; x < size; ++x)
+		{
+			unsigned char value = ((x / squareSize + y / squareSize) % 2 == 0) ? 240 : 15;
+			unsigned char* pixel = &pixels[(y * size + x) * 4];
+			pixel[0] = pixel[1] = pixel[2] = value;
+			pixel[3] = 255;
+		}
+	}
+	return make_unique<Texture>(size, size, pixels.data(), unit, true);
+}
+
+unique_ptr<Texture> Texture::createNoise(int size, unsigned int seed, int unit)
+{
+	mt19937 random(seed);
+	uniform_int_distribution<int> brightness(0, 255);
+	vector<unsigned char> pixels(size * size * 4);
+	for (int y = 0; y < size; ++y)
+	{
+		for (int x = 0; x < size; ++x)
+		{
+			int value = brightness(random);
+			if (y % 2 == 1)
+			{
+				value = value * 3 / 4; //scan lines
+			}
+			unsigned char* pixel = &pixels[(y * size + x) * 4];
+			pixel[0] = pixel[1] = pixel[2] = static_cast<unsigned char>(value);
+			pixel[3] = 255;
+		}
+	}
+	return make_unique<Texture>(size, size, pixels.data(), unit, false);
 }
 
 void Texture::bind(int unit, bool bilinear, unsigned int mipMappingQuality)
@@ -69,8 +128,9 @@ void Texture::bind(int unit, bool bilinear, unsigned int mipMappingQuality)
 	}
 	else
 	{
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+		//GL_CLAMP does not exist in the OpenGL core profile
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
 }
 

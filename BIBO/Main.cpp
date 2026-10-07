@@ -1,57 +1,35 @@
-#pragma comment(lib, "glew32.lib")
-#pragma comment(lib, "opengl32.lib")
-#pragma comment(lib, "glfw3.lib")
-#pragma comment(lib, "DevIL.lib")
-#pragma comment(lib, "ILU.lib")
-#pragma comment(lib, "ILUT.lib")
-
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <sstream>
-#ifndef GLEW_INCLUDED
-#define GLEW_INCLUDED
-#include <GL\glew.h>
-#include <gl\wglew.h>
-#include <GL\GL.h>
-#endif
-#ifndef GLFW_INCLUDED
-#define GLFW_INCLUDED
+#include <string>
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#endif
 
 #include "Scene/Scene.hpp"
-#include <map>
-#include "Util/PvdCallback.hpp"
+#include "Physics/Physics.hpp"
+#include "Util/Console.hpp"
 
 using namespace bibo;
-
-
-#ifndef PX_INCLUDED
-#define PX_INCLUDED
-#include "PhysX/PxPhysicsAPI.h"
-#include "PhysX/extensions/PxExtensionsAPI.h"
-#endif
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
 using namespace scene;
-using namespace physx;
 
-static void APIENTRY DebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const GLvoid* userParam);
-static void APIENTRY DebugCallbackAMD(GLuint id, GLenum category, GLenum severity, GLsizei length, const GLchar* message, GLvoid* userParam);
+//Only registered in debug builds
+[[maybe_unused]] static void GLAPIENTRY DebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const GLvoid* userParam);
+[[maybe_unused]] static void GLAPIENTRY DebugCallbackAMD(GLuint id, GLenum category, GLenum severity, GLsizei length, const GLchar* message, GLvoid* userParam);
 static string FormatDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity, const char* msg);
 
-static PxDefaultErrorCallback gDefaultErrorCallback;
-static PxDefaultAllocator gDefaultAllocatorCallback;
-PxFoundation *mFoundation;
-PxPhysics *mPhysics;
-PxCooking* mCooking;
+unique_ptr<physics::PhysicsWorld> physicsWorld;
 
 
 void initialize();
 void init(GLFWwindow* window);
-void initPX();
+void initPhysics();
 void initTextRendering();
 void initFreeType();
 void textRendering();
@@ -63,8 +41,6 @@ void update(float time_delta);
 void gameLoop();
 void renderQuad();
 void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale, vec3 color);
-void togglePvdConnection();
-void createPvdConnection();
 void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
 
 //vars
@@ -95,9 +71,13 @@ GLuint blurColorbuffers[3];
 GLuint shadowColorTexture; //used for variance shadow mapping, is usually blurred
 const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
 
+#ifdef _WIN32
+//Ask laptops with switchable graphics to run the game on the dedicated Nvidia/AMD GPU
 extern "C" {
-	_declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+	__declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }
+#endif
 //Based on: http://learnopengl.com/code_viewer.php?code=in-practice/text_rendering
 //Holds all state information relevant to a character as loaded using FreeType
 struct Character {
@@ -124,22 +104,6 @@ bool varianceShadowMappingEnabled = false;
 string lastMessage = "";
 float messageTimeLeft = 0;
 
-struct PvdParameters
-{
-	char							ip[256];
-	PxU32							port;
-	PxU32							timeout;
-	bool							useFullPvdConnection;
-
-	PvdParameters()
-		: port(5425)
-		, timeout(10)
-		, useFullPvdConnection(true)
-	{
-		PxStrcpy(ip, 256, "127.0.0.1");
-	}
-};
-
 int main(int argc, char** argv)
 {
 
@@ -149,13 +113,13 @@ int main(int argc, char** argv)
 		if ((stringstream(argv[1]) >> windowWidth).fail())
 		{
 			cerr << "ERROR: Could not parse first element, try again!" << endl;
-			system("PAUSE");
+			util::pause();
 			exit(EXIT_FAILURE);
 		}
 
 		if ((stringstream(argv[2]) >> windowHeight).fail()) {
 			cerr << "ERROR: Could not parse second element, try again!" << endl;
-			system("PAUSE");
+			util::pause();
 			exit(EXIT_FAILURE);
 		}
 
@@ -163,7 +127,7 @@ int main(int argc, char** argv)
 			if ((stringstream(argv[3]) >> fullscreen).fail()) {
 
 				cerr << "ERROR: Could not parse third command-line-arg, try again!" << endl;
-				system("PAUSE");
+				util::pause();
 				exit(EXIT_FAILURE);
 			}
 		}
@@ -188,7 +152,7 @@ void initialize()
 {
 	if (!glfwInit()) {
 		cerr << "ERROR: Could not init glfw." << endl;
-		system("PAUSE");
+		util::pause();
 		exit(EXIT_FAILURE);
 
 	}
@@ -208,15 +172,15 @@ void initialize()
 	}
 
 	window = glfwCreateWindow(windowWidth, windowHeight, "Hello CGUE", monitor, nullptr);
-	glfwSetKeyCallback(window, fKeyCallback);
 
 	if (!window) // window == nullptr
 	{
-		cerr << "ERROR;" << endl;
+		cerr << "ERROR: Could not create a window with an OpenGL 4.3 core context" << endl;
 		glfwTerminate();
-		system("PAUSE");
+		util::pause();
 		exit(EXIT_FAILURE);
 	}
+	glfwSetKeyCallback(window, fKeyCallback);
 	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwMakeContextCurrent(window);
 
@@ -227,10 +191,18 @@ void initialize()
 	{
 		cerr << "OpenGL Error: " << error << endl;
 	}
-	if (glewInit() != GLEW_OK) {
-		cerr << "ERROR: Could not load glew" << endl;
+	GLenum glewStatus = glewInit();
+#ifdef GLEW_ERROR_NO_GLX_DISPLAY
+	//On Wayland there is no GLX display, but the OpenGL functions were loaded nevertheless
+	if (glewStatus == GLEW_ERROR_NO_GLX_DISPLAY)
+	{
+		glewStatus = GLEW_OK;
+	}
+#endif
+	if (glewStatus != GLEW_OK) {
+		cerr << "ERROR: Could not load glew: " << glewGetErrorString(glewStatus) << endl;
 		glfwTerminate();
-		system("PAUSE");
+		util::pause();
 		exit(EXIT_FAILURE);
 	}
 	if (glewIsSupported("GL_VERSION_4_3"))
@@ -244,7 +216,7 @@ void initialize()
 
 	initDebug();
 
-	initPX();
+	initPhysics();
 
 	init(window);
 
@@ -252,28 +224,24 @@ void initialize()
 
 void initDebug()
 {
-	//Following if code is from wiki 
-#if _DEBUG
-	// Query the OpenGL function to register your callback function.
-	PFNGLDEBUGMESSAGECALLBACKPROC _glDebugMessageCallback = (PFNGLDEBUGMESSAGECALLBACKPROC)wglGetProcAddress("glDebugMessageCallback");
-	PFNGLDEBUGMESSAGECALLBACKARBPROC _glDebugMessageCallbackARB = (PFNGLDEBUGMESSAGECALLBACKARBPROC)wglGetProcAddress("glDebugMessageCallbackARB");
-	PFNGLDEBUGMESSAGECALLBACKAMDPROC _glDebugMessageCallbackAMD = (PFNGLDEBUGMESSAGECALLBACKAMDPROC)wglGetProcAddress("glDebugMessageCallbackAMD");
-
+	//Following if code is from wiki
+#ifndef NDEBUG
+	// GLEW already loaded the debug output functions (if the driver supports them).
 	// Register your callback function.
-	if (_glDebugMessageCallback != nullptr) {
-		_glDebugMessageCallback(DebugCallback, nullptr);
+	if (glDebugMessageCallback != nullptr) {
+		glDebugMessageCallback(DebugCallback, nullptr);
 	}
-	else if (_glDebugMessageCallbackARB != nullptr) {
-		_glDebugMessageCallbackARB(DebugCallback, nullptr);
+	else if (glDebugMessageCallbackARB != nullptr) {
+		glDebugMessageCallbackARB(DebugCallback, nullptr);
 	}
-	else if (_glDebugMessageCallbackAMD != nullptr) {
-		_glDebugMessageCallbackAMD(DebugCallbackAMD, nullptr);
+	else if (glDebugMessageCallbackAMD != nullptr) {
+		glDebugMessageCallbackAMD(DebugCallbackAMD, nullptr);
 	}
 
 	// Enable synchronous callback. This ensures that your callback function is called
 	// right after an error has occurred. This capability is not defined in the AMD
 	// version.
-	if ((_glDebugMessageCallback != nullptr) || (_glDebugMessageCallbackARB != nullptr)) {
+	if ((glDebugMessageCallback != nullptr) || (glDebugMessageCallbackARB != nullptr)) {
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	}
 #endif
@@ -282,12 +250,12 @@ void initDebug()
 
 
 //The following debug callbacks are from wiki: https://lva.cg.tuwien.ac.at/cgue/wiki/doku.php?id=students:debugcontext
-static void APIENTRY DebugCallbackAMD(GLuint id, GLenum category, GLenum severity, GLsizei length, const GLchar* message, GLvoid* userParam) {
+static void GLAPIENTRY DebugCallbackAMD(GLuint id, GLenum category, GLenum severity, GLsizei length, const GLchar* message, GLvoid* userParam) {
 	string error = FormatDebugOutput(category, category, id, severity, message);
 	cout << error << endl;
 }
 
-static void APIENTRY DebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const GLvoid* userParam) {
+static void GLAPIENTRY DebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const GLvoid* userParam) {
 	string error = FormatDebugOutput(source, type, id, severity, message);
 	cout << error << endl;
 }
@@ -546,7 +514,7 @@ void init(GLFWwindow* window) {
 	initTextRendering();
 
 	cout << "Loading assets from files via assimp and setting up scene..." << endl;
-	gameScene = make_unique<Scene>(window, mainShader.get(), mPhysics, mFoundation, mCooking);
+	gameScene = make_unique<Scene>(window, mainShader.get(), physicsWorld.get());
 
 }
 
@@ -746,42 +714,15 @@ void renderQuad()
 void cleanup() {
 	cout << "Cleaning up memory..." << endl;
 	gameScene.reset(nullptr);
-	mPhysics->release();
-	mFoundation->release();
-	mCooking->release();
+	//The scene (and the character controller of the bear) must be released before the physics world
+	physicsWorld.reset(nullptr);
 }
 
 
-void initPX()
+void initPhysics()
 {
-	cout << "Initializing Nvidia PhysX..." << endl;
-	mFoundation = PxCreateFoundation(
-		PX_PHYSICS_VERSION,
-		gDefaultAllocatorCallback,
-		gDefaultErrorCallback);
-
-
-	PxTolerancesScale scale;
-
-	mPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *mFoundation, scale);
-
-	PxCookingParams params(scale);
-	params.meshWeldTolerance = 0.001f;
-	params.meshPreprocessParams = PxMeshPreprocessingFlags(PxMeshPreprocessingFlag::eWELD_VERTICES | PxMeshPreprocessingFlag::eREMOVE_UNREFERENCED_VERTICES | PxMeshPreprocessingFlag::eREMOVE_DUPLICATED_TRIANGLES);
-	mCooking = PxCreateCooking(PX_PHYSICS_VERSION, *mFoundation, params);
-	if (!mCooking)
-	{
-		cerr << "Error: PxCreateCooking failed!" << endl;
-	}
-
-	togglePvdConnection();
-
-	if (mPhysics->getPvdConnectionManager()) {
-		PvdCallback* myPvdCallback = new PvdCallback(mPhysics);
-		mPhysics->getPvdConnectionManager()->addHandler(*myPvdCallback);
-	}
-
-	//mPhysics->registerDeletionListener(*this, PxDeletionEventFlag::eUSER_RELEASE);
+	cout << "Initializing Jolt Physics..." << endl;
+	physicsWorld = make_unique<physics::PhysicsWorld>();
 }
 
 // Based on: http://learnopengl.com/code_viewer.php?code=in-practice/text_rendering
@@ -791,12 +732,19 @@ void initFreeType()
 	FT_Library ft;
 	// All functions return a value different than 0 whenever an error occurred
 	if (FT_Init_FreeType(&ft))
+	{
 		cout << "ERROR::FREETYPE: Could not init FreeType Library" << endl;
+		return;
+	}
 
-	// Load font as face
+	// Load font as face (without a font the game still runs, just without HUD text)
 	FT_Face face;
-	if (FT_New_Face(ft, "Font/arial.ttf", 0, &face))
+	if (FT_New_Face(ft, "Font/DejaVuSans.ttf", 0, &face))
+	{
 		cout << "ERROR::FREETYPE: Failed to load font" << endl;
+		FT_Done_FreeType(ft);
+		return;
+	}
 
 	// Set size to load glyphs as
 	FT_Set_Pixel_Sizes(face, 0, 48);
@@ -838,7 +786,7 @@ void initFreeType()
 			texture,
 			ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
 			ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-			face->glyph->advance.x
+			static_cast<GLuint>(face->glyph->advance.x)
 		};
 		Characters.insert(pair<GLchar, Character>(c, character));
 	}
@@ -901,49 +849,6 @@ void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale
 
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_BLEND);
-}
-
-void togglePvdConnection()
-{
-	if (!mPhysics->getPvdConnectionManager()) return;
-	if (mPhysics->getPvdConnectionManager()->isConnected())
-		mPhysics->getPvdConnectionManager()->disconnect();
-	else
-		createPvdConnection();
-}
-
-void createPvdConnection()
-{
-	PxVisualDebuggerConnectionManager* pvd = mPhysics->getPvdConnectionManager();
-	if (!pvd)
-		return;
-
-	//The connection flags state overall what data is to be sent to PVD.  Currently
-	//the Debug connection flag requires support from the implementation (don't send
-	//the data when debug isn't set) but the other two flags, profile and memory
-	//are taken care of by the PVD SDK.
-
-	//Use these flags for a clean profile trace with minimal overhead
-	PxVisualDebuggerConnectionFlags theConnectionFlags(PxVisualDebuggerConnectionFlag::eDEBUG | PxVisualDebuggerConnectionFlag::ePROFILE | PxVisualDebuggerConnectionFlag::eMEMORY);
-	PvdParameters mPvdParams;
-
-	if (!mPvdParams.useFullPvdConnection)
-	{
-		theConnectionFlags = PxVisualDebuggerConnectionFlag::ePROFILE;
-	}
-
-	//Create a pvd connection that writes data straight to the filesystem.  This is
-	//the fastest connection on windows for various reasons.  First, the transport is quite fast as
-	//pvd writes data in blocks and filesystems work well with that abstraction.
-	//Second, you don't have the PVD application parsing data and using CPU and memory bandwidth
-	//while your application is running.
-	//PxVisualDebuggerExt::createConnection(mPhysics->getPvdConnectionManager(), "c:\\temp.pxd2", theConnectionFlags);
-
-	//The normal way to connect to pvd.  PVD needs to be running at the time this function is called.
-	//We don't worry about the return value because we are already registered as a listener for connections
-	//and thus our onPvdConnected call will take care of setting up our basic connection state.
-
-	PxVisualDebuggerExt::createConnection(pvd, mPvdParams.ip, mPvdParams.port, mPvdParams.timeout, theConnectionFlags);
 }
 
 void textRendering()

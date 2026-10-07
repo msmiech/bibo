@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 #include "Plane.hpp"
-#include <glm/detail/func_geometric.inl>
+#include <glm/glm.hpp>
 
 
 Plane::Plane(vec3 &v1, vec3 &v2, vec3 &v3) {

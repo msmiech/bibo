@@ -1,10 +1,8 @@
 #pragma once
 
+#include <memory>
 #include <string>
-#ifndef GLEW_DEFINED
-#define GLEW_DEFINED
-#include <GL\glew.h>
-#endif
+#include <GL/glew.h>
 
 using namespace std;
 
@@ -21,10 +19,29 @@ namespace bibo
 	{
 		GLuint handle;
 		int textureUnit;
+		void upload(int width, int height, const unsigned char* rgbaPixels);
 	public:
-		Texture(const wstring& path, int unit, bool repeat);
-		Texture(const wstring& path, int unit);
+		/**
+		* Loads an image file (PNG, JPG, TGA, ...). If the file cannot be loaded, a magenta placeholder is used.
+		*/
+		Texture(const string& path, int unit, bool repeat);
+		Texture(const string& path, int unit);
+		/**
+		* Creates a texture from RGBA pixels (4 bytes per pixel)
+		*/
+		Texture(int width, int height, const unsigned char* rgbaPixels, int unit, bool repeat);
 		~Texture();
+		Texture(const Texture&) = delete;
+		Texture& operator=(const Texture&) = delete;
+
+		/**
+		* Black and white checkerboard (e.g. a chequered flag)
+		*/
+		static unique_ptr<Texture> createCheckerboard(int size, int squares, int unit);
+		/**
+		* Random grey pixels with dark scan lines, looks like the static of an analog TV
+		*/
+		static unique_ptr<Texture> createNoise(int size, unsigned int seed, int unit);
 
 		void bind(int unit, bool bilinear, unsigned int mipMappingQuality);
 		void bind(int unit);

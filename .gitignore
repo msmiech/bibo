@@ -157,3 +157,14 @@ $RECYCLE.BIN/
 /build-Debug
 .vs
 build-Release
+
+# =========================
+# CMake
+# =========================
+/out/
+cmake-build-*/
+CMakeUserPresets.json
+compile_commands.json
+.cache/
+.vscode/
+.idea/

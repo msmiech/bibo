@@ -1,0 +1,131 @@
+name: Build
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'Screenshots/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'Screenshots/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Ubuntu (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC
+            cc: gcc
+            cxx: g++
+            system_libs: 'OFF'
+          - name: Clang
+            cc: clang
+            cxx: clang++
+            system_libs: 'OFF'
+          - name: GCC, system libraries
+            cc: gcc
+            cxx: g++
+            system_libs: 'ON'
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang cmake ninja-build pkg-config \
+            libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libxkbcommon-dev wayland-protocols \
+            xvfb xauth libgl1-mesa-dri
+          if [ "${{ matrix.system_libs }}" = "ON" ]; then
+            sudo apt-get install -y --no-install-recommends \
+              libglfw3-dev libglm-dev libassimp-dev libfreetype-dev libglew-dev
+          fi
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBIBO_USE_SYSTEM_LIBS=${{ matrix.system_libs }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      # Runs the game for a while on a virtual X server with Mesa's software renderer (llvmpipe, OpenGL 4.5).
+      # Catches shaders that only compile on the lenient Nvidia driver, missing assets and crashes during start up.
+      - name: Smoke test (software OpenGL)
+        working-directory: build
+        run: |
+          status=0
+          xvfb-run -a -s "-screen 0 1280x720x24" timeout 30 ./BIBO 800 600 0 < /dev/null > smoke.log 2>&1 || status=$?
+          cat smoke.log
+          # 124: the game was still running when timeout stopped it
+          if [ "$status" -ne 124 ]; then
+            echo "::error::BIBO exited with code $status"
+            exit 1
+          fi
+          if grep -E "Failed|Could not|ERROR|not complete|below 4.3" smoke.log; then
+            echo "::error::BIBO reported errors during start up"
+            exit 1
+          fi
+
+  windows:
+    name: Windows MSYS2 (${{ matrix.name }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: UCRT64 GCC
+            msystem: UCRT64
+            system_libs: 'OFF'
+          - name: CLANG64 Clang
+            msystem: CLANG64
+            system_libs: 'OFF'
+          - name: UCRT64 GCC, system libraries
+            msystem: UCRT64
+            system_libs: 'ON'
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          pacboy: >-
+            toolchain:p
+            cmake:p
+            ninja:p
+            ${{ matrix.system_libs == 'ON' && 'glfw:p glm:p assimp:p freetype:p glew:p' || '' }}
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBIBO_USE_SYSTEM_LIBS=${{ matrix.system_libs }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      # With the downloaded libraries the game is linked statically and must run without MinGW/compiler runtime DLLs
+      - name: Check that BIBO.exe only depends on Windows DLLs
+        if: matrix.system_libs == 'OFF'
+        run: |
+          objdump=$(command -v objdump || command -v llvm-objdump)
+          "$objdump" -p build/BIBO.exe | grep "DLL Name"
+          if "$objdump" -p build/BIBO.exe | grep "DLL Name" | grep -iE "lib(stdc\+\+|gcc_s|winpthread|c\+\+|unwind|assimp|freetype|glfw|glew)|glew32|glfw3|zlib1"; then
+            echo "::error::BIBO.exe depends on non-system DLLs"
+            exit 1
+          fi

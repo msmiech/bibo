@@ -2,13 +2,10 @@
 
 #include "SceneObject.hpp"
 #include "../Resources/Texture.hpp"
-#include <PhysX/PxRigidDynamic.h>
-#ifndef GLM_INCLUDED
-#define GLM_INCLUDED
+#include "../Physics/Physics.hpp"
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.inl>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#endif
 
 #define CUBE_VERTEX_COUNT 24
 #define CUBE_INDEX_COUNT 36
@@ -27,8 +24,13 @@ namespace bibo
 			void update(float time_delta) override;
 			void draw(Shader* shader) override;
 
-			physx::PxRigidDynamic* gBox;
+			/**
+			* The cube follows the position and rotation of the physics body from now on
+			*/
+			void setPhysicsBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle body);
 		private:
+			physics::PhysicsWorld* physicsWorld = nullptr;
+			physics::BodyHandle physicsBody = physics::INVALID_BODY;
 			GLuint vao;
 			GLuint positionBuffer, normalBuffer, uvBuffer,  indexBuffer;
 			Shader* shader;

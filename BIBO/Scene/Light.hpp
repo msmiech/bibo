@@ -21,11 +21,11 @@ namespace bibo
 			void draw(Shader* shader) override;
 			void loadUniforms(Shader* shader);
 			vec3 getPosition() override;
-			vec3 getDirection();
+			vec3 getDirection() override;
 		private:
 			void convertLight(aiLight* light);
 			GLuint lightVAO, lightVBO;
-			uint type;
+			unsigned int type;
 			vec3 position;
 			vec3 direction;
 			vec3 ambient;

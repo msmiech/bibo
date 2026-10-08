@@ -162,6 +162,8 @@ build-Release
 # CMake
 # =========================
 /out/
+/build-*/
+/BIBO-dist/
 cmake-build-*/
 CMakeUserPresets.json
 compile_commands.json

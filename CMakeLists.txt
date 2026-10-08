@@ -76,6 +76,7 @@ else()
 	set(FT_DISABLE_PNG ON)
 	set(FT_DISABLE_HARFBUZZ ON)
 	set(FT_DISABLE_BROTLI ON)
+	set(SKIP_INSTALL_ALL ON) # cmake --install only installs the game
 	FetchContent_Declare(freetype
 		URL https://github.com/freetype/freetype/archive/refs/tags/VER-2-14-3.tar.gz
 		URL_HASH SHA256=dc49de6b01a266eef4876a4dd34d9842c475d3e28ff2eff63bd2fb760ab56261

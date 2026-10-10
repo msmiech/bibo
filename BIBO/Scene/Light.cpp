@@ -96,8 +96,8 @@ void Light::convertLight(aiLight* light)
 
 	//specular = vec3(6.f, 6.f, 6.f);
 	specular.r = light->mColorSpecular.r;
-	specular.b = light->mColorSpecular.g;
-	specular.g = light->mColorSpecular.b;
+	specular.g = light->mColorSpecular.g;
+	specular.b = light->mColorSpecular.b;
 }
 
 

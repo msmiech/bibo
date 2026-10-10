@@ -56,7 +56,7 @@ void main()
 		hdrResult.a = 1.0;
 		// Gamma correction  
 		hdrResult = pow(hdrResult, vec4(1.0 / gamma));
-		fragColor = hdrResult, 1.0f;
+		fragColor = hdrResult;
 	}
 	else
     {

@@ -9,12 +9,12 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 	glBindVertexArray(vao);
 
 	//glGenBuffers(4, vbo);
-	vbo[POS_BUFFER] = NULL;
-	vbo[UV_BUFFER] = NULL;
-	vbo[NORMAL_BUFFER] = NULL;
-	vbo[INDEX_BUFFER] = NULL;
-	vbo[TANGENT_BUFFER] = NULL;
-	vbo[BITANGENT_BUFFER] = NULL;
+	vbo[POS_BUFFER] = 0;
+	vbo[UV_BUFFER] = 0;
+	vbo[NORMAL_BUFFER] = 0;
+	vbo[INDEX_BUFFER] = 0;
+	vbo[TANGENT_BUFFER] = 0;
+	vbo[BITANGENT_BUFFER] = 0;
 
 	numFaces = mesh->mNumFaces;
 	numVertices = mesh->mNumVertices;
@@ -96,9 +96,12 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 	if (mesh->HasFaces()) {
 		indices = new unsigned int[mesh->mNumFaces * 3];
 		for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {
-			indices[i * 3] = mesh->mFaces[i].mIndices[0];
-			indices[i * 3 + 1] = mesh->mFaces[i].mIndices[1];
-			indices[i * 3 + 2] = mesh->mFaces[i].mIndices[2];
+			const aiFace& face = mesh->mFaces[i];
+			//Points and lines are not rendered (degenerate triangle)
+			bool isTriangle = face.mNumIndices == 3;
+			indices[i * 3] = face.mIndices[0];
+			indices[i * 3 + 1] = isTriangle ? face.mIndices[1] : face.mIndices[0];
+			indices[i * 3 + 2] = isTriangle ? face.mIndices[2] : face.mIndices[0];
 		}
 
 		glGenBuffers(1, &vbo[INDEX_BUFFER]);
@@ -152,18 +155,32 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 			aiVector3D Tangent;
 			aiVector3D Bitangent;
 
-			for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
+			for (unsigned int i = 0; i < mesh->mNumVertices * 3; ++i)
 			{
-				v0 = mesh->mVertices[i];
-				v1 = mesh->mVertices[i + 1];
-				v2 = mesh->mVertices[i + 2];
+				tangents[i] = 0.0f;
+				bitangents[i] = 0.0f;
+			}
+
+			//One tangent per triangle, assigned to all of its vertices
+			for (unsigned int faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex)
+			{
+				const aiFace& face = mesh->mFaces[faceIndex];
+				if (face.mNumIndices != 3)
+				{
+					continue;
+				}
+				const unsigned int vertexIndices[3] = { face.mIndices[0], face.mIndices[1], face.mIndices[2] };
+
+				v0 = mesh->mVertices[vertexIndices[0]];
+				v1 = mesh->mVertices[vertexIndices[1]];
+				v2 = mesh->mVertices[vertexIndices[2]];
 
 				Edge1 = v1 - v0;
 				Edge2 = v2 - v0;
 
-				uv0 = mesh->mTextureCoords[0][i];
-				uv1 = mesh->mTextureCoords[0][i + 1];
-				uv2 = mesh->mTextureCoords[0][i + 2];
+				uv0 = mesh->mTextureCoords[0][vertexIndices[0]];
+				uv1 = mesh->mTextureCoords[0][vertexIndices[1]];
+				uv2 = mesh->mTextureCoords[0][vertexIndices[2]];
 
 				float DeltaU1 = uv1.x - uv0.x;
 				float DeltaV1 = uv1.y - uv0.y;
@@ -182,13 +199,16 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 				Bitangent.y = f * (-DeltaU2 * Edge1.y - DeltaU1 * Edge2.y);
 				Bitangent.z = f * (-DeltaU2 * Edge1.z - DeltaU1 * Edge2.z);
 
-				tangents[i * 3] = Tangent.x;
-				tangents[i * 3 + 1] = Tangent.y;
-				tangents[i * 3 + 2] = Tangent.z;
+				for (unsigned int i : vertexIndices)
+				{
+					tangents[i * 3] = Tangent.x;
+					tangents[i * 3 + 1] = Tangent.y;
+					tangents[i * 3 + 2] = Tangent.z;
 
-				bitangents[i * 3] = Bitangent.x;
-				bitangents[i * 3 + 1] = Bitangent.y;
-				bitangents[i * 3 + 2] = Bitangent.z;
+					bitangents[i * 3] = Bitangent.x;
+					bitangents[i * 3 + 1] = Bitangent.y;
+					bitangents[i * 3 + 2] = Bitangent.z;
+				}
 
 			}
 		}
@@ -240,7 +260,20 @@ Mesh::~Mesh() {
 	if (vbo[INDEX_BUFFER]) {
 		glDeleteBuffers(1, &vbo[INDEX_BUFFER]);
 	}
+	if (vbo[TANGENT_BUFFER]) {
+		glDeleteBuffers(1, &vbo[TANGENT_BUFFER]);
+	}
+	if (vbo[BITANGENT_BUFFER]) {
+		glDeleteBuffers(1, &vbo[BITANGENT_BUFFER]);
+	}
 	glDeleteVertexArrays(1, &vao);
+
+	delete[] vertices;
+	delete[] normals;
+	delete[] texCoords;
+	delete[] tangents;
+	delete[] bitangents;
+	delete[] indices;
 }
 
 /**
@@ -272,7 +305,7 @@ void Mesh::draw(Shader* shader) {
 	}
 
 	glBindVertexArray(vao);
-	glDrawElements(GL_TRIANGLES, numVertices, GL_UNSIGNED_INT, nullptr); //previously numberOfElements = numFaces * 3
+	glDrawElements(GL_TRIANGLES, numFaces * 3, GL_UNSIGNED_INT, nullptr); //the index buffer contains 3 indices per face
 	glBindVertexArray(0);
 	if (texture)
 	{

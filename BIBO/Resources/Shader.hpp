@@ -1,12 +1,7 @@
 #pragma once
 
 #include <string>
-#ifndef GLEW_INCLUDED
-#define GLEW_INCLUDED
-#include <GL\glew.h>
-#include <gl\wglew.h>
-#include <GL\GL.h>
-#endif
+#include <GL/glew.h>
 
 using namespace std;
 

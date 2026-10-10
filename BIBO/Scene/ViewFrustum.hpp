@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include <glm/detail/type_vec3.hpp>
+#include <glm/glm.hpp>
 #include "../Resources/Plane.hpp"
 
 namespace CPM_GLM_AABB_NS {
@@ -24,7 +24,7 @@ namespace bibo
 
 		public:
 
-			static enum { OUTSIDE, INTERSECT, INSIDE };
+			enum { OUTSIDE, INTERSECT, INSIDE };
 
 			Plane pl[6];
 
@@ -32,8 +32,8 @@ namespace bibo
 			float nearD, farD, ratio, angle, tang;
 			float nw, nh, fw, fh;
 
-			FrustumG::FrustumG();
-			FrustumG::~FrustumG();
+			FrustumG();
+			~FrustumG();
 
 			void setCamInternals(float angle, float ratio, float nearD, float farD);
 			void setCamDef(vec3 &p, vec3 &l, vec3 &u);

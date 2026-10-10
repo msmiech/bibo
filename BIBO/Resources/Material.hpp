@@ -1,12 +1,7 @@
 ﻿#pragma once
-#ifndef GLM_INCLUDED
-#define GLM_INCLUDED
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.inl>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/detail/type_vec3.hpp>
-#include <glm/detail/type_vec2.hpp>
-#endif
 
 using namespace glm;
 namespace bibo

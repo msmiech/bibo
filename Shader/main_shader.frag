@@ -83,7 +83,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 N, vec3 L)
 // From http://fabiensanglard.net/shadowmappingVSM/index.php
 float chebyshevUpperBound(float distance)
 {
-	vec2 moments = texture2D(shadowMap, scPostW.xy).rg;
+	vec2 moments = texture(shadowMap, scPostW.xy).rg;
 	
 	// Surface is fully lit. as the current fragment is before the light occluder
 	if (distance <= moments.x)
@@ -201,16 +201,17 @@ void main()
     //float shadow = shadowMappingEnabled ? ShadowCalculation(fragPosLightSpace, N, L) : 0.0;
     //vec3 lightResult = (ambient + (1.0 - shadow) * (diffuse + specular)) * textureColor;    
 	vec4 lightResult = vec4((ambient + (1.0 - shadow) * (diffuse + specular)), 1.0) * textureColor;
+	fragColor = lightResult;
+
+    // Only bright fragments contribute to bloom (brightColor must always be written, otherwise its content is undefined)
     float brightness = dot(lightResult.rgb, vec3(0.2126, 0.7152, 0.0722));
     if(brightness > 1.0)
 	{
-        brightColor = vec4(fragColor);
+        brightColor = fragColor;
     }
-	//else
-	//{
-	//	brightColor = vec4(0.0, 0.0, 0.0, 1.0);
-    //}
-
-	fragColor = lightResult;
+	else
+	{
+		brightColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
 }
 

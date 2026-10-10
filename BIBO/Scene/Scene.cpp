@@ -1,15 +1,15 @@
 ﻿#include "Scene.hpp"
+#include <algorithm>
+#include <glm/gtc/constants.hpp>
 
 using namespace bibo;
 using namespace scene;
 
 Geometry* rotatingRock;
 
-Scene::Scene(GLFWwindow* window, Shader* shader, PxPhysics* mPhysics, PxFoundation* mFoundation, PxCooking* mCooking) : window(window), mPhysics(mPhysics), mFoundation(mFoundation), mCooking(mCooking)
+Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld) : window(window), physicsWorld(physicsWorld)
 {
 	shader->enable();
-
-	initPxScene();
 
 	geometries.clear();
 	arrows.clear();
@@ -20,26 +20,26 @@ Scene::Scene(GLFWwindow* window, Shader* shader, PxPhysics* mPhysics, PxFoundati
 	lights = util::retrieveLightFromScene(*window, shader, "Model/SnowTerrain/track1.dae");
 	camera = make_unique<Camera>(vec3(0.0f, 1.0f, 2.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), shader, *window);
 
-	textures.push_back(make_unique<Texture>(L"Texture/pusheen.png", 0)); //0
-	Texture* pusheenTexPtr = textures[0].get();
+	textures.push_back(Texture::createCheckerboard(256, 8, 0)); //0, chequered flag (generated, no image file)
+	Texture* checkerboardTexPtr = textures[0].get();
 
-	textures.push_back(make_unique<Texture>(L"Texture/cfur01.jpg", 0)); //1
-	textures.push_back(make_unique<Texture>(L"Texture/sky1Tex.jpg", 0)); //2
-	textures.push_back(make_unique<Texture>(L"Texture/snow.jpg", 0)); //3
-	textures.push_back(make_unique<Texture>(L"Texture/snow-normal.jpg", 2)); //4
-	textures.push_back(make_unique<Texture>(L"Texture/ground07.jpg", 0)); //5
-	textures.push_back(make_unique<Texture>(L"Texture/wood16.jpg", 0)); //6
-	textures.push_back(make_unique<Texture>(L"Texture/wood16n.jpg", 2)); //7
-	textures.push_back(make_unique<Texture>(L"Texture/Water.png", 0));//8
-	textures.push_back(make_unique<Texture>(L"Texture/ground07n.jpg", 2)); //9
+	textures.push_back(make_unique<Texture>("Texture/cfur01.jpg", 0)); //1
+	textures.push_back(make_unique<Texture>("Texture/sky1Tex.jpg", 0)); //2
+	textures.push_back(make_unique<Texture>("Texture/snow.jpg", 0)); //3
+	textures.push_back(make_unique<Texture>("Texture/snow-normal.jpg", 2)); //4
+	textures.push_back(make_unique<Texture>("Texture/ground07.jpg", 0)); //5
+	textures.push_back(make_unique<Texture>("Texture/wood16.jpg", 0)); //6
+	textures.push_back(make_unique<Texture>("Texture/wood16n.jpg", 2)); //7
+	textures.push_back(make_unique<Texture>("Texture/Water.png", 0));//8
+	textures.push_back(make_unique<Texture>("Texture/ground07n.jpg", 2)); //9
 	initAnimatedTextures();
 
-	geometries.push_back(make_unique<Bear>(mat4(1.0f), shader, *window, textures[1].get(), mPhysics, pxManager, this)); //0
+	geometries.push_back(make_unique<Bear>(mat4(1.0f), shader, *window, textures[1].get(), physicsWorld, [this](physics::BodyHandle body) { onBearHit(body); })); //0
 	bear = static_cast<Bear*>(geometries[0].get());
 	Material bearMaterial;
 	bearMaterial.ambient = vec3(0.8f, 0.8f, 0.8f);
 	bearMaterial.diffuse = vec3(0.8f, 0.8f, 0.8f);
-	bearMaterial.specular = vec3((0.8f, 0.8f, 0.8f));
+	bearMaterial.specular = vec3(0.8f, 0.8f, 0.8f);
 	bearMaterial.shininess = 10.0f;
 	bear->getModel()->meshes[0]->setMaterial(bearMaterial);
 
@@ -52,7 +52,7 @@ Scene::Scene(GLFWwindow* window, Shader* shader, PxPhysics* mPhysics, PxFoundati
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Boden", textures[3].get()));//1
 	world = geometries[1].get();
 
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "FinishLine", pusheenTexPtr));//2
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "FinishLine", checkerboardTexPtr));//2
 	finishLine = geometries[2].get();
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock1", textures[5].get(), textures[9].get())); //3
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock2", textures[5].get(), textures[9].get())); //4
@@ -73,23 +73,23 @@ Scene::Scene(GLFWwindow* window, Shader* shader, PxPhysics* mPhysics, PxFoundati
 	water = geometries[16].get();
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Cube", textures[6].get(), textures[7].get())); //17
 
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Monitor1", pusheenTexPtr)); //18
-	//geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Monitor2", pusheenTexPtr)); //19
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Monitor1", checkerboardTexPtr)); //18
+	//geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Monitor2", checkerboardTexPtr)); //19
 
 	monitor1 = geometries[18].get();
 	Material monitorMaterial;
 	monitorMaterial.ambient = vec3(0.8f, 0.8f, 0.8f);
 	monitorMaterial.diffuse = vec3(0.8f, 0.8f, 0.8f);
-	monitorMaterial.specular = vec3((0.8f, 0.8f, 0.8f));
+	monitorMaterial.specular = vec3(0.8f, 0.8f, 0.8f);
 	monitorMaterial.shininess = 1.0f;
 	monitor1->getModel()->meshes[0]->setMaterial(monitorMaterial);
 
 
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil0", pusheenTexPtr)); //18
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil1", pusheenTexPtr)); //19
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil2", pusheenTexPtr)); //20
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil3", pusheenTexPtr)); //21
-	initPxActors();
+	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil0", checkerboardTexPtr)); //18
+	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil1", checkerboardTexPtr)); //19
+	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil2", checkerboardTexPtr)); //20
+	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil3", checkerboardTexPtr)); //21
+	initPhysicsBodies();
 
 	rotatingRock = new Geometry(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock1", textures[5].get(), textures[9].get());
 	rotatingRock->modelMatrix = translate(rotatingRock->modelMatrix, vec3(10, 25, 1));
@@ -108,8 +108,7 @@ Scene::~Scene()
 
 
 void Scene::update(float time_delta) {
-	pxScene->simulate(time_delta);
-	pxScene->fetchResults(true);
+	physicsWorld->update(time_delta);
 	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
 	{
 		gameOver = false;
@@ -124,7 +123,7 @@ void Scene::update(float time_delta) {
 	if (accumulatedVideoTime > 0.1f)
 	{
 		accumulatedVideoTime = 0.f;
-		monitor1->getModel()->meshes[0]->setTexture(crashVideo[++crashFrame % crashVideo.size()].get());
+		monitor1->getModel()->meshes[0]->setTexture(monitorVideo[++monitorFrame % monitorVideo.size()].get());
 		water->getModel()->meshes[0]->setTexture(waterVideo[++waterFrame % waterVideo.size()].get());
 	}
 
@@ -356,186 +355,95 @@ int Scene::getUserScore()
 }
 
 
-/**
-* The following method is based on: http://mmmovania.blogspot.co.at/2013/01/some-status-updates-and-source-code.html
-**/
-void Scene::initPxScene()
+void Scene::initPhysicsBodies()
 {
-	//Create the scene
-	PxSceneDesc sceneDesc(mPhysics->getTolerancesScale());
-	sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f);
-
-	if (!sceneDesc.cpuDispatcher) {
-		PxDefaultCpuDispatcher* mCpuDispatcher = PxDefaultCpuDispatcherCreate(1);
-		if (!mCpuDispatcher)
-			cerr << "PxDefaultCpuDispatcherCreate failed!" << endl;
-		sceneDesc.cpuDispatcher = mCpuDispatcher;
-	}
-	if (!sceneDesc.filterShader)
-		sceneDesc.filterShader = PxDefaultSimulationFilterShader;
-
-
-	pxScene = mPhysics->createScene(sceneDesc);
-	if (!pxScene)
-		cerr << "createScene failed!" << endl;
-
-	pxManager = PxCreateControllerManager(*pxScene);
-
-	pxScene->setVisualizationParameter(PxVisualizationParameter::eSCALE, 1.0);
-	pxScene->setVisualizationParameter(PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
-	//pxScene->setVisualizationParameter(PxVisualizationParameter::eDEFORMABLE_MESH, 1.0f);
-	//pxScene->setVisualizationParameter(PxVisualizationParameter::eDEFORMABLE_SELFCOLLISIONS, 1.0f);
-	//pxScene->setVisualizationParameter(PxVisualizationParameter::eCOLLISION_DYNAMIC, 1.0f);
-	//pxScene->setVisualizationParameter(PxVisualizationParameter::eDEFORMABLE_SHAPES, 1.0f);
-}
-
-void Scene::initPxActors()
-{
-	PxMaterial* mMaterial = mPhysics->createMaterial(0.5, 0.5, 0.5);
-
-
-
-	//Create actors 
-	//1) Create ground plane
-	PxTransform planePos = PxTransform(PxVec3(0.0f, -5.0f, 0.0f), PxQuat(PxHalfPi, PxVec3(0.0f, 0.0f, 1.0f)));
-	PxRigidStatic* plane = mPhysics->createRigidStatic(planePos);
-	plane->createShape(PxPlaneGeometry(), *mMaterial);
-	pxScene->addActor(*plane);
+	//Create bodies
+	//1) Create ground plane (a large box whose top face is at y = -5)
+	physicsWorld->createStaticBox(vec3(0.0f, -6.0f, 0.0f), vec3(1000.0f, 1.0f, 1000.0f));
 
 
 	//2) Create cube
-	PxTransform boxPos(util::convert(bear->getPosition() - vec3(0.0f, -10.0f, 5.0f)));
-	PxBoxGeometry boxGeometry(PxVec3(0.4f));
-	PxRigidDynamic* gBox = PxCreateDynamic(*mPhysics, boxPos, boxGeometry, *mMaterial, 1.0f);
-	pxScene->addActor(*gBox);
-	debugCube->gBox = gBox;
+	physics::BodyHandle box = physicsWorld->createDynamicBox(bear->getPosition() - vec3(0.0f, -10.0f, 5.0f), vec3(0.4f), 1.0f);
+	debugCube->setPhysicsBody(physicsWorld, box);
 
 	//2) Create Wall
-	PxTransform wallPos(util::convert(bear->getPosition() - vec3(0.0f, 0, -3.0f)));
-	PxBoxGeometry wallGeometry(PxVec3(7.0f, 7.0f, 0.01));
-	PxRigidStatic* gWall = PxCreateStatic(*mPhysics, wallPos, wallGeometry, *mMaterial);
-	pxScene->addActor(*gWall);
+	physicsWorld->createStaticBox(bear->getPosition() - vec3(0.0f, 0, -3.0f), vec3(7.0f, 7.0f, 0.01f));
 
 
 
 	Geometry* geomBox2 = geometries[17].get();
-	PxTransform box2Pos(util::convert(geomBox2->getPosition()));
-	PxBoxGeometry box2Geometry(PxVec3(0.8f));
-	PxRigidDynamic* gBox2 = PxCreateDynamic(*mPhysics, box2Pos, box2Geometry, *mMaterial, 1.0f);
-	pxScene->addActor(*gBox2);
+	physics::BodyHandle box2 = physicsWorld->createDynamicBox(geomBox2->getPosition(), vec3(0.8f), 1.0f);
 	geomBox2->setStatic(false);
-	geomBox2->setDynamicActor(gBox2);
+	geomBox2->setDynamicBody(physicsWorld, box2);
 
 	for (int i = 3; i <= 14; i++)
 	{
 		Geometry* geomRock = geometries[i].get();
-		PxTransform rockPos(util::convert(geomRock->getPosition()));
-		PxSphereGeometry rockPXGeometry(PxReal(0.7f));
-		PxRigidStatic* gRock = PxCreateStatic(*mPhysics, rockPos, rockPXGeometry, *mMaterial);
-		pxScene->addActor(*gRock);
+		physics::BodyHandle rock = physicsWorld->createStaticSphere(geomRock->getPosition(), 0.7f);
 		geomRock->setStatic(true);
-		geomRock->setStaticActor(gRock);
-		gRock->setName("Rock");
-		actorsRock.push_back(gRock);
+		geomRock->setStaticBody(physicsWorld, rock);
+		bodiesRock.push_back(rock);
 	}
-	
 
 
+
+	//The terrain is a static triangle mesh, rotated from Z-up (Blender/Collada) to Y-up
 	Mesh* worldMesh = world->getModel()->meshes[0];
-	PxTriangleMesh* pxMesh = util::convert(worldMesh, mPhysics, mCooking);
-	//aiMesh* mesh = world->model->meshes[0]->source;
-	//PxTriangleMesh* pxMesh = util::convert(mesh, mPhysics, mCooking);
+	physicsWorld->createStaticMesh(worldMesh->vertices, worldMesh->numVertices, worldMesh->indices, worldMesh->numFaces,
+		125.0f, world->getPosition(), angleAxis(half_pi<float>(), vec3(-1.0f, 0.0f, 0.0f)));
 
-	if (pxMesh)
-	{
-		PxTriangleMeshGeometry triGeom(pxMesh);
-		triGeom.scale = PxMeshScale(125.0f);
-		if (triGeom.isValid())
-		{
-			PxMat44 pxModelMat = util::convert(world->modelMatrix);
-			PxTransform worldPose = PxTransform(pxModelMat); //worldPose.q
-			PxTransform pose = PxTransform(util::convert(world->getPosition()), PxQuat(PxHalfPi, PxVec3(-1.0f, 0.0f, 0.0f)));
-			PxRigidStatic* worldActor = mPhysics->createRigidStatic(pose);
-			PxShape* shape = worldActor->createShape(triGeom, *mMaterial);
-			PX_UNUSED(shape);
-			pxScene->addActor(*worldActor);
-		}
-	}
+	physicsWorld->optimizeBroadPhase();
 }
 
 void Scene::initAnimatedTextures()
 {
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00421.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00431.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00441.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00451.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00461.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00471.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00481.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00491.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00501.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00511.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00521.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00531.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00541.png", 0));
-	crashVideo.push_back(make_unique<Texture>(L"Texture/video/crash/scene00551.png", 0));
+	//TV static on the monitor (generated, no image files)
+	for (unsigned int i = 0; i < 14; ++i)
+	{
+		monitorVideo.push_back(Texture::createNoise(128, i + 1, 0));
+	}
 
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water01.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water02.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water03.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water04.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water05.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water06.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water07.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water08.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water09.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water10.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water11.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water12.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water13.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water14.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water15.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>(L"Texture/video/water/Water16.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water01.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water02.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water03.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water04.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water05.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water06.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water07.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water08.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water09.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water10.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water11.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water12.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water13.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water14.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water15.png", 0, true));
+	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water16.png", 0, true));
 }
 
 /**
-* Bear collision callbacks!
+* Bear collision callback!
 **/
-void Scene::onShapeHit(const PxControllerShapeHit& hit)
+void Scene::onBearHit(physics::BodyHandle body)
 {
-	
+
 	/*
-	if (actorName)
+	for (int i = 0; i < bodiesFish.size(); i++)
 	{
-	for (int i = 0; i < actorsFish.size(); i++)
+	if (body == bodiesFish[i])
 	{
-	if (strcmp(actorName, actorsFish[i]->getName()))
-	{
-	int index = stoi(actorName);
 	geometries[index]->drawable = false;
-	pxScene->removeActor(*hit.actor, false);
+	physicsWorld->removeBody(body);
 	userScore += 1;
 	}
 	}*/
-	
-	if (hit.actor->getName() != nullptr){
-		const char* actorName = hit.actor->getName();
-		if (strcmp(actorName, "Rock") == 0)
-		{
-			gameOver = true;
-		}
+
+	if (find(bodiesRock.begin(), bodiesRock.end(), body) != bodiesRock.end())
+	{
+		gameOver = true;
 	}
 
 	//TODO implement fish collision
 	//cout << "Bear hit shape" << endl;
-
-}
-
-void Scene::onControllerHit(const PxControllersHit& hit)
-{
-
-}
-void Scene::onObstacleHit(const PxControllerObstacleHit& hit)
-{
 
 }

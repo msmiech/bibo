@@ -3,11 +3,13 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
+#include <cstdlib>
+#include "../Util/Console.hpp"
 
 using namespace bibo;
 using namespace std;
 
-const bool LOCATION_NOT_FOUND_OUTPUT = FALSE;
+const bool LOCATION_NOT_FOUND_OUTPUT = false;
 
 Shader::Shader(const string& vertexShader, const string& fragmentShader)
 	: programHandle(0)
@@ -19,7 +21,7 @@ Shader::Shader(const string& vertexShader, const string& fragmentShader)
 	if (programHandle == 0)
 	{
 		cerr << "Failed to create shader program" << endl;
-		system("PAUSE");
+		util::pause();
 		exit(EXIT_FAILURE);
 	}
 	loadShader(vertexShader, GL_VERTEX_SHADER, vertexHandle);
@@ -65,18 +67,18 @@ void Shader::loadShader(const string& shader,
 	ifstream shaderFile(shader); //inputFileStream
 	if (!shaderFile) {
 		cerr << "Shader file could not be found or does not exist: " << shader << endl;
-		system("PAUSE");
+		util::pause();
 		exit(EXIT_FAILURE);
 	}
 
 	if (!shaderFile.is_open()) {
 		cerr << "Could not open file (maybe unauthorized): " << shader << endl;
-		system("PAUSE");
+		util::pause();
 		exit(EXIT_FAILURE);
 	}
 	if (!shaderFile.good()) {
 		cerr << "Failed to parse shader file (bad/damaged): " << shader << endl;
-		system("PAUSE");
+		util::pause();
 		exit(EXIT_FAILURE);
 	}
 
@@ -89,7 +91,7 @@ void Shader::loadShader(const string& shader,
 	if (handle == 0)
 	{
 		cerr << "Failed to create shader" << endl;
-		system("PAUSE");
+		util::pause();
 		exit(EXIT_FAILURE);
 	}
 
@@ -109,7 +111,7 @@ void Shader::loadShader(const string& shader,
 
 		cerr << "Failed to compile shader" << endl << msg.get() << endl;
 
-		system("PAUSE");
+		util::pause();
 
 		msg.reset(nullptr);
 
@@ -136,7 +138,7 @@ void Shader::link() {
 		glGetProgramInfoLog(programHandle, logSize, nullptr, msg.get());
 
 		cerr << "Failed to link prog" << endl << msg.get() << endl;
-		system("PAUSE");
+		util::pause();
 
 
 		msg.reset(nullptr); //just eye-candy

@@ -68,7 +68,7 @@ void Model::init(Shader* shader, const aiScene* scene, const char* nodeName, Tex
 		node = node->FindNode(nodeName);
 		if (!node)
 		{
-			printf("Could not find/load node: %s");
+			printf("Could not find/load node: %s\n", nodeName);
 			return;
 		}
 	}

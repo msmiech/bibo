@@ -1,14 +1,11 @@
 ﻿#pragma once
 #include "SceneObject.hpp"
 
-#ifndef GLM_INCLUDED
-#define GLM_INCLUDED
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.inl>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#endif
 #include "../Resources/Model.hpp"
-#include <PhysX/PxRigidStatic.h>
+#include "../Physics/Physics.hpp"
 
 using namespace glm;
 using namespace std;
@@ -22,9 +19,9 @@ namespace bibo
 		{
 			Model* model;
 			bool collidable = false;
-			bool pxStatic = true;
-			physx::PxRigidStatic* pxStaticActor;
-			physx::PxRigidDynamic* pxDynamicActor;
+			bool physicsStatic = true;
+			physics::PhysicsWorld* physicsWorld = nullptr;
+			physics::BodyHandle physicsBody = physics::INVALID_BODY;
 		public:
 			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture);
 			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* file, const char* nodeName, Texture* texture);
@@ -38,11 +35,14 @@ namespace bibo
 
 			Model* getModel();
 			bool isStatic();
-			void setStatic(bool pxStatic);
+			void setStatic(bool physicsStatic);
 			bool isCollidable();
 			void setCollidable(bool collidable);
-			void setStaticActor(physx::PxRigidStatic* staticActor);
-			void setDynamicActor(physx::PxRigidDynamic* dynamicActor);
+			/**
+			* The geometry follows the position and rotation of the physics body from now on
+			*/
+			void setStaticBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle staticBody);
+			void setDynamicBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle dynamicBody);
 			bool drawable = true;
 			Texture* normalMap;
 			bool hasNormalMap;

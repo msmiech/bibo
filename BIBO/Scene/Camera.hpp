@@ -1,10 +1,7 @@
 ﻿#pragma once
-#ifndef GLM_INCLUDED
-#define GLM_INCLUDED
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.inl>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#endif
 #include "SceneObject.hpp"
 
 using namespace glm;

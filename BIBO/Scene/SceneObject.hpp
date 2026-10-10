@@ -1,21 +1,10 @@
 #pragma once
 
-#ifndef GLM_INCLUDED
-#define GLM_INCLUDED
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.inl>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#endif
-#ifndef GLEW_INCLUDED
-#define GLEW_INCLUDED
-#include <GL\glew.h>
-#include <gl\wglew.h>
-#include <GL\GL.h>
-#endif
-#ifndef GLFW_INCLUDED
-#define GLFW_INCLUDED
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#endif
 #include "../Resources/Shader.hpp"
 
 using namespace glm;

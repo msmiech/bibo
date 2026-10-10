@@ -47,16 +47,9 @@ Geometry::~Geometry()
 
 void Geometry::update(float time_delta)
 {
-	if (!collidable)
+	if (!collidable || !physicsWorld || physicsBody == physics::INVALID_BODY)
 		return;
-	if (pxStatic && pxStaticActor)
-	{
-		modelMatrix = util::convert(PxMat44(pxStaticActor->getGlobalPose()));
-	}
-	else if (!pxStatic && pxDynamicActor)
-	{
-		modelMatrix = util::convert(PxMat44(pxDynamicActor->getGlobalPose()));
-	}
+	modelMatrix = physicsWorld->getTransform(physicsBody);
 }
 
 void Geometry::draw(Shader* shader)
@@ -84,12 +77,12 @@ Model* Geometry::getModel()
 
 bool Geometry::isStatic()
 {
-	return pxStatic;
+	return physicsStatic;
 }
 
-void Geometry::setStatic(bool pxStatic)
+void Geometry::setStatic(bool physicsStatic)
 {
-	this->pxStatic = pxStatic;
+	this->physicsStatic = physicsStatic;
 }
 
 bool Geometry::isCollidable()
@@ -103,18 +96,20 @@ void Geometry::setCollidable(bool collidable)
 }
 
 
-void Geometry::setStaticActor(PxRigidStatic* staticActor)
+void Geometry::setStaticBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle staticBody)
 {
 	collidable = true;
-	pxStatic = true;
-	this->pxStaticActor = staticActor;
+	physicsStatic = true;
+	this->physicsWorld = physicsWorld;
+	this->physicsBody = staticBody;
 }
 
-void Geometry::setDynamicActor(PxRigidDynamic* dynamicActor)
+void Geometry::setDynamicBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle dynamicBody)
 {
 	collidable = true;
-	pxStatic = false;
-	this->pxDynamicActor = dynamicActor;
+	physicsStatic = false;
+	this->physicsWorld = physicsWorld;
+	this->physicsBody = dynamicBody;
 }
 
 bool Geometry::getHasNormalMap()

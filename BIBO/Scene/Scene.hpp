@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <vector>
 #include "SceneObject.hpp"
 #include "Geometry.hpp"
@@ -6,37 +6,29 @@
 #include <memory>
 #include "Bear.hpp"
 #include "Cube.hpp"
-#include <filesystem>
 #include "../Util/Util.hpp"
-#include <memory>
-#ifndef PX_INCLUDED
-#define PX_INCLUDED
-#include "PhysX/PxPhysicsAPI.h"
-#include "PhysX/PxRigidActor.h"
-#include "PhysX/extensions/PxDefaultCpuDispatcher.h"
-#include "PhysX/PxVisualizationParameter.h"
-#endif
+#include "../Physics/Physics.hpp"
 
 
 using namespace std;
-using namespace physx;
 
 namespace bibo
 {
 	namespace scene
 	{
-		class Scene : public PxUserControllerHitReport
+		class Scene
 		{
-			void initPxScene();
-			void initPxActors();
+			void initPhysicsBodies();
 			void initAnimatedTextures();
+			//Called when the bear touches a physics body
+			void onBearHit(physics::BodyHandle body);
 
 			GLFWwindow* window;
 			vector<unique_ptr<Geometry>> geometries;
 			vector<unique_ptr<Light>> lights;
 			unique_ptr<Camera> camera;
 			vector<unique_ptr<Texture>> textures;
-			vector<unique_ptr<Texture>> crashVideo;
+			vector<unique_ptr<Texture>> monitorVideo;
 			vector<unique_ptr<Texture>> waterVideo;
 			vector<unique_ptr<Geometry>> arrows;
 
@@ -48,12 +40,8 @@ namespace bibo
 			Geometry* water;
 			unique_ptr<Cube> debugCube;
 
-			//PX stuff
-			PxControllerManager* pxManager;
-			PxFoundation* mFoundation;
-			PxPhysics* mPhysics;
-			PxScene* pxScene;
-			PxCooking* mCooking;
+			//Physics
+			physics::PhysicsWorld* physicsWorld;
 
 			bool shadowMappingEnabled = true;
 			bool normalMappingEnabled = true;
@@ -63,15 +51,15 @@ namespace bibo
 			bool gameOver = false;
 			bool gameWon = false;
 
-			vector<PxActor*> actorsFish;
-			vector<PxActor*> actorsRock;
+			vector<physics::BodyHandle> bodiesFish;
+			vector<physics::BodyHandle> bodiesRock;
 
 			float accumulatedVideoTime = 0;
-			int crashFrame = 0;
+			int monitorFrame = 0;
 			int waterFrame = 0;
 
 		public:
-			Scene(GLFWwindow* window, Shader* shader, PxPhysics* mPhysx, PxFoundation* mFoundation, PxCooking* mCooking);
+			Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld);
 			~Scene();
 
 			void update(float time_delta);
@@ -89,11 +77,6 @@ namespace bibo
 			int getUserScore();
 			bool isGameOver();
 			bool isGameWon();
-
-			//PxUserControllerHitReport implementation
-			void onShapeHit(const PxControllerShapeHit& hit) override;
-			void onControllerHit(const PxControllersHit& hit) override;
-			void onObstacleHit(const PxControllerObstacleHit& hit) override;
 		};
 	}
 }

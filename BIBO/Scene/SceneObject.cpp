@@ -1,4 +1,5 @@
 #include "SceneObject.hpp"
+#include <cmath>
 
 
 using namespace bibo::scene;
@@ -43,7 +44,7 @@ vec3 SceneObject::getDirection()
 	sinPitch = -modelMatrix[2][0];
 	cosPitch = sqrt(1 - sinPitch*sinPitch);
 
-	if (abs(cosPitch) > 0.00001f)
+	if (std::abs(cosPitch) > 0.00001f)
 	{
 		sinRoll = modelMatrix[2][1] / cosPitch;
 		cosRoll = modelMatrix[2][2] / cosPitch;

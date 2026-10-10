@@ -68,7 +68,16 @@ Cube::~Cube()
 void Cube::update(float time_delta)
 {
 	//modelMatrix = rotate(modelMatrix, radians(90.0f) * time_delta, vec3(0, 1, 0));
-	modelMatrix = util::convert(PxMat44(gBox->getGlobalPose()));
+	if (physicsWorld && physicsBody != physics::INVALID_BODY)
+	{
+		modelMatrix = physicsWorld->getTransform(physicsBody);
+	}
+}
+
+void Cube::setPhysicsBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle body)
+{
+	this->physicsWorld = physicsWorld;
+	this->physicsBody = body;
 }
 
 void Cube::draw(Shader* shader)

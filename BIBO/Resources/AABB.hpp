@@ -15,7 +15,7 @@ namespace CPM_GLM_AABB_NS {
 	public:
 		AABB();
 
-		AABB(const vec3& center, glm::float_t radius);
+		AABB(const vec3& center, float radius);
 
 		AABB(const vec3& p1, const vec3& p2);
 
@@ -26,16 +26,16 @@ namespace CPM_GLM_AABB_NS {
 
 		bool isNull() const { return mMin.x > mMax.x || mMin.y > mMax.y || mMin.z > mMax.z; }
 
-		void extend(glm::float_t val);
+		void extend(float val);
 
 		void extend(const vec3& p);
 
-		void extend(const vec3& center, glm::float_t radius);
+		void extend(const vec3& center, float radius);
 
 		void extend(const AABB& aabb);
 
 		void extendDisk(const vec3& center, const vec3& normal,
-			glm::float_t radius);
+			float radius);
 
 		void translate(const vec3& v);
 
@@ -45,9 +45,9 @@ namespace CPM_GLM_AABB_NS {
 
 		vec3 getDiagonal() const;
 
-		glm::float_t getLongestEdge() const;
+		float getLongestEdge() const;
 
-		glm::float_t getShortestEdge() const;
+		float getShortestEdge() const;
 
 		vec3 getMin() const { return mMin; }
 
@@ -58,7 +58,7 @@ namespace CPM_GLM_AABB_NS {
 		enum INTERSECTION_TYPE { INSIDE, INTERSECT, OUTSIDE };
 		INTERSECTION_TYPE intersect(const AABB& bb) const;
 
-		bool isSimilarTo(const AABB& b, glm::float_t diff = 0.5) const;
+		bool isSimilarTo(const AABB& b, float diff = 0.5) const;
 
 	private:
 

@@ -1,5 +1,7 @@
 #include "Bear.hpp"
+#include <cmath>
 #include <iostream>
+#include <glm/gtx/rotate_vector.hpp>
 #include "../Util/Util.hpp"
 
 using namespace bibo;
@@ -18,8 +20,8 @@ bool characterMoved = false;
 bool characterRotated = false;
 bool characterJumped = false;
 
-Bear::Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, Texture* texture, PxPhysics* mPhysics, PxControllerManager* manager, PxUserControllerHitReport* scene)
-	: Geometry(modelMatrix, shader, window, "Model/SnowTerrain/track1.dae", "BearBody", texture), mPhysics(mPhysics), initialTransform(modelMatrix), direction(vec3(0.0f, 0.0f, -1.0f)),
+Bear::Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, Texture* texture, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit)
+	: Geometry(modelMatrix, shader, window, "Model/SnowTerrain/track1.dae", "BearBody", texture), initialTransform(modelMatrix), direction(vec3(0.0f, 0.0f, -1.0f)),
 	leftHand(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "LeftHand", texture)),
 	rightHand(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "RightHand", texture)),
 	leftLeg(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "LeftLeg", texture)),
@@ -49,29 +51,20 @@ Bear::Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, Texture* textur
 	rightLegOffSet.z = temp;
 	rightLegOffSet.x = rightLegOffSet.x - 1.25f;
 
-	PxCapsuleControllerDesc desc; //A controller is a special kinematic PxRigidDynamic
-	desc.position = PxExtendedVec3(position.x, position.y, position.z); //initial position
+	physics::CharacterControllerDesc desc; //A controller is a kinematic capsule, moved by the game logic
+	desc.position = position; //initial position
 	desc.contactOffset = 0.05f; //controller skin within which contacts generated
 	desc.stepOffset = 1.0f; //max obstacle height the character can climb
-	desc.slopeLimit = cosf(radians(45.0f)); // max slope the character can walk
+	desc.slopeLimit = radians(45.0f); // max slope the character can walk
 	desc.radius = 1.0f; //radius of the capsule
 	desc.height = 0.6f; //height of the controller
-	desc.upDirection = PxVec3(0.0f, 1.0f, 0.0f); // Specifies the 'up' direction
-	desc.reportCallback = scene;
 
-
-	PxMaterial* testMat = mPhysics->createMaterial(10.0f, 10.0f, 10.0f);
-	desc.material = testMat; // material defines physical properties like friction, bounciness etc. - see PhysX materials
-
-	pxController = manager->createController(desc);
-	pxActor = pxController->getActor();
-	pxActor->setGlobalPose(PxTransform(util::convert(modelMatrix)));
-	pxControllerFilters = new PxControllerFilters();
+	characterController = make_unique<physics::CharacterController>(*physicsWorld, desc, std::move(onHit));
 
 	Material legMaterial;
 	legMaterial.ambient = vec3(0.8f, 0.8f, 0.8f);
 	legMaterial.diffuse = vec3(0.8f, 0.8f, 0.8f);
-	legMaterial.specular = vec3((0.87f, 1.0f, 0.65f));
+	legMaterial.specular = vec3(0.87f, 1.0f, 0.65f);
 	legMaterial.shininess = 10.0f;
 	leftLeg.getModel()->meshes[0]->setMaterial(legMaterial);
 	rightLeg.getModel()->meshes[0]->setMaterial(legMaterial);
@@ -81,7 +74,6 @@ Bear::Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, Texture* textur
 
 Bear::~Bear()
 {
-	pxController->release();
 }
 
 void Bear::update(float time_delta)
@@ -97,16 +89,16 @@ void Bear::update(float time_delta)
 	characterJumped = false;
 
 	/*
-	 Bewegung des Controllers funktionert mit Hilfe der move Methode:
-	 flags = c->move(direction * speed * deltaT, minDistance, deltaT, controllerFilters);
-	 Der erste Parameter umfasst nicht nur die Richtung der Bewegung, sondern auch die Distanz (daher muss auch der Speed bzw. deltaT miteinberechnet werden). minDistance ist die Distanz, bei der der rekursive Algorithmus für die Kollision gestoppt wird, am besten auf einen Wert zwischen 0.001f und 0.1f setzen (einfach ein wenig testen). Zum Schluss gibt es noch die Möglichkeit die Kollisionen einzuschränken mit den controllerFilters. Diese sind vom Typ PxControllerFilters und rein der Aufruf des Standardkonstruktors reicht um den Controller mit allen Objekten in der Szene kollidieren zu lassen. Als Rückgabetype liefert die move Methode flags vom Typ PxControllerFlag mit denen sich diverse Informationen festgestellen lassen, ob und wie der Character kollidiert ist.*/
+	 The controller is moved with characterController->move(direction * speed * time_delta, time_delta):
+	 the first parameter is the displacement (direction and distance) of this frame, the result tells
+	 whether the bear stands on the ground after the move (collision below the capsule).*/
 
-	PxControllerCollisionFlags pxMoveResult;
+	bool standingOnGround = false;
 
 	if (rightKey == GLFW_PRESS)
 	{
 		modelMatrix = rotate(modelMatrix, radians(-90.0f) * time_delta, vec3(0.0f, 0.0f, 1.0f));
-		direction = util::rotateY(direction, radians(-90.0f) * time_delta);
+		direction = glm::rotateY(direction, radians(-90.0f) * time_delta);
 		direction = normalize(direction);
 		characterRotated = true;
 		rotationYAngle -= 100 * time_delta;
@@ -114,16 +106,16 @@ void Bear::update(float time_delta)
 	if (leftKey == GLFW_PRESS)
 	{
 		modelMatrix = rotate(modelMatrix, radians(90.0f) * time_delta, vec3(0.0f, 0.0f, 1.0f));
-		direction = util::rotateY(direction, radians(90.0f) * time_delta);
+		direction = glm::rotateY(direction, radians(90.0f) * time_delta);
 		direction = normalize(direction);
 		characterRotated = true;
 		rotationYAngle += 100 * time_delta;
 	}
 	if (forwardKey == GLFW_PRESS)
 	{
-		if (pxController)
+		if (characterController)
 		{
-			pxMoveResult = pxController->move(util::convert(direction * forwardVelocity * time_delta), 0.00001f, time_delta, nullptr);
+			standingOnGround = characterController->move(direction * forwardVelocity * time_delta, time_delta);
 			if (reverseAnim)
 			{
 				frontAngle -= 125 * time_delta;
@@ -140,9 +132,9 @@ void Bear::update(float time_delta)
 	}
 	if (backKey == GLFW_PRESS)
 	{
-		if (pxController)
+		if (characterController)
 		{
-			pxMoveResult = pxController->move(util::convert(direction * backwardVelocity * time_delta), 0.00001f, time_delta, nullptr);
+			standingOnGround = characterController->move(direction * backwardVelocity * time_delta, time_delta);
 			if (reverseAnim)
 			{
 				frontAngle += 100 * time_delta;
@@ -158,7 +150,7 @@ void Bear::update(float time_delta)
 	}
 	if (jumpKey == GLFW_PRESS)
 	{
-		if (pxController && jumpTimeLeft > 0)
+		if (characterController && jumpTimeLeft > 0)
 		{
 			jumpTimeLeft -= time_delta;
 			if (jumpTimeLeft <= 0)
@@ -168,22 +160,22 @@ void Bear::update(float time_delta)
 			if(!characterJumped) {
 				totalFallingTime = time_delta;
 			}
-			pxMoveResult = pxController->move(PxVec3(0.0f, jumpVelocity * time_delta, 0.0f), 0.00001f, time_delta, nullptr);
+			standingOnGround = characterController->move(vec3(0.0f, jumpVelocity * time_delta, 0.0f), time_delta);
 			characterJumped = true;
 		}
 	}
 	else characterJumped = false;
 
-	if (pxMoveResult != PxControllerCollisionFlag::eCOLLISION_DOWN) //bear is airborne
+	if (!standingOnGround) //bear is airborne
 	{
 		totalFallingTime += time_delta;
 		if (jumpTimeOut > 0)
 		{
 			jumpTimeOut -= time_delta;
 		}
-		pxController->move(PxVec3(0.0f, gravity * totalFallingTime, 0.0f), 0.00001f, time_delta, nullptr);
+		characterController->move(vec3(0.0f, gravity * totalFallingTime, 0.0f), time_delta);
 	}
-	if (pxMoveResult == PxControllerCollisionFlag::eCOLLISION_DOWN)
+	if (standingOnGround)
 	{
 		jumpTimeLeft = maxJumpTime;
 		jumpTimeOut = 0.0f;
@@ -195,15 +187,15 @@ void Bear::update(float time_delta)
 		jumpTimeLeft = maxJumpTime;
 	}
 
-	setPosition(util::convert(pxController->getPosition()));
+	setPosition(characterController->getPosition());
 
-	if (abs(frontAngle) > 50.f || abs(backAngle) > 50.f)
+	if (std::abs(frontAngle) > 50.f || std::abs(backAngle) > 50.f)
 	{
 		frontAngle = frontAngle > 0 ? 50.f : -50.f;
 		backAngle = backAngle > 0 ? 50.f : -50.f;
 		reverseAnim = !reverseAnim;
 	}
-	if (abs(rotationYAngle) > 50.f)
+	if (std::abs(rotationYAngle) > 50.f)
 	{
 		rotationYAngle = rotationYAngle > 0 ? 45.f : -45.f;
 	}

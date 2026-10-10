@@ -6,8 +6,8 @@ layout (location = 1) in vec3 normal;
 uniform mat4 lightSpaceMatrix;
 uniform mat4 model;
 
-layout (location = 0) out vec4 worldPosition;
-layout (location = 1) out vec4 worldNormal;
+out vec4 worldPosition;
+out vec4 worldNormal;
 
 void main()
 {

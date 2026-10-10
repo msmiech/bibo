@@ -3,12 +3,11 @@
 using namespace bibo;
 using namespace resources;
 
-Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, aiMatrix4x4 transformation) : shader(shader), material(material), texture(texture), source(mesh)
+Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture) : material(material), texture(texture)
 {
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
 
-	//glGenBuffers(4, vbo);
 	vbo[POS_BUFFER] = 0;
 	vbo[UV_BUFFER] = 0;
 	vbo[NORMAL_BUFFER] = 0;
@@ -25,7 +24,6 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 
 			auto pos = mesh->mVertices[i];
 
-			//aiTransformVecByMatrix4(&pos, &transformation);
 
 			vertices[i * 3] = pos.x;
 			vertices[i * 3 + 1] = pos.y;
@@ -40,7 +38,6 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 		glVertexAttribPointer(positionIndex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 		glEnableVertexAttribArray(positionIndex);
 
-		//delete[] vertices;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
@@ -51,9 +48,6 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 
 			auto normal = mesh->mNormals[i];
 
-			//auto inverseTransformation = transformation.Inverse();
-			//uto inverseTransposed = inverseTransformation.Transpose();
-			//aiTransformVecByMatrix4(&normal, &inverseTransposed);
 
 			normals[i * 3] = normal.x;
 			normals[i * 3 + 1] = normal.y;
@@ -69,7 +63,6 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 			glVertexAttribPointer(normalIndex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 			glEnableVertexAttribArray(normalIndex);
 		}
-		//delete[] normals;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
@@ -88,7 +81,6 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 		glVertexAttribPointer(uvIndex, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 		glEnableVertexAttribArray(uvIndex);
 
-		//delete[] texCoords;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
@@ -108,16 +100,12 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[INDEX_BUFFER]);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * mesh->mNumFaces * sizeof(GLuint), indices, GL_STATIC_DRAW);
 
-		//auto faceIndex = mainShader->getAttribLocation("face");
-		//glVertexAttribPointer(faceIndex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
-		//glEnableVertexAttribArray(faceIndex);
 
-		//delete[] indices;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
 
-	// Normal Mapping preparations TODO get this working
+	//Tangents and bitangents for normal mapping
 	if (mesh->HasPositions() && mesh->HasTextureCoords(0)){
 		tangents = new float[mesh->mNumVertices * 3];
 		bitangents = new float[mesh->mNumVertices * 3];
@@ -222,7 +210,6 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 			glVertexAttribPointer(tangentLocation, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 			glEnableVertexAttribArray(tangentLocation);
 
-			//delete[] tangents;
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 		}
 
@@ -236,7 +223,6 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, ai
 			glVertexAttribPointer(bitangentLocation, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 			glEnableVertexAttribArray(bitangentLocation);
 		}
-		//delete[] bitangents;
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
@@ -318,17 +304,7 @@ void Mesh::setTexture(Texture* texture)
 	this->texture = texture;
 }
 
-Texture* Mesh::getTexture()
-{
-	return texture;
-}
-
 void Mesh::setMaterial(Material material)
 {
 	this->material = material;
-}
-
-Material Mesh::getMaterial()
-{
-	return material;
 }

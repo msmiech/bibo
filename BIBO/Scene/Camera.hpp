@@ -3,6 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "SceneObject.hpp"
+#include "ViewFrustum.hpp"
 
 using namespace glm;
 
@@ -13,7 +14,7 @@ namespace bibo
 		class Camera : public SceneObject
 		{
 		public:
-			Camera(vec3 position, vec3 direction, vec3 up, Shader* shader, GLFWwindow& window);
+			Camera(vec3 position, vec3 direction, vec3 up, GLFWwindow& window);
 			~Camera();
 
 			void draw(Shader* shader) override {};
@@ -27,6 +28,10 @@ namespace bibo
 			mat4 getViewMatrix();
 			mat4 getProjectionMatrix();
 			/**
+			* The volume the camera sees with its view and projection matrix
+			*/
+			ViewFrustum getViewFrustum();
+			/**
 			* Size of the image in pixels, determines the aspect ratio of the projection
 			*/
 			void setViewportSize(int width, int height);
@@ -35,8 +40,8 @@ namespace bibo
 
 		private:
 			void onMouseMoved(double mouseX, double mouseY, float time_delta);
+			float getAspectRatio();
 
-			Shader* shader;
 			int windowWidth, windowHeight;
 
 			vec3 position, direction, right, up;

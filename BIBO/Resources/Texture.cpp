@@ -62,6 +62,18 @@ Texture::~Texture() {
 
 unique_ptr<Texture> Texture::createCheckerboard(int size, int squares, int unit)
 {
+	vector<unsigned char> pixels = checkerboardPixels(size, squares);
+	return make_unique<Texture>(size, size, pixels.data(), unit, true);
+}
+
+unique_ptr<Texture> Texture::createNoise(int size, unsigned int seed, int unit)
+{
+	vector<unsigned char> pixels = noisePixels(size, seed);
+	return make_unique<Texture>(size, size, pixels.data(), unit, false);
+}
+
+vector<unsigned char> Texture::checkerboardPixels(int size, int squares)
+{
 	vector<unsigned char> pixels(size * size * 4);
 	int squareSize = size / squares;
 	for (int y = 0; y < size; ++y)
@@ -74,10 +86,10 @@ unique_ptr<Texture> Texture::createCheckerboard(int size, int squares, int unit)
 			pixel[3] = 255;
 		}
 	}
-	return make_unique<Texture>(size, size, pixels.data(), unit, true);
+	return pixels;
 }
 
-unique_ptr<Texture> Texture::createNoise(int size, unsigned int seed, int unit)
+vector<unsigned char> Texture::noisePixels(int size, unsigned int seed)
 {
 	mt19937 random(seed);
 	uniform_int_distribution<int> brightness(0, 255);
@@ -96,7 +108,7 @@ unique_ptr<Texture> Texture::createNoise(int size, unsigned int seed, int unit)
 			pixel[3] = 255;
 		}
 	}
-	return make_unique<Texture>(size, size, pixels.data(), unit, false);
+	return pixels;
 }
 
 void Texture::bind(int unit, bool bilinear, unsigned int mipMappingQuality)

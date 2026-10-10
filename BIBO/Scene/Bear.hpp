@@ -21,10 +21,13 @@ namespace bibo
 			void update(float time_delta) override;
 			void draw(Shader* shader) override;
 			vec3 getDirection() override;
+			bool isVisible(const ViewFrustum& frustum) override;
 
-			void reset();
+			/**
+			* Shape and movement limits of the bear's physics capsule
+			*/
+			static physics::CharacterControllerDesc characterControllerDesc(vec3 position);
 		private:
-			mat4 initialTransform;
 			vec3 direction;
 
 			unique_ptr<physics::CharacterController> characterController;

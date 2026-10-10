@@ -1,5 +1,5 @@
-﻿#include "Geometry.hpp"
-#include "Scene.hpp"
+#include "Geometry.hpp"
+#include <algorithm>
 
 using namespace bibo;
 using namespace scene;
@@ -9,7 +9,7 @@ Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const a
 {
 	hasNormalMap = false;
 	normalMap = nullptr;
-	model = new Model(shader, assimpScene, nodeName, texture);
+	model = make_unique<Model>(shader, assimpScene, nodeName, texture);
 	this->modelMatrix = model->getTranformationMat() * modelMatrix;
 }
 
@@ -18,7 +18,7 @@ Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const c
 {
 	hasNormalMap = false;
 	normalMap = nullptr;
-	model = new Model(shader, filePath, nodeName, texture);
+	model = make_unique<Model>(shader, filePath, nodeName, texture);
 	this->modelMatrix = model->getTranformationMat() * modelMatrix;
 }
 
@@ -26,18 +26,9 @@ Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const c
 	: SceneObject(modelMatrix, window), normalMap(normalMapTexture)
 {
 	hasNormalMap = true;
-	model = new Model(shader, filePath, nodeName, texture);
+	model = make_unique<Model>(shader, filePath, nodeName, texture);
 	this->modelMatrix = model->getTranformationMat() * modelMatrix;
 
-}
-
-Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* filePath, Texture* texture)
-	: SceneObject(modelMatrix, window)
-{
-	hasNormalMap = false;
-	normalMap = nullptr;
-	model = new Model(shader, filePath, texture);
-	this->modelMatrix = model->getTranformationMat() * modelMatrix;
 }
 
 Geometry::~Geometry()
@@ -47,17 +38,13 @@ Geometry::~Geometry()
 
 void Geometry::update(float time_delta)
 {
-	if (!collidable || !physicsWorld || physicsBody == physics::INVALID_BODY)
+	if (!physicsWorld || physicsBody == physics::INVALID_BODY)
 		return;
 	modelMatrix = physicsWorld->getTransform(physicsBody);
 }
 
 void Geometry::draw(Shader* shader)
 {
-	if (!drawable)
-	{
-		return;
-	}
 	GLuint modelLocation = shader->getUniformLocation("model");
 	if (modelLocation != 0xFFFFFFFF)
 	{
@@ -70,46 +57,23 @@ void Geometry::draw(Shader* shader)
 	model->draw(shader);
 }
 
+bool Geometry::isVisible(const ViewFrustum& frustum)
+{
+	vec3 center = vec3(modelMatrix * vec4(model->getBoundingSphereCenter(), 1.0f));
+	//The model matrix can scale the model (e.g. the terrain)
+	float scale = std::max({ length(vec3(modelMatrix[0])), length(vec3(modelMatrix[1])), length(vec3(modelMatrix[2])) });
+	return frustum.sphereInFrustum(center, model->getBoundingSphereRadius() * scale) != ViewFrustum::OUTSIDE;
+}
+
 Model* Geometry::getModel()
 {
-	return model;
+	return model.get();
 }
 
-bool Geometry::isStatic()
+void Geometry::setPhysicsBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle body)
 {
-	return physicsStatic;
-}
-
-void Geometry::setStatic(bool physicsStatic)
-{
-	this->physicsStatic = physicsStatic;
-}
-
-bool Geometry::isCollidable()
-{
-	return collidable;
-}
-
-void Geometry::setCollidable(bool collidable)
-{
-	this->collidable = collidable;
-}
-
-
-void Geometry::setStaticBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle staticBody)
-{
-	collidable = true;
-	physicsStatic = true;
 	this->physicsWorld = physicsWorld;
-	this->physicsBody = staticBody;
-}
-
-void Geometry::setDynamicBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle dynamicBody)
-{
-	collidable = true;
-	physicsStatic = false;
-	this->physicsWorld = physicsWorld;
-	this->physicsBody = dynamicBody;
+	this->physicsBody = body;
 }
 
 bool Geometry::getHasNormalMap()

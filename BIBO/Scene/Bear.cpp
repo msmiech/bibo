@@ -21,7 +21,7 @@ bool characterRotated = false;
 bool characterJumped = false;
 
 Bear::Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, Texture* texture, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit)
-	: Geometry(modelMatrix, shader, window, "Model/SnowTerrain/track1.dae", "BearBody", texture), initialTransform(modelMatrix), direction(vec3(0.0f, 0.0f, -1.0f)),
+	: Geometry(modelMatrix, shader, window, "Model/SnowTerrain/track1.dae", "BearBody", texture), direction(vec3(0.0f, 0.0f, -1.0f)),
 	leftHand(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "LeftHand", texture)),
 	rightHand(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "RightHand", texture)),
 	leftLeg(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "LeftLeg", texture)),
@@ -51,15 +51,7 @@ Bear::Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, Texture* textur
 	rightLegOffSet.z = temp;
 	rightLegOffSet.x = rightLegOffSet.x - 1.25f;
 
-	physics::CharacterControllerDesc desc; //A controller is a kinematic capsule, moved by the game logic
-	desc.position = position; //initial position
-	desc.contactOffset = 0.05f; //controller skin within which contacts generated
-	desc.stepOffset = 1.0f; //max obstacle height the character can climb
-	desc.slopeLimit = radians(45.0f); // max slope the character can walk
-	desc.radius = 1.0f; //radius of the capsule
-	desc.height = 0.6f; //height of the controller
-
-	characterController = make_unique<physics::CharacterController>(*physicsWorld, desc, std::move(onHit));
+	characterController = make_unique<physics::CharacterController>(*physicsWorld, characterControllerDesc(position), std::move(onHit));
 
 	Material legMaterial;
 	legMaterial.ambient = vec3(0.8f, 0.8f, 0.8f);
@@ -76,13 +68,24 @@ Bear::~Bear()
 {
 }
 
+physics::CharacterControllerDesc Bear::characterControllerDesc(vec3 position)
+{
+	physics::CharacterControllerDesc desc; //A controller is a kinematic capsule, moved by the game logic
+	desc.position = position; //initial position
+	desc.contactOffset = 0.05f; //controller skin within which contacts generated
+	desc.stepOffset = 1.0f; //max obstacle height the character can climb
+	desc.slopeLimit = radians(45.0f); // max slope the character can walk
+	desc.radius = 1.0f; //radius of the capsule
+	desc.height = 0.6f; //height of the controller
+	return desc;
+}
+
 void Bear::update(float time_delta)
 {
 	auto rightKey = glfwGetKey(window, GLFW_KEY_RIGHT);
 	auto leftKey = glfwGetKey(window, GLFW_KEY_LEFT);
 	auto forwardKey = glfwGetKey(window, GLFW_KEY_UP);
 	auto backKey = glfwGetKey(window, GLFW_KEY_DOWN);
-	auto fallKey = glfwGetKey(window, GLFW_KEY_C);
 	auto jumpKey = glfwGetKey(window, GLFW_KEY_SPACE);
 	characterMoved = false;
 	characterRotated = false;
@@ -246,7 +249,8 @@ vec3 Bear::getDirection()
 	return direction;
 }
 
-void Bear::reset()
+bool Bear::isVisible(const ViewFrustum& frustum)
 {
-	this->modelMatrix = initialTransform;
+	//The limbs stick out of the body
+	return Geometry::isVisible(frustum) || leftHand.isVisible(frustum) || rightHand.isVisible(frustum) || leftLeg.isVisible(frustum) || rightLeg.isVisible(frustum);
 }

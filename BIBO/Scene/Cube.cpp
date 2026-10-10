@@ -67,7 +67,6 @@ Cube::~Cube()
 
 void Cube::update(float time_delta)
 {
-	//modelMatrix = rotate(modelMatrix, radians(90.0f) * time_delta, vec3(0, 1, 0));
 	if (physicsWorld && physicsBody != physics::INVALID_BODY)
 	{
 		modelMatrix = physicsWorld->getTransform(physicsBody);
@@ -139,60 +138,6 @@ const float Cube::positions[CUBE_VERTEX_COUNT * 3] = {
 	-0.5f, -0.5f, 0.5f
 
 };
-
-/*
-const float new_positions[24 * 3] = {
-//Back
--0.5f, -0.5f, -0.5f,
--0.5f, 0.5f, -0.5f,
-0.5f, 0.5f, -0.5f,
-0.5f, -0.5f, -0.5f,
-
-//Front
--0.5f, -0.5f, 0.5f,
-0.5f, -0.5f, 0.5f,
-0.5f, 0.5f, 0.5f,
--0.5f, 0.5f, 0.5f,
-
-//Top
-0.5f, 0.5f, 0.5f,
-0.5f, 0.5f, -0.5f,
--0.5f, 0.5f, -0.5f,
--0.5f, 0.5f, 0.5f,
-
-//Bottom
-0.5f, -0.5f, 0.5f,
--0.5f, -0.5f, 0.5f,
--0.5f, -0.5f, -0.5f,
-0.5f, -0.5f, -0.5f,
-
-//Right
-0.5f, 0.5f, 0.5f,
-0.5f, -0.5f, 0.5f,
-0.5f, -0.5f, -0.5f,
-0.5f, 0.5f, -0.5f,
-
-//Left
--0.5f, 0.5f, 0.5f,
--0.5f, 0.5f, -0.5f,
--0.5f, -0.5f, -0.5f,
--0.5f, -0.5f, 0.5f,
-
-};
-*/
-
-/*const unsigned int old_indices[CUBE_INDEX_COUNT] = {
-
-	3, 7, 6,
-
-	1, 2, 6,
-	1, 6, 5,
-
-	0, 4, 7,
-	0, 7, 3
-
-	};
-	*/
 
 const float Cube::normals[CUBE_VERTEX_COUNT * 3] = {
 	0.0f, 0.0f, -1.0f,
@@ -279,22 +224,3 @@ const float Cube::uvs[CUBE_VERTEX_COUNT * 2] = {
 	1.0f, 1.0f,
 	0.0f, 1.0f
 };
-
-/*const float Cube::new_uvs[24 * 2] = {
-	1.0f, 0.0f,
-	1.0f, 1.0f,
-	0.0f, 1.0f,
-	0.0f, 0.0f,
-
-	0.0f, 0.0f,
-	1.0f, 0.0f,
-	1.0f, 1.0f,
-	0.0f, 1.0f,
-
-	0.0f, 0.0f,
-	1.0f, 1.0f,
-	1.0f, 1.0f,
-	0.0f, 1.0f,
-
-	};
-	*/

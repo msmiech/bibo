@@ -40,9 +40,21 @@ jobs:
             cc: gcc
             cxx: g++
             system_libs: 'ON'
+          # Memory errors, leaks and undefined behavior make the tests (and the smoke test) fail
+          - name: GCC, AddressSanitizer + UndefinedBehaviorSanitizer
+            cc: gcc
+            cxx: g++
+            system_libs: 'OFF'
+            build_type: RelWithDebInfo
+            sanitize: -fsanitize=address,undefined -fno-omit-frame-pointer
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
+      # Initial compiler and linker flags of CMake (empty without sanitizers)
+      CFLAGS: ${{ matrix.sanitize }}
+      CXXFLAGS: ${{ matrix.sanitize }}
+      LDFLAGS: ${{ matrix.sanitize }}
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
     steps:
       - uses: actions/checkout@v7
 
@@ -60,10 +72,14 @@ jobs:
           fi
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBIBO_USE_SYSTEM_LIBS=${{ matrix.system_libs }}
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type || 'Release' }} -DBIBO_USE_SYSTEM_LIBS=${{ matrix.system_libs }}
 
       - name: Build
         run: cmake --build build --parallel
+
+      # The tests that need OpenGL 4.3 run on the virtual X server with Mesa's software renderer as well
+      - name: Test
+        run: xvfb-run -a -s "-screen 0 1280x720x24" ctest --test-dir build --output-on-failure --timeout 300
 
       # Runs the game for a while on a virtual X server with Mesa's software renderer (llvmpipe, OpenGL 4.5).
       # Catches shaders that only compile on the lenient Nvidia driver, missing assets and crashes during start up.
@@ -120,6 +136,10 @@ jobs:
 
       - name: Build
         run: cmake --build build --parallel
+
+      # The runners have no graphics card: the tests that need OpenGL 4.3 are skipped
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --timeout 300
 
       # With the downloaded libraries the game is linked statically and must run without MinGW/compiler runtime DLLs
       - name: Check that BIBO.exe only depends on Windows DLLs

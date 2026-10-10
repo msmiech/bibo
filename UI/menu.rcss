@@ -1,0 +1,403 @@
+/*
+ * Style of the main, pause and settings menu. RCSS is the CSS dialect of RmlUi, see https://mikke89.github.io/RmlUiDoc/
+ * Sizes are given in dp: the game scales the menus so that the window is always 720dp high, whatever its resolution.
+ *
+ * Colors: text #e4edf6, secondary text #93a7bb, accent #74c7ff, panels #0a121e
+ */
+
+body
+{
+	width: 100%;
+	height: 100%;
+	font-family: DejaVu Sans;
+	font-weight: normal;
+	font-style: normal;
+	font-size: 18dp;
+	color: #e4edf6;
+}
+
+div, p, h1, h2
+{
+	display: block;
+}
+
+/* Keyboard keys in the hints, e.g. Esc */
+.hints
+{
+	font-size: 14dp;
+	color: #93a7bb;
+}
+.key
+{
+	display: inline-block;
+	min-width: 12dp;
+	margin: 0 6dp 0 18dp;
+	padding: 2dp 6dp;
+	border: 1dp #93a7bb80;
+	border-radius: 4dp;
+	font-size: 13dp;
+	text-align: center;
+	color: #e4edf6;
+}
+.key.first
+{
+	margin-left: 0;
+}
+
+/* Buttons of the main and pause menu. The focused button is highlighted, the mouse moves the focus to the button under it. */
+button
+{
+	display: block;
+	box-sizing: border-box;
+	width: 300dp;
+	margin: 4dp 0;
+	padding: 11dp 20dp;
+	border-left: 4dp #74c7ff00;
+	border-radius: 3dp;
+	font-size: 22dp;
+	letter-spacing: 2dp;
+	text-transform: uppercase;
+	color: #b4c4d4;
+	tab-index: auto;
+	nav: vertical;
+	cursor: pointer;
+	transition: color background-color border-left-color 0.15s cubic-out;
+}
+button:focus
+{
+	color: #ffffff;
+	background-color: #74c7ff24;
+	border-left-color: #74c7ff;
+}
+button:active
+{
+	background-color: #74c7ff40;
+}
+
+
+/* ---------- Main menu: column on the left, the scene stays visible on the right ---------- */
+
+#main-menu .side
+{
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	box-sizing: border-box;
+	width: 640dp;
+	padding: 100dp 0 0 72dp;
+	decorator: linear-gradient(to right, #07101cf2 0%, #07101cd9 55%, #07101c00 100%);
+}
+#main-menu .title
+{
+	font-size: 54dp;
+	line-height: 1.1;
+	letter-spacing: 4dp;
+	text-transform: uppercase;
+	color: #ffffff;
+	font-effect: shadow(0dp 3dp #00000099);
+}
+#main-menu .accent
+{
+	width: 72dp;
+	height: 4dp;
+	margin: 22dp 0 18dp;
+	border-radius: 2dp;
+	background-color: #74c7ff;
+}
+#main-menu .tagline
+{
+	width: 400dp;
+	margin-bottom: 44dp;
+	font-size: 17dp;
+	line-height: 1.45;
+	color: #93a7bb;
+}
+#main-menu .hints
+{
+	position: absolute;
+	bottom: 40dp;
+	left: 72dp;
+}
+
+
+/* ---------- Pause menu: dialog in the middle of the dimmed scene ---------- */
+
+#pause-menu
+{
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: #050b1499;
+}
+.dialog
+{
+	width: 380dp;
+	padding: 36dp 40dp 28dp;
+	border: 1dp #ffffff1a;
+	border-radius: 10dp;
+	background-color: #0a121eeb;
+	box-shadow: 0dp 16dp 48dp #000000a0;
+	text-align: center;
+}
+.dialog h1
+{
+	margin-bottom: 26dp;
+	font-size: 34dp;
+	letter-spacing: 6dp;
+	text-transform: uppercase;
+}
+.dialog button, .panel-footer button
+{
+	width: 100%;
+	border: 1dp #ffffff1f;
+	border-radius: 6dp;
+	text-align: center;
+	transition: color background-color border-color 0.15s cubic-out;
+}
+.dialog button:focus, .panel-footer button:focus
+{
+	border-color: #74c7ff;
+}
+.dialog .hints
+{
+	margin-top: 22dp;
+}
+
+
+/* ---------- Settings menu: panel with a scrollable list of settings ---------- */
+
+#settings
+{
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: #050b14b3;
+}
+.panel
+{
+	position: relative;
+	width: 680dp;
+	height: 640dp;
+	border: 1dp #ffffff1a;
+	border-radius: 10dp;
+	background-color: #0a121ef2;
+	box-shadow: 0dp 8dp 24dp #000000a0;
+}
+.panel-header
+{
+	box-sizing: border-box;
+	height: 72dp;
+	padding: 0 32dp;
+	border-bottom: 1dp #ffffff14;
+	line-height: 72dp;
+	font-size: 28dp;
+	letter-spacing: 4dp;
+	text-transform: uppercase;
+}
+.panel-content
+{
+	position: absolute;
+	top: 72dp;
+	bottom: 72dp;
+	left: 0;
+	right: 0;
+	padding: 0 24dp 16dp;
+	overflow: hidden auto;
+}
+.panel-footer
+{
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	box-sizing: border-box;
+	height: 72dp;
+	padding: 0 32dp;
+	border-top: 1dp #ffffff14;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+.panel-footer button
+{
+	width: 160dp;
+	margin: 0;
+	padding: 8dp 0;
+	font-size: 16dp;
+}
+
+h2
+{
+	margin: 22dp 8dp 6dp;
+	font-size: 13dp;
+	letter-spacing: 3dp;
+	text-transform: uppercase;
+	color: #74c7ff;
+}
+.row
+{
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	height: 40dp;
+	padding: 0 8dp;
+	border-radius: 4dp;
+}
+.row:hover
+{
+	background-color: #ffffff0a;
+}
+.row.disabled .label, .hint, .value
+{
+	color: #93a7bb;
+}
+/* data-visible would only hide an element, but keep its space in the layout */
+.hidden
+{
+	display: none;
+}
+.hint
+{
+	font-size: 14dp;
+}
+
+/* Checkboxes look like switches: the knob is a radial gradient */
+input.checkbox
+{
+	width: 44dp;
+	height: 24dp;
+	border-radius: 12dp;
+	background-color: #ffffff26;
+	decorator: radial-gradient(circle 9dp at 12dp 12dp, #e4edf6 80%, #e4edf600 100%);
+	tab-index: auto;
+	nav: vertical;
+	cursor: pointer;
+}
+input.checkbox:checked
+{
+	background-color: #74c7ff;
+	decorator: radial-gradient(circle 9dp at 32dp 12dp, #ffffff 80%, #ffffff00 100%);
+}
+input.checkbox:focus
+{
+	box-shadow: 0dp 0dp 0dp 2dp #74c7ff80;
+}
+input.checkbox:disabled
+{
+	opacity: 0.35;
+	cursor: unavailable;
+}
+
+/* Drop-down lists: the arrow is a triangle drawn with the border */
+select
+{
+	width: 230dp;
+	height: 32dp;
+	font-size: 16dp;
+	tab-index: auto;
+	nav: vertical;
+	cursor: pointer;
+}
+select selectvalue
+{
+	box-sizing: border-box;
+	width: auto;
+	height: 32dp;
+	padding: 0 36dp 0 12dp;
+	border: 1dp #ffffff26;
+	border-radius: 5dp;
+	background-color: #ffffff14;
+	line-height: 30dp;
+}
+select:hover selectvalue, select:focus selectvalue
+{
+	border-color: #74c7ff;
+}
+select selectarrow
+{
+	width: 0;
+	height: 0;
+	margin: 13dp 14dp 0 0;
+	border-width: 7dp 6dp 0 6dp;
+	border-color: #93a7bb #93a7bb00 #93a7bb00 #93a7bb00;
+}
+select selectbox
+{
+	margin-top: 4dp;
+	padding: 4dp 0;
+	border: 1dp #ffffff26;
+	border-radius: 5dp;
+	background-color: #121d2d;
+	box-shadow: 0dp 8dp 24dp #00000080;
+	max-height: 260dp;
+}
+select selectbox option
+{
+	padding: 6dp 12dp;
+	color: #c9d6e3;
+}
+select selectbox option:hover
+{
+	background-color: #74c7ff33;
+	color: #ffffff;
+}
+select selectbox option:checked
+{
+	color: #74c7ff;
+}
+
+/* Apply button of the display settings */
+input.button
+{
+	padding: 6dp 18dp;
+	border-radius: 5dp;
+	background-color: #74c7ff;
+	font-size: 14dp;
+	letter-spacing: 2dp;
+	text-transform: uppercase;
+	color: #0a121e;
+	tab-index: auto;
+	nav: vertical;
+	cursor: pointer;
+}
+input.button:focus
+{
+	box-shadow: 0dp 0dp 0dp 2dp #ffffffb0;
+}
+input.button:disabled
+{
+	background-color: #ffffff1a;
+	color: #93a7bb80;
+	cursor: arrow;
+}
+
+scrollbarvertical
+{
+	width: 6dp;
+	margin-right: 6dp;
+}
+scrollbarvertical slidertrack
+{
+	border-radius: 3dp;
+	background-color: #ffffff0d;
+}
+scrollbarvertical sliderbar
+{
+	min-height: 32dp;
+	border-radius: 3dp;
+	background-color: #ffffff40;
+}
+scrollbarvertical sliderbar:hover, scrollbarvertical sliderbar:active
+{
+	background-color: #ffffff70;
+}
+scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc
+{
+	width: 0;
+	height: 0;
+}
+scrollbarhorizontal
+{
+	height: 0;
+}

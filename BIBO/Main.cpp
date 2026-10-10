@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -10,7 +11,10 @@
 
 #include "Scene/Scene.hpp"
 #include "Physics/Physics.hpp"
+#include "UI/Menu.hpp"
 #include "Util/Console.hpp"
+#include "Util/Display.hpp"
+#include "Util/Settings.hpp"
 
 using namespace bibo;
 
@@ -31,7 +35,9 @@ void initialize();
 void init(GLFWwindow* window);
 void initPhysics();
 void initTextRendering();
+void updateTextProjection();
 void initFreeType();
+void initMenu();
 void textRendering();
 void initDebug();
 void cleanup();
@@ -41,14 +47,32 @@ void update(float time_delta);
 void gameLoop();
 void renderQuad();
 void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale, vec3 color);
+void resizeScreenBuffers();
+void applyGraphicsSettings();
+void pauseGame();
+void resumeGame();
+void onMenuAction(ui::MenuAction action);
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
+void framebufferSizeCallback(GLFWwindow* window, int width, int height);
+void windowFocusCallback(GLFWwindow* window, int focused);
 
 //vars
-unsigned int windowWidth = 800;
+const char* const SETTINGS_FILE = "settings.cfg"; //in the working directory, like the assets
+Settings settings;
+unsigned int windowWidth = 800; //Size of the framebuffer in pixels
 unsigned int windowHeight = 600;
-bool fullscreen = false;
 GLFWwindow* window;
 float time_delta; //Last frame time
+
+enum GameState
+{
+	MAIN_MENU,
+	PLAYING,
+	PAUSED
+};
+GameState gameState = MAIN_MENU;
+unique_ptr<ui::Menu> menu;
 
 unique_ptr<Shader> mainShader;
 unique_ptr<Shader> depthShader;
@@ -92,13 +116,8 @@ GLuint textVBO;
 //Quad VAO/VBO for screen (space) drawing
 GLuint quadVAO = 0;
 GLuint quadVBO;
-//HUD options
-bool displayHelp = false;
-bool displayFrameTime = true;
-bool wireFrameMode = false;
+//Options that are not part of the settings
 bool viewFrustumCulling = true;
-bool hdrEnabled = true;
-bool bloomEnabled = true;
 //float hdrExposure = 1.0f;
 bool varianceShadowMappingEnabled = false;
 string lastMessage = "";
@@ -106,30 +125,34 @@ float messageTimeLeft = 0;
 
 int main(int argc, char** argv)
 {
+	//Saved by the settings menu, the command line arguments take precedence
+	settings.load(SETTINGS_FILE);
 
 	if (argc >= 3) {
 		cout << "You are running" << endl;
 
-		if ((stringstream(argv[1]) >> windowWidth).fail())
+		if ((stringstream(argv[1]) >> settings.width).fail() || settings.width <= 0)
 		{
 			cerr << "ERROR: Could not parse first element, try again!" << endl;
 			util::pause();
 			exit(EXIT_FAILURE);
 		}
 
-		if ((stringstream(argv[2]) >> windowHeight).fail()) {
+		if ((stringstream(argv[2]) >> settings.height).fail() || settings.height <= 0) {
 			cerr << "ERROR: Could not parse second element, try again!" << endl;
 			util::pause();
 			exit(EXIT_FAILURE);
 		}
 
 		if (argc >= 4) {
+			bool fullscreen;
 			if ((stringstream(argv[3]) >> fullscreen).fail()) {
 
 				cerr << "ERROR: Could not parse third command-line-arg, try again!" << endl;
 				util::pause();
 				exit(EXIT_FAILURE);
 			}
+			settings.windowMode = fullscreen ? FULLSCREEN : WINDOWED;
 		}
 	}
 
@@ -162,16 +185,8 @@ void initialize()
 	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWmonitor* monitor = nullptr;
-
-	if (fullscreen) {
-		monitor = glfwGetPrimaryMonitor();
-		//Set monitor refresh rate
-		auto refresh_rate = 60;
-		glfwWindowHint(GLFW_REFRESH_RATE, refresh_rate);
-	}
-
-	window = glfwCreateWindow(windowWidth, windowHeight, "Hello CGUE", monitor, nullptr);
+	//Windowed, full screen or borderless (see settings)
+	window = display::createWindow(settings.windowMode, settings.width, settings.height, "BIBO Project");
 
 	if (!window) // window == nullptr
 	{
@@ -180,7 +195,32 @@ void initialize()
 		util::pause();
 		exit(EXIT_FAILURE);
 	}
-	glfwSetKeyCallback(window, fKeyCallback);
+	//The framebuffer can be smaller than requested (e.g. limited to the screen) or larger (scaled on high DPI screens)
+	int framebufferWidth, framebufferHeight;
+	glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+	windowWidth = std::max(framebufferWidth, 1);
+	windowHeight = std::max(framebufferHeight, 1);
+
+	//Input goes to the game or, while it is visible, to the menu
+	glfwSetKeyCallback(window, keyCallback);
+	glfwSetCharCallback(window, [](GLFWwindow*, unsigned int codepoint) {
+		if (menu && menu->isVisible()) menu->onChar(codepoint);
+	});
+	glfwSetMouseButtonCallback(window, [](GLFWwindow*, int button, int action, int mods) {
+		if (menu && menu->isVisible()) menu->onMouseButton(button, action, mods);
+	});
+	glfwSetScrollCallback(window, [](GLFWwindow*, double, double yOffset) {
+		if (menu && menu->isVisible()) menu->onScroll(yOffset);
+	});
+	//The menu always knows where the mouse is, so that it highlights the right button as soon as it opens
+	glfwSetCursorPosCallback(window, [](GLFWwindow*, double x, double y) {
+		if (menu) menu->onCursorPos(x, y);
+	});
+	glfwSetCursorEnterCallback(window, [](GLFWwindow*, int entered) {
+		if (menu) menu->onCursorEnter(entered == GLFW_TRUE);
+	});
+	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+	glfwSetWindowFocusCallback(window, windowFocusCallback);
 	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwMakeContextCurrent(window);
 
@@ -508,14 +548,90 @@ void initShaders()
 
 void init(GLFWwindow* window) {
 	glEnable(GL_DEPTH_TEST);
-	glfwSetWindowTitle(window, "BIBO Project");
 
 	initShaders();
 	initTextRendering();
 
 	cout << "Loading assets from files via assimp and setting up scene..." << endl;
 	gameScene = make_unique<Scene>(window, mainShader.get(), physicsWorld.get());
+	gameScene->setViewportSize(windowWidth, windowHeight);
+	//The scene stands still behind the main menu. Simulating the first second (without input) lets the bear land
+	//on the ground and the camera follow it, as at the start of the game.
+	for (int i = 0; i < 60; ++i)
+	{
+		gameScene->update(1.0f / 60.0f);
+	}
 
+	applyGraphicsSettings();
+	initMenu();
+}
+
+void initMenu()
+{
+	cout << "Initializing menus (RmlUi)..." << endl;
+	menu = make_unique<ui::Menu>(window, settings, onMenuAction);
+	menu->showMainMenu();
+	if (!menu->isVisible())
+	{
+		//Without menus (e.g. missing UI folder) the game starts right away, ESC quits as in earlier versions
+		gameState = PLAYING;
+	}
+}
+
+//Applies the settings that are not read directly when drawing (like settings.hdr)
+void applyGraphicsSettings()
+{
+	glfwSwapInterval(settings.vsync ? 1 : 0);
+	glPolygonMode(GL_FRONT_AND_BACK, settings.wireframe ? GL_LINE : GL_FILL);
+	texSettings::bilinear = settings.bilinearFiltering;
+	texSettings::mipMappingQuality = settings.mipmapping;
+	gameScene->setNormalMappingEnabled(settings.normalMapping);
+	gameScene->setShadowMappingEnabled(settings.shadows);
+	gameScene->setTransparencyEnabled(settings.transparency);
+}
+
+void onMenuAction(ui::MenuAction action)
+{
+	switch (action)
+	{
+	case ui::MenuAction::Start:
+	case ui::MenuAction::Resume:
+		resumeGame();
+		break;
+	case ui::MenuAction::Quit:
+		glfwSetWindowShouldClose(window, true);
+		break;
+	case ui::MenuAction::GraphicsChanged:
+		applyGraphicsSettings();
+		break;
+	case ui::MenuAction::ApplyDisplay:
+		//The new framebuffer size arrives in framebufferSizeCallback
+		display::applyWindowMode(window, settings.windowMode, settings.width, settings.height);
+		applyGraphicsSettings(); //the swap interval (VSync) may be reset by a new video mode
+		[[fallthrough]];
+	case ui::MenuAction::SettingsClosed:
+		if (!settings.save(SETTINGS_FILE))
+		{
+			cerr << "WARNING: Could not save the settings to " << SETTINGS_FILE << endl;
+		}
+		break;
+	}
+}
+
+void pauseGame()
+{
+	gameState = PAUSED;
+	menu->showPauseMenu();
+	if (!menu->isVisible())
+	{
+		glfwSetWindowShouldClose(window, true);
+	}
+}
+
+void resumeGame()
+{
+	gameState = PLAYING;
+	menu->hide();
 }
 
 
@@ -528,9 +644,7 @@ void initTextRendering()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	mat4 textProjectionMatrix = ortho(0.0f, static_cast<GLfloat>(windowWidth), 0.0f, static_cast<GLfloat>(windowHeight));
-	textShader->enable();
-	glUniformMatrix4fv(textShader->getUniformLocation("projection"), 1, GL_FALSE, value_ptr(textProjectionMatrix));
+	updateTextProjection();
 
 	initFreeType();
 
@@ -550,6 +664,99 @@ void initTextRendering()
 	glDisable(GL_BLEND);
 }
 
+//Text is positioned in pixels, (0, 0) is the bottom left corner of the window
+void updateTextProjection()
+{
+	mat4 textProjectionMatrix = ortho(0.0f, static_cast<GLfloat>(windowWidth), 0.0f, static_cast<GLfloat>(windowHeight));
+	textShader->enable();
+	glUniformMatrix4fv(textShader->getUniformLocation("projection"), 1, GL_FALSE, value_ptr(textProjectionMatrix));
+}
+
+//The render targets of the HDR and bloom passes have the size of the window, so they are reallocated when it changes
+void resizeScreenBuffers()
+{
+	for (GLuint i = 0; i < 2; i++)
+	{
+		glBindTexture(GL_TEXTURE_2D, colorBuffers[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, windowWidth, windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
+		glBindTexture(GL_TEXTURE_2D, blurColorbuffers[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, windowWidth, windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindRenderbuffer(GL_RENDERBUFFER, depthBloomRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, windowWidth, windowHeight);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	updateTextProjection();
+}
+
+void framebufferSizeCallback(GLFWwindow* window, int width, int height)
+{
+	if (width <= 0 || height <= 0)
+	{
+		return; //minimized
+	}
+	windowWidth = width;
+	windowHeight = height;
+	if (gameScene)
+	{
+		resizeScreenBuffers();
+		gameScene->setViewportSize(width, height);
+	}
+	if (menu)
+	{
+		menu->onFramebufferResized(width, height);
+	}
+	if (settings.windowMode == WINDOWED && !glfwGetWindowMonitor(window))
+	{
+		//Keeps the size of a window resized by the user (e.g. by dragging its border) for the settings
+		glfwGetWindowSize(window, &settings.width, &settings.height);
+	}
+}
+
+void windowFocusCallback(GLFWwindow* window, int focused)
+{
+	//e.g. when switching to another window with Alt+Tab
+	if (!focused && gameState == PLAYING)
+	{
+		pauseGame();
+	}
+}
+
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+	if (!menu)
+	{
+		return; //still loading
+	}
+	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+	{
+		switch (gameState)
+		{
+		case PLAYING:
+			pauseGame();
+			break;
+		case PAUSED:
+			if (!menu->back())
+			{
+				resumeGame();
+			}
+			break;
+		case MAIN_MENU:
+			menu->back();
+			break;
+		}
+		return;
+	}
+
+	if (gameState == PLAYING)
+	{
+		fKeyCallback(window, key, scancode, action, mods);
+	}
+	else
+	{
+		menu->onKey(key, action, mods);
+	}
+}
 
 void gameLoop()
 {
@@ -566,15 +773,31 @@ void gameLoop()
 
 		glfwPollEvents();
 
-		if (glfwGetKey(window, GLFW_KEY_ESCAPE))
-			glfwSetWindowShouldClose(window, true);
+		//Nothing to draw while the window is minimized
+		if (glfwGetWindowAttrib(window, GLFW_ICONIFIED))
+		{
+			glfwWaitEvents();
+			continue;
+		}
 
+		//Handles the buttons pressed in the menu (e.g. Start changes the game state)
+		menu->update();
 
-		//Do game logic here
-		mainShader->enable();
-		update(time_delta);
+		//Do game logic here, the game stands still while a menu is open
+		if (gameState == PLAYING)
+		{
+			mainShader->enable();
+			update(time_delta);
+		}
 		//Do drawing of game here
 		draw();
+
+		if (menu->isVisible())
+		{
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); //also in wireframe mode
+			menu->render();
+			glPolygonMode(GL_FRONT_AND_BACK, settings.wireframe ? GL_LINE : GL_FILL);
+		}
 
 		glfwSwapBuffers(window);
 
@@ -605,7 +828,7 @@ void draw() {
 	}
 
 	////Pass 2 - Main Scene///
-	if (!wireFrameMode)
+	if (!settings.wireframe)
 	{
 		// 1. Render scene into floating point framebuffer
 		glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
@@ -624,13 +847,13 @@ void draw() {
 	//Rendering light sources
 	lightShader->enable();
 	gameScene->renderLightSourcesOnly(lightShader.get());
-	if (!hdrEnabled || !bloomEnabled || wireFrameMode)
+	if (!settings.hdr || !settings.bloom || settings.wireframe)
 	{
 		textRendering();
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	if (!wireFrameMode)
+	if (!settings.wireframe)
 	{
 		// Horizontal/Vertical gaussian blur  
 		bool bloomBlurHorizontal = true, firstPass = true;
@@ -648,7 +871,7 @@ void draw() {
 				firstPass = false;
 			}
 		}
-		if (hdrEnabled)
+		if (settings.hdr)
 		{
 			textRendering();
 		}
@@ -661,8 +884,8 @@ void draw() {
 		glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, blurColorbuffers[!bloomBlurHorizontal]);
-		glUniform1i(postProcessingShader->getUniformLocation("hdrEnabled"), hdrEnabled);
-		glUniform1i(postProcessingShader->getUniformLocation("bloomEnabled"), bloomEnabled);
+		glUniform1i(postProcessingShader->getUniformLocation("hdrEnabled"), settings.hdr);
+		glUniform1i(postProcessingShader->getUniformLocation("bloomEnabled"), settings.bloom);
 		//glUniform1f(postProcessingShader->getUniformLocation("hdrExposure"), hdrExposure);
 		renderQuad();
 	}
@@ -713,6 +936,8 @@ void renderQuad()
 
 void cleanup() {
 	cout << "Cleaning up memory..." << endl;
+	//Releases the OpenGL resources of the menus, so it must happen before the window (and its context) is destroyed
+	menu.reset(nullptr);
 	gameScene.reset(nullptr);
 	//The scene (and the character controller of the bear) must be released before the physics world
 	physicsWorld.reset(nullptr);
@@ -853,14 +1078,18 @@ void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale
 
 void textRendering()
 {
-	if (displayHelp)
+	if (gameState == MAIN_MENU)
+	{
+		return; //the main menu covers the HUD
+	}
+	if (settings.showHelp)
 	{
 		renderText(textShader.get(), "Press UP or DOWN (arrow) keys to walk", windowWidth / 10.f, windowHeight - 2.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Press LEFT or RIGHT (arrow) keys to turn left or right", windowWidth / 10.f, windowHeight - 3.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Press SPACE key to jump", windowWidth / 10.f, windowHeight - 4.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Survive the dangerous trial and make it in time!", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 	}
-	if (displayFrameTime)
+	if (settings.showFrameTime)
 	{
 		renderText(textShader.get(), "FPS: " + to_string(1.f / time_delta).substr(0, 4), windowWidth / 10.f, windowHeight - 1.f * windowHeight / 10.f, 0.6f, vec3(0.9, 0.5f, 0.5f));
 		renderText(textShader.get(), "Frametime: " + to_string(time_delta).substr(0, 5), windowWidth / 3.f, windowHeight - 1.f * windowHeight / 10.f, 0.6f, vec3(0.9, 0.5f, 0.5f));
@@ -915,49 +1144,45 @@ void blurShadowMap()
 
 void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
+	//The F-keys change the same settings as the settings menu
 	if (key == GLFW_KEY_F1 && action == GLFW_PRESS)
 	{
-		displayHelp = !displayHelp;
+		settings.showHelp = !settings.showHelp;
 	}
 
 	if (key == GLFW_KEY_F2 && action == GLFW_PRESS)
 	{
-		displayFrameTime = !displayFrameTime;
-		string frameTimeMsg = displayFrameTime ? "enabled" : "disabled";
+		settings.showFrameTime = !settings.showFrameTime;
+		string frameTimeMsg = settings.showFrameTime ? "enabled" : "disabled";
 		lastMessage = "Frame/time display " + frameTimeMsg;
 		messageTimeLeft = 3;
 	}
 
 	if (key == GLFW_KEY_F3 && action == GLFW_PRESS)
 	{
-		wireFrameMode = !wireFrameMode;
-		if (wireFrameMode)
-		{
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		}
-		else
-		{
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		}
-		string wireFrameModeMsg = wireFrameMode ? "enabled" : "disabled";
+		settings.wireframe = !settings.wireframe;
+		applyGraphicsSettings();
+		string wireFrameModeMsg = settings.wireframe ? "enabled" : "disabled";
 		lastMessage = "Wireframe mode " + wireFrameModeMsg;
 		messageTimeLeft = 3;
 	}
 
 	if (key == GLFW_KEY_F4 && action == GLFW_PRESS)
 	{
-		texSettings::bilinear = !texSettings::bilinear;
-		string bilinearMsg = texSettings::bilinear ? "bilinear" : "nearest neighbor";
+		settings.bilinearFiltering = !settings.bilinearFiltering;
+		applyGraphicsSettings();
+		string bilinearMsg = settings.bilinearFiltering ? "bilinear" : "nearest neighbor";
 		lastMessage = "Texture sampling: " + bilinearMsg;
 		messageTimeLeft = 3;
 	}
 
 	if (key == GLFW_KEY_F5 && action == GLFW_PRESS)
 	{
-		texSettings::mipMappingQuality = (texSettings::mipMappingQuality + 1) % 3;
+		settings.mipmapping = (settings.mipmapping + 1) % 3;
+		applyGraphicsSettings();
 
 		string mipmapMsg;
-		switch (texSettings::mipMappingQuality)
+		switch (settings.mipmapping)
 		{
 		case 0: mipmapMsg = "OFF";
 			break;
@@ -974,17 +1199,17 @@ void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 	if (key == GLFW_KEY_F6 && action == GLFW_PRESS)
 	{
-		bool normalMappingEnabled = !gameScene->isNormalMappingEnabled();
-		gameScene->setNormalMappingEnabled(normalMappingEnabled);
-		lastMessage = "Normal Mapping enabled: " + to_string(normalMappingEnabled);
+		settings.normalMapping = !settings.normalMapping;
+		applyGraphicsSettings();
+		lastMessage = "Normal Mapping enabled: " + to_string(settings.normalMapping);
 		messageTimeLeft = 3;
 	}
 
 	if (key == GLFW_KEY_F7 && action == GLFW_PRESS)
 	{
-		bool shadowMappingEnabled = !gameScene->isShadowMappingEnabled();
-		gameScene->setShadowMappingEnabled(shadowMappingEnabled);
-		lastMessage = "Shadow Mapping (PCF) enabled: " + to_string(shadowMappingEnabled);
+		settings.shadows = !settings.shadows;
+		applyGraphicsSettings();
+		lastMessage = "Shadow Mapping (PCF) enabled: " + to_string(settings.shadows);
 		messageTimeLeft = 3;
 	}
 
@@ -1010,23 +1235,23 @@ void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 	if (key == GLFW_KEY_F9 && action == GLFW_PRESS)
 	{
-		bool transparencyEnabled = !gameScene->isTransparencyEnabled();
-		gameScene->setTransparencyEnabled(transparencyEnabled);
-		lastMessage = "Transparency enabled: " + to_string(transparencyEnabled);
+		settings.transparency = !settings.transparency;
+		applyGraphicsSettings();
+		lastMessage = "Transparency enabled: " + to_string(settings.transparency);
 		messageTimeLeft = 3;
 	}
 
 	if (key == GLFW_KEY_F10 && action == GLFW_PRESS)
 	{
-		hdrEnabled = !hdrEnabled;
-		lastMessage = "HDR enabled: " + to_string(hdrEnabled);
+		settings.hdr = !settings.hdr;
+		lastMessage = "HDR enabled: " + to_string(settings.hdr);
 		messageTimeLeft = 3;
 	}
 
-	if (hdrEnabled && key == GLFW_KEY_F11 && action == GLFW_PRESS)
+	if (settings.hdr && key == GLFW_KEY_F11 && action == GLFW_PRESS)
 	{
-		bloomEnabled = !bloomEnabled;
-		lastMessage = "Bloom (requries HDR) enabled: " + to_string(bloomEnabled);
+		settings.bloom = !settings.bloom;
+		lastMessage = "Bloom (requries HDR) enabled: " + to_string(settings.bloom);
 		messageTimeLeft = 3;
 	}
 

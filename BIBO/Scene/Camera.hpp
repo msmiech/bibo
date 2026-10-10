@@ -26,6 +26,10 @@ namespace bibo
 
 			mat4 getViewMatrix();
 			mat4 getProjectionMatrix();
+			/**
+			* Size of the image in pixels, determines the aspect ratio of the projection
+			*/
+			void setViewportSize(int width, int height);
 
 			bool isLocked();
 

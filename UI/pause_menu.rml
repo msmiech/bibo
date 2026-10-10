@@ -1,0 +1,16 @@
+<rml>
+<head>
+	<title>Pause menu</title>
+	<link type="text/rcss" href="menu.rcss"/>
+</head>
+<!-- data-model: variables and events (data-event-click) of the game, see BIBO/UI/Menu.cpp -->
+<body id="pause-menu" data-model="menu">
+	<div class="dialog">
+		<h1>Paused</h1>
+		<button autofocus data-event-click="resume">Resume</button>
+		<button data-event-click="settings">Settings</button>
+		<button data-event-click="quit">Quit game</button>
+		<p class="hints"><span class="key first">Esc</span>Resume</p>
+	</div>
+</body>
+</rml>

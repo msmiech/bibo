@@ -170,3 +170,6 @@ compile_commands.json
 .cache/
 .vscode/
 .idea/
+
+# Saved by the settings menu of the game
+settings.cfg

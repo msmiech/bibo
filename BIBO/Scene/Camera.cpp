@@ -124,6 +124,15 @@ mat4 Camera::getProjectionMatrix()
 		zFar);
 }
 
+void Camera::setViewportSize(int width, int height)
+{
+	if (width > 0 && height > 0)
+	{
+		windowWidth = width;
+		windowHeight = height;
+	}
+}
+
 bool Camera::isLocked()
 {
 	return locked;

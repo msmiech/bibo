@@ -109,6 +109,16 @@ To create a folder with the executable and all assets that can be copied to anot
 cmake --install build --prefix BIBO-dist
 ```
 
+Ready-to-run packages for Windows and Linux are attached to the [releases](https://github.com/msmiech/bibo/releases).
+They are built by the [release workflow](.github/workflows/release.yml) when a version tag is pushed, e.g. for version 2.0:
+
+```bash
+git tag 2.0
+git push origin 2.0
+```
+
+Tags with a suffix such as `2.1-rc1` are published as pre-releases.
+
 For a debug build (OpenGL debug output on the console) configure a separate folder with `-DCMAKE_BUILD_TYPE=Debug`, e.g. `cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug`.
 
 ### Troubleshooting

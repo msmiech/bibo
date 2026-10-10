@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25...3.31)
 
 project(BIBO
-	VERSION 1.1.0
+	VERSION 2.0.0
 	DESCRIPTION "Bear-In Bear-Out: a small 3D OpenGL game"
 	LANGUAGES C CXX)
 

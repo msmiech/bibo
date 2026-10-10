@@ -305,6 +305,11 @@ void Scene::draw(Shader* shader, mat4 view, mat4 projection)
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void Scene::setViewportSize(int width, int height)
+{
+	camera->setViewportSize(width, height);
+}
+
 void Scene::setTransparencyEnabled(bool transparency)
 {
 	this->transparencyEnabled = transparency;

@@ -68,6 +68,10 @@ namespace bibo
 			void renderFromCamera(Shader* shader);
 			void renderFromLightSource(Shader* shader);
 			void renderLightSourcesOnly(Shader* shader);
+			/**
+			* Size of the rendered image in pixels (e.g. after the window was resized)
+			*/
+			void setViewportSize(int width, int height);
 			void setTransparencyEnabled(bool transparency);
 			void setNormalMappingEnabled(bool normalMappingEnabled);
 			void setShadowMappingEnabled(bool shadowMappingEnabled);

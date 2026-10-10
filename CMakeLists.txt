@@ -132,6 +132,31 @@ FetchContent_Declare(JoltPhysics
 	SYSTEM)
 FetchContent_MakeAvailable(JoltPhysics)
 
+# RmlUi: HTML/CSS based user interface library for the menus (renders text with the FreeType library above)
+set(RMLUI_FONT_ENGINE freetype)
+set(RMLUI_SAMPLES OFF)
+set(RMLUI_LUA_BINDINGS OFF)
+set(RMLUI_SVG_PLUGIN OFF)
+set(RMLUI_LOTTIE_PLUGIN OFF)
+set(RMLUI_COMPILER_OPTIONS OFF) # no extra warning flags for the library
+if(NOT BIBO_USE_SYSTEM_LIBS)
+	set(CMAKE_DISABLE_FIND_PACKAGE_Freetype ON) # RmlUi uses the Freetype::Freetype target of the downloaded FreeType
+endif()
+FetchContent_Populate(rmlui
+	URL https://github.com/mikke89/RmlUi/archive/refs/tags/6.3.tar.gz
+	URL_HASH SHA256=d977298bb6147610e5984d5db85ddf284020d655a8713913f6982074f1dbdede
+	SOURCE_DIR ${FETCHCONTENT_BASE_DIR}/rmlui-src)
+# EXCLUDE_FROM_ALL also skips the install rules of RmlUi (headers, libraries), so cmake --install only installs the game
+add_subdirectory(${rmlui_SOURCE_DIR} ${FETCHCONTENT_BASE_DIR}/rmlui-build EXCLUDE_FROM_ALL SYSTEM)
+
+# The GLFW platform and OpenGL 3 renderer of RmlUi are not part of the library, they are compiled from its Backends folder
+add_library(bibo_rmlui_backend STATIC
+	${rmlui_SOURCE_DIR}/Backends/RmlUi_Platform_GLFW.cpp
+	BIBO/UI/RmlUi_Renderer_GL3_GLEW.cpp)
+target_include_directories(bibo_rmlui_backend SYSTEM PUBLIC ${rmlui_SOURCE_DIR}/Backends)
+target_compile_definitions(bibo_rmlui_backend PRIVATE GLEW_NO_GLU) # the GLEW of the system would include the GLU header otherwise
+target_link_libraries(bibo_rmlui_backend PUBLIC RmlUi::Core glfw GLEW::GLEW)
+
 # ---------------------------------------------------------------------------
 # Game
 # ---------------------------------------------------------------------------
@@ -169,7 +194,13 @@ add_executable(BIBO
 	BIBO/Scene/SceneObject.hpp
 	BIBO/Scene/ViewFrustum.cpp
 	BIBO/Scene/ViewFrustum.hpp
+	BIBO/UI/Menu.cpp
+	BIBO/UI/Menu.hpp
 	BIBO/Util/Console.hpp
+	BIBO/Util/Display.cpp
+	BIBO/Util/Display.hpp
+	BIBO/Util/Settings.cpp
+	BIBO/Util/Settings.hpp
 	BIBO/Util/Util.cpp
 	BIBO/Util/Util.hpp)
 
@@ -186,6 +217,7 @@ target_link_libraries(BIBO PRIVATE
 	assimp::assimp
 	Freetype::Freetype
 	Jolt
+	bibo_rmlui_backend
 	bibo_stb)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -201,7 +233,7 @@ if(MSVC)
 endif()
 
 # The game loads its assets relative to the working directory, so they are copied next to the executable
-set(BIBO_ASSET_DIRS Font Model Shader Texture)
+set(BIBO_ASSET_DIRS Font Model Shader Texture UI)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.26)
 	set(BIBO_COPY_DIRECTORY copy_directory_if_different)
 else()

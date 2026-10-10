@@ -1,0 +1,20 @@
+<rml>
+<head>
+	<title>Main menu</title>
+	<link type="text/rcss" href="menu.rcss"/>
+</head>
+<!-- data-model: variables and events (data-event-click) of the game, see BIBO/UI/Menu.cpp -->
+<body id="main-menu" data-model="menu">
+	<div class="side">
+		<h1 class="title">Bear-In<br/>Bear-Out</h1>
+		<div class="accent"></div>
+		<p class="tagline">Complete a lap as fast as possible and avoid the obstacles on the way.</p>
+
+		<button autofocus data-event-click="start">Start</button>
+		<button data-event-click="settings">Settings</button>
+		<button data-event-click="quit">Quit</button>
+
+		<p class="hints"><span class="key first">↑</span><span class="key" style="margin-left: 0;">↓</span>Select<span class="key">Enter</span>Confirm</p>
+	</div>
+</body>
+</rml>

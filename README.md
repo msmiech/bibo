@@ -24,6 +24,7 @@ Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complet
 * Transparency
 * Shadow Maps
 * Animated textures (e.g. water)
+* View frustum culling: objects outside of the camera's view are not drawn (F8 to switch it off, the HUD shows how many objects are drawn)
 
 ## Building
 The game is built with [CMake](https://cmake.org) 3.25 or newer, the [Ninja](https://ninja-build.org) build tool and any C++17 compiler (Clang, GCC, MinGW-w64 or MSVC).
@@ -118,6 +119,31 @@ For a debug build (OpenGL debug output on the console) configure a separate fold
 * To use a specific compiler, add e.g. `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++` to the configure command (together with `--fresh`).
 * `Could not create a window with an OpenGL 4.3 core context`: update the graphics driver; OpenGL 4.3 is required.
 
+## Testing
+The automated tests use [Catch2](https://github.com/catchorg/Catch2) and are built together with the game (configure with `-DBIBO_BUILD_TESTS=OFF` to skip them).
+Run them in the build folder with CTest:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+The tests are in the `tests` folder:
+* `unit`: game rules (falling off the track, reaching the goal), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions), the view frustum (compared with the camera matrices for random cameras), math helpers and the generated textures
+* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain, the wall blocks the shortcut to the goal and the collision mesh of the terrain matches the rendered terrain
+* `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the camera and the whole scene (e.g. culling never removes a visible pixel). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
+  On Linux servers without a graphics card they run on a virtual X server with Mesa's software renderer: `xvfb-run -a ctest --test-dir build --output-on-failure`
+
+Every test case is a separate CTest test and its Catch2 tags become CTest labels, e.g. only the physics tests: `ctest --test-dir build -L physics`.
+The test executable can also be run directly, e.g. `build/tests/bibo_tests "[rules]"` (see `--help` for the options of Catch2).
+
+The CI also runs the tests with AddressSanitizer and UndefinedBehaviorSanitizer (memory errors, leaks, undefined behavior). On Linux:
+
+```bash
+CFLAGS="-fsanitize=address,undefined" CXXFLAGS="-fsanitize=address,undefined" LDFLAGS="-fsanitize=address,undefined" cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build-asan --parallel
+UBSAN_OPTIONS=halt_on_error=1 xvfb-run -a ctest --test-dir build-asan --output-on-failure
+```
+
 ## Implementation Details
 ### Language and Compiler
 This project was originally written in C++11 using Microsoft Visual Studio 2013.
@@ -133,6 +159,7 @@ Downloaded automatically by CMake (see `CMakeLists.txt` for the exact versions a
 * [GLM](https://github.com/g-truc/glm) 1.0 (math)
 * [Jolt Physics](https://github.com/jrouwe/JoltPhysics) 5.6 (physics, replaces Nvidia PhysX 3.3.4)
 * [stb_image](https://github.com/nothings/stb) (image loading, replaces DevIL)
+* [Catch2](https://github.com/catchorg/Catch2) 3.16 (tests only)
 
 ## Sources
 ### Literature

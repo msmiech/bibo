@@ -3,7 +3,6 @@
 #include "Texture.hpp"
 #include "Shader.hpp"
 #include <assimp/mesh.h>
-#include <assimp/matrix4x4.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -35,24 +34,19 @@ namespace bibo
 				BUFFER_COUNT = 6
 			};
 
-			const unsigned int MAX_FACES = 16777216;
-
 			GLuint vao;
 			GLuint vbo[BUFFER_COUNT];
-
-			Shader* shader;
 
 			Material material;
 			Texture* texture;
 
 		public:
-			Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, aiMatrix4x4 transformation);
+			Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture);
 			~Mesh();
 			Mesh(const Mesh&) = delete;
 			Mesh& operator=(const Mesh&) = delete;
 			void draw(Shader* shader);
 
-			aiMesh* source;
 			unsigned int numVertices;
 			unsigned int numFaces;
 			float* vertices = nullptr;
@@ -63,10 +57,8 @@ namespace bibo
 			unsigned int* indices = nullptr;
 
 			void setTexture(Texture* texture);
-			Texture* getTexture();
 
 			void setMaterial(Material material);
-			Material getMaterial();
 		};
 	}
 }

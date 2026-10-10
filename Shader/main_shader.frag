@@ -39,13 +39,8 @@ uniform sampler2D shadowMap;
 uniform sampler2D normalMap;
 uniform vec3 worldEye;
 uniform bool shadowMappingEnabled;
-uniform bool varianceShadowMappingEnabled;
 uniform bool normalMappingEnabled;
-uniform bool bloomEnabled;
 uniform bool textureTransparent;
-
-//local vars
-vec4 scPostW;
 
 layout (location = 0) out vec4 fragColor;
 layout (location = 1) out vec4 brightColor;
@@ -78,27 +73,6 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 N, vec3 L)
 
 
     return shadow;
-}
-
-// From http://fabiensanglard.net/shadowmappingVSM/index.php
-float chebyshevUpperBound(float distance)
-{
-	vec2 moments = texture(shadowMap, scPostW.xy).rg;
-	
-	// Surface is fully lit. as the current fragment is before the light occluder
-	if (distance <= moments.x)
-		return 1.0;
-
-	// The fragment is either in shadow or penumbra. We now use chebyshev's upperBound to check
-	// How likely this pixel is to be lit (p_max)
-	float variance = moments.y - (moments.x * moments.x);
-	//variance = max(variance, 0.000002);
-	variance = max(variance, 0.00002);
-
-	float d = distance - moments.x;
-	float p_max = variance / (variance + d * d);
-
-	return p_max;
 }
 
 
@@ -178,28 +152,10 @@ void main()
     vec3 specular = light.specularColor * (spec * material.specular);
 
 	float shadow = 0.0;
-	//Based on https://github.com/cforfang/opengl-shadowmapping
-	if(shadowMappingEnabled) 
+	if(shadowMappingEnabled)
 	{
-		if(varianceShadowMappingEnabled) 
-		{
-			scPostW = fragPosLightSpace / fragPosLightSpace.w;
-			//transform coordinates to range [0,1]
-			scPostW = scPostW * 0.5 + 0.5;
-
-			bool outsideShadowMap = fragPosLightSpace.w <= 0.0f || (scPostW.x < 0 || scPostW.y < 0) || (scPostW.x >= 1 || scPostW.y >= 1);
-			if (!outsideShadowMap) 
-			{
-				shadow = chebyshevUpperBound(scPostW.z);
-			}
-		}
-		else
-		{
-			shadow = ShadowCalculation(fragPosLightSpace, N, L);
-		}
+		shadow = ShadowCalculation(fragPosLightSpace, N, L);
 	}
-    //float shadow = shadowMappingEnabled ? ShadowCalculation(fragPosLightSpace, N, L) : 0.0;
-    //vec3 lightResult = (ambient + (1.0 - shadow) * (diffuse + specular)) * textureColor;    
 	vec4 lightResult = vec4((ambient + (1.0 - shadow) * (diffuse + specular)), 1.0) * textureColor;
 	fragColor = lightResult;
 

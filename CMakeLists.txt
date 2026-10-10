@@ -14,6 +14,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 option(BIBO_USE_SYSTEM_LIBS "Use the installed GLFW, GLM, Assimp, FreeType and GLEW instead of downloading them" OFF)
+option(BIBO_BUILD_TESTS "Build the automated tests (downloads Catch2)" ON)
 
 find_package(OpenGL REQUIRED)
 
@@ -135,13 +136,10 @@ FetchContent_MakeAvailable(JoltPhysics)
 # ---------------------------------------------------------------------------
 # Game
 # ---------------------------------------------------------------------------
-add_executable(BIBO
-	BIBO/Main.cpp
+# Everything except main() is a library, so that the tests use exactly the same code as the game
+add_library(bibo_core STATIC
 	BIBO/Physics/Physics.cpp
 	BIBO/Physics/Physics.hpp
-	BIBO/Resources/AABB.cpp
-	BIBO/Resources/AABB.hpp
-	BIBO/Resources/Material.cpp
 	BIBO/Resources/Material.hpp
 	BIBO/Resources/Mesh.cpp
 	BIBO/Resources/Mesh.hpp
@@ -159,6 +157,7 @@ add_executable(BIBO
 	BIBO/Scene/Camera.hpp
 	BIBO/Scene/Cube.cpp
 	BIBO/Scene/Cube.hpp
+	BIBO/Scene/GameRules.hpp
 	BIBO/Scene/Geometry.cpp
 	BIBO/Scene/Geometry.hpp
 	BIBO/Scene/Light.cpp
@@ -173,27 +172,32 @@ add_executable(BIBO
 	BIBO/Util/Util.cpp
 	BIBO/Util/Util.hpp)
 
-target_include_directories(BIBO PRIVATE BIBO)
-target_compile_definitions(BIBO PRIVATE
+target_include_directories(bibo_core PUBLIC BIBO)
+target_compile_definitions(bibo_core PUBLIC
 	GLM_FORCE_CTOR_INIT     # GLM >= 0.9.9 no longer initializes vectors/matrices by default (0.9.7 did)
 	GLM_ENABLE_EXPERIMENTAL # glm/gtx/rotate_vector.hpp
 	GLEW_NO_GLU)
-target_link_libraries(BIBO PRIVATE
+target_link_libraries(bibo_core PUBLIC
 	OpenGL::GL
 	GLEW::GLEW
 	glfw
 	glm::glm
 	assimp::assimp
-	Freetype::Freetype
 	Jolt
 	bibo_stb)
 
+add_executable(BIBO BIBO/Main.cpp)
+target_link_libraries(BIBO PRIVATE
+	bibo_core
+	Freetype::Freetype)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+	target_compile_options(bibo_core PRIVATE -Wall)
 	target_compile_options(BIBO PRIVATE -Wall)
 endif()
 if(MINGW AND NOT BIBO_USE_SYSTEM_LIBS)
-	# Self-contained executable without MinGW runtime DLLs
-	target_link_options(BIBO PRIVATE -static)
+	# Self-contained executables without MinGW runtime DLLs (the game and the tests)
+	target_link_options(bibo_core INTERFACE -static)
 endif()
 if(MSVC)
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT BIBO)
@@ -217,3 +221,11 @@ endforeach()
 
 install(TARGETS BIBO RUNTIME DESTINATION .)
 install(DIRECTORY ${BIBO_ASSET_DIRS} DESTINATION .)
+
+# ---------------------------------------------------------------------------
+# Tests (see "Testing" in README.md)
+# ---------------------------------------------------------------------------
+if(BIBO_BUILD_TESTS)
+	enable_testing()
+	add_subdirectory(tests)
+endif()

@@ -1,47 +1,42 @@
-﻿#pragma once
+#pragma once
 #include <glm/glm.hpp>
 #include "../Resources/Plane.hpp"
-
-namespace CPM_GLM_AABB_NS {
-	class AABB;
-}
-
-using namespace glm;
 
 namespace bibo
 {
 	namespace scene
 	{
 		/**
+		* The volume a perspective camera sees, bounded by 6 planes whose normals point inwards.
 		* Code based on: http://www.lighthouse3d.com/tutorials/view-frustum-culling/geometric-approach-implementation/
 		**/
-		class FrustumG {
-
-			enum {
-				TOP = 0, BOTTOM, LEFT,
-				RIGHT, NEARP, FARP
-			};
-
+		class ViewFrustum
+		{
 		public:
+			enum Result { OUTSIDE, INTERSECT, INSIDE };
 
-			enum { OUTSIDE, INTERSECT, INSIDE };
+			/**
+			* @param fieldOfView Vertical opening angle in degrees
+			* @param aspectRatio Width divided by height
+			*/
+			void setCamInternals(float fieldOfView, float aspectRatio, float nearDistance, float farDistance);
+			/**
+			* @param position Position of the camera
+			* @param lookAt Any point in the viewing direction
+			* @param up Up direction of the camera
+			*/
+			void setCamDef(const glm::vec3& position, const glm::vec3& lookAt, const glm::vec3& up);
 
-			Plane pl[6];
+			Result pointInFrustum(const glm::vec3& point) const;
+			Result sphereInFrustum(const glm::vec3& center, float radius) const;
 
-			vec3 ntl, ntr, nbl, nbr, ftl, ftr, fbl, fbr;
-			float nearD, farD, ratio, angle, tang;
-			float nw, nh, fw, fh;
+		private:
+			enum { TOP = 0, BOTTOM, LEFT, RIGHT, NEARP, FARP, PLANE_COUNT };
+			resources::Plane planes[PLANE_COUNT];
 
-			FrustumG();
-			~FrustumG();
-
-			void setCamInternals(float angle, float ratio, float nearD, float farD);
-			void setCamDef(vec3 &p, vec3 &l, vec3 &u);
-			int pointInFrustum(vec3 &p);
-			int sphereInFrustum(vec3 &p, float raio);
-			int boxInFrustum(CPM_GLM_AABB_NS::AABB &b);
-
+			float nearDistance = 0.1f, farDistance = 100.0f;
+			//Half width and height of the near and far plane
+			float nearWidth = 0.0f, nearHeight = 0.0f, farWidth = 0.0f, farHeight = 0.0f;
 		};
-
 	}
 }

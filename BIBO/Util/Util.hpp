@@ -18,15 +18,9 @@ using namespace bibo::scene;
 
 namespace bibo
 {
-	const bool DEBUG = true;
-
 	namespace util
 	{
-		/**
-		* @return The loaded scene, which is owned by the caller (delete it when no longer needed) or nullptr
-		*/
-		const aiScene* loadSceneFromFile(const char* file);
-		vector<unique_ptr<Light>> retrieveLightFromScene(GLFWwindow& window, Shader* shader, const char* file);
+			vector<unique_ptr<Light>> retrieveLightFromScene(GLFWwindow& window, Shader* shader, const char* file);
 		mat4 ConvertMatrix(aiMatrix4x4 in);
 	}
 }

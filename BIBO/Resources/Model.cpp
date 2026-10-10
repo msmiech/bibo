@@ -1,7 +1,6 @@
 #include "Model.hpp"
 #include <iostream>
 #include <fstream>
-#include <cassert>
 #include "../Util/Util.hpp"
 
 using namespace bibo;
@@ -41,11 +40,6 @@ Model::Model(Shader* shader, const char* path, const char* nodeName, Texture* te
 
 }
 
-Model::Model(Shader* shader, const char* filename, Texture* texture) : Model(shader, filename, nullptr, texture)
-{
-	//Just calling the other constructor
-}
-
 Model::Model(Shader* shader, const aiScene* scene, const char* nodeName, Texture* texture)
 {
 	init(shader, scene, nodeName, texture);
@@ -53,10 +47,6 @@ Model::Model(Shader* shader, const aiScene* scene, const char* nodeName, Texture
 
 void Model::init(Shader* shader, const aiScene* scene, const char* nodeName, Texture* texture)
 {
-	aiMatrix4x4 vertexRotationAroundUpAxis;
-	aiMatrix4x4::RotationZ(radians(-180.0f), vertexRotationAroundUpAxis);
-
-
 	auto node = scene->mRootNode;
 	if (!node)
 	{
@@ -79,7 +69,38 @@ void Model::init(Shader* shader, const aiScene* scene, const char* nodeName, Tex
 
 	tranformationMat = ConvertMatrix(transformation);
 
-	createMeshes(shader, scene, node, texture, vertexRotationAroundUpAxis);
+	createMeshes(shader, scene, node, texture);
+	computeBoundingSphere();
+}
+
+void Model::computeBoundingSphere()
+{
+	vec3 minimum(numeric_limits<float>::max());
+	vec3 maximum(numeric_limits<float>::lowest());
+	for (const Mesh* mesh : meshes)
+	{
+		for (unsigned int i = 0; mesh->vertices && i < mesh->numVertices; ++i)
+		{
+			vec3 vertex(mesh->vertices[i * 3], mesh->vertices[i * 3 + 1], mesh->vertices[i * 3 + 2]);
+			minimum = glm::min(minimum, vertex);
+			maximum = glm::max(maximum, vertex);
+		}
+	}
+	if (minimum.x > maximum.x)
+	{
+		return; //no vertices
+	}
+
+	boundingSphereCenter = 0.5f * (minimum + maximum);
+	boundingSphereRadius = 0.0f;
+	for (const Mesh* mesh : meshes)
+	{
+		for (unsigned int i = 0; mesh->vertices && i < mesh->numVertices; ++i)
+		{
+			vec3 vertex(mesh->vertices[i * 3], mesh->vertices[i * 3 + 1], mesh->vertices[i * 3 + 2]);
+			boundingSphereRadius = std::max(boundingSphereRadius, glm::distance(boundingSphereCenter, vertex));
+		}
+	}
 }
 
 /**
@@ -96,7 +117,7 @@ Model::~Model()
 /**
 *	Creates model meshes
 **/
-void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node, Texture* texture, aiMatrix4x4 vertexRotationAroundUpAxis)
+void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node, Texture* texture)
 {
 	if (node->mNumChildren == 0)
 	{
@@ -121,27 +142,14 @@ void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node, Tex
 						meshMaterial.diffuse = vec3(diffuse.r, diffuse.g, diffuse.b);
 					}
 
-
 					aiColor4D specular;
 					if (aiGetMaterialColor(assimpMaterial, AI_MATKEY_COLOR_SPECULAR, &specular) == AI_SUCCESS)
 					{
 						meshMaterial.specular = vec3(specular.r, specular.g, specular.b);
-
 					}
-
-					//aiColor4D emission;
-					//if (aiGetMaterialColor(assimpMaterial, AI_MATKEY_COLOR_EMISSIVE, &emission) == AI_SUCCESS)
-					//{
-					// not relevant for us at the moment
-					//}
-
-					float shininess = 32.0f;
-					//unsigned int max;
-					//aiGetMaterialFloatArray(assimpMaterial, AI_MATKEY_SHININESS, &shininess, &max); //TODO ?
-					meshMaterial.shininess = shininess;
 				}
 			}
-			meshes.push_back(new Mesh(shader, assimpMesh, meshMaterial, texture, vertexRotationAroundUpAxis));
+			meshes.push_back(new Mesh(shader, assimpMesh, meshMaterial, texture));
 		}
 	}
 	else
@@ -168,27 +176,14 @@ void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node, Tex
 							meshMaterial.diffuse = vec3(diffuse.r, diffuse.g, diffuse.b);
 						}
 
-
 						aiColor4D specular;
 						if (aiGetMaterialColor(assimpMaterial, AI_MATKEY_COLOR_SPECULAR, &specular) == AI_SUCCESS)
 						{
 							meshMaterial.specular = vec3(specular.r, specular.g, specular.b);
-
 						}
-
-						//aiColor4D emission;
-						//if (aiGetMaterialColor(assimpMaterial, AI_MATKEY_COLOR_EMISSIVE, &emission) == AI_SUCCESS)
-						//{
-						// not relevant for us at the moment
-						//}
-
-						float shininess = 32.0f;
-						//unsigned int max;
-						//aiGetMaterialFloatArray(assimpMaterial, AI_MATKEY_SHININESS, &shininess, &max); //TODO ?
-						meshMaterial.shininess = shininess;
 					}
 				}
-				meshes.push_back(new Mesh(shader, assimpMesh, meshMaterial, texture, vertexRotationAroundUpAxis));
+				meshes.push_back(new Mesh(shader, assimpMesh, meshMaterial, texture));
 			}
 		}
 	}

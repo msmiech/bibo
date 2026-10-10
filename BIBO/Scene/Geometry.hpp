@@ -1,11 +1,13 @@
-﻿#pragma once
+#pragma once
 #include "SceneObject.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "ViewFrustum.hpp"
 #include "../Resources/Model.hpp"
 #include "../Physics/Physics.hpp"
+#include <memory>
 
 using namespace glm;
 using namespace std;
@@ -17,38 +19,31 @@ namespace bibo
 	{
 		class Geometry : public SceneObject
 		{
-			Model* model;
-			bool collidable = false;
-			bool physicsStatic = true;
+			unique_ptr<Model> model;
 			physics::PhysicsWorld* physicsWorld = nullptr;
 			physics::BodyHandle physicsBody = physics::INVALID_BODY;
 		public:
 			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture);
 			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* file, const char* nodeName, Texture* texture);
-			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* file, Texture* texture);
 			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* file, const char* nodeName, Texture* texture, Texture* normalMapTexture);
 
 			virtual ~Geometry();
 
 			virtual void update(float time_delta);
 			virtual void draw(Shader* shader);
+			/**
+			* @return false if the geometry is completely outside of the view frustum and does not need to be drawn
+			*/
+			virtual bool isVisible(const ViewFrustum& frustum);
 
 			Model* getModel();
-			bool isStatic();
-			void setStatic(bool physicsStatic);
-			bool isCollidable();
-			void setCollidable(bool collidable);
 			/**
 			* The geometry follows the position and rotation of the physics body from now on
 			*/
-			void setStaticBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle staticBody);
-			void setDynamicBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle dynamicBody);
-			bool drawable = true;
+			void setPhysicsBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle body);
 			Texture* normalMap;
 			bool hasNormalMap;
 			bool getHasNormalMap();
-			void setTexture(Texture* texture);
-			Texture* getTexture();
 		};
 	}
 }

@@ -287,6 +287,11 @@ int Scene::draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* f
 	return drawnGeometries;
 }
 
+void Scene::setViewportSize(int width, int height)
+{
+	camera->setViewportSize(width, height);
+}
+
 void Scene::setTransparencyEnabled(bool transparency)
 {
 	this->transparencyEnabled = transparency;

@@ -31,6 +31,10 @@ namespace bibo
 			* The volume the camera sees with its view and projection matrix
 			*/
 			ViewFrustum getViewFrustum();
+			/**
+			* Size of the image in pixels, determines the aspect ratio of the projection
+			*/
+			void setViewportSize(int width, int height);
 
 			bool isLocked();
 

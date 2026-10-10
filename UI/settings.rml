@@ -1,0 +1,95 @@
+<rml>
+<head>
+	<title>Settings</title>
+	<link type="text/rcss" href="menu.rcss"/>
+</head>
+<!--
+	data-model: the settings of the game, see BIBO/UI/Menu.cpp.
+	Graphics settings are applied as soon as they change, the window mode and resolution with the Apply button.
+-->
+<body id="settings" data-model="menu">
+	<div class="panel">
+		<div class="panel-header">Settings</div>
+
+		<div class="panel-content">
+			<h2>Display</h2>
+			<div class="row">
+				<span class="label">Window mode</span>
+				<select autofocus data-value="window_mode">
+					<option value="0">Windowed</option>
+					<option value="1">Fullscreen</option>
+					<option value="2">Borderless</option>
+				</select>
+			</div>
+			<div class="row" data-class-disabled="window_mode == 2">
+				<span class="label">Resolution</span>
+				<select data-class-hidden="window_mode == 2" data-value="resolution">
+					<option data-for="name : resolutions" data-value="it_index">{{ name }}</option>
+				</select>
+				<span class="value" data-class-hidden="window_mode != 2">Desktop resolution</span>
+			</div>
+			<div class="row">
+				<span class="hint">The window mode and resolution change when applied</span>
+				<input type="button" value="Apply" data-attrif-disabled="!display_changed" data-event-click="apply_display"/>
+			</div>
+
+			<h2>Graphics</h2>
+			<label class="row">
+				<span class="label">Vertical sync</span>
+				<input type="checkbox" data-checked="vsync"/>
+			</label>
+			<label class="row">
+				<span class="label">HDR</span>
+				<input type="checkbox" data-checked="hdr"/>
+			</label>
+			<label class="row" data-class-disabled="!hdr">
+				<span class="label">Bloom (requires HDR)</span>
+				<input type="checkbox" data-checked="bloom" data-attrif-disabled="!hdr"/>
+			</label>
+			<label class="row">
+				<span class="label">Shadows</span>
+				<input type="checkbox" data-checked="shadows"/>
+			</label>
+			<label class="row">
+				<span class="label">Normal mapping</span>
+				<input type="checkbox" data-checked="normal_mapping"/>
+			</label>
+			<label class="row">
+				<span class="label">Transparency</span>
+				<input type="checkbox" data-checked="transparency"/>
+			</label>
+			<label class="row">
+				<span class="label">Bilinear texture filtering</span>
+				<input type="checkbox" data-checked="bilinear_filtering"/>
+			</label>
+			<div class="row">
+				<span class="label">Mipmapping</span>
+				<select data-value="mipmapping">
+					<option value="0">Off</option>
+					<option value="1">Nearest</option>
+					<option value="2">Linear</option>
+				</select>
+			</div>
+			<label class="row">
+				<span class="label">Wireframe</span>
+				<input type="checkbox" data-checked="wireframe"/>
+			</label>
+
+			<h2>Interface</h2>
+			<label class="row">
+				<span class="label">Show frame time</span>
+				<input type="checkbox" data-checked="show_frame_time"/>
+			</label>
+			<label class="row">
+				<span class="label">Show controls</span>
+				<input type="checkbox" data-checked="show_help"/>
+			</label>
+		</div>
+
+		<div class="panel-footer">
+			<p class="hints"><span class="key first">Esc</span>Back</p>
+			<button data-event-click="back">Back</button>
+		</div>
+	</div>
+</body>
+</rml>

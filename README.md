@@ -15,7 +15,11 @@ Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complet
 * Keyboard controls
   * Arrow keys for navigation
   * Space bar for jumping
+  * ESC for the pause menu
   * F-Keys for settings and debug features (F1 for help)
+* Main menu, pause menu and settings menu (based on RmlUi, usable with mouse or keyboard)
+  * Graphics settings (VSync, HDR, bloom, shadows, normal mapping, transparency, texture filtering, mipmapping, wireframe)
+  * Resolution and window mode (windowed, fullscreen or borderless)
 * Supports complex models (like the bear, see copyright in files)
 * Multiple light sources
 * HDR
@@ -101,14 +105,26 @@ To use the libraries of the distribution instead of downloading them, also insta
 Not supported: the game requires OpenGL 4.3, macOS only provides OpenGL 4.1.
 
 ### Running and distributing
-The build copies the game assets (`Font`, `Model`, `Shader`, `Texture`) next to the executable, and the game loads them from the current folder, so always start it from the build folder.
-The command line arguments are `BIBO [width height [fullscreen]]`: width and height of the window in pixels and `1` for fullscreen (default: `800 600 0`). ESC quits the game.
+The build copies the game assets (`Font`, `Model`, `Shader`, `Texture`, `UI`) next to the executable, and the game loads them from the current folder, so always start it from the build folder.
+The game starts in the main menu, ESC opens the pause menu during the game.
+The settings menu saves the settings to `settings.cfg` in the current folder (a text file, delete it to reset the settings).
+The command line arguments `BIBO [width height [fullscreen]]` override the saved resolution and window mode: width and height of the window in pixels and `1` for fullscreen (default: `800 600 0`).
 
 To create a folder with the executable and all assets that can be copied to another computer:
 
 ```bash
 cmake --install build --prefix BIBO-dist
 ```
+
+Ready-to-run packages for Windows and Linux are attached to the [releases](https://github.com/msmiech/bibo/releases).
+They are built by the [release workflow](.github/workflows/release.yml) when a version tag is pushed, e.g. for version 2.0:
+
+```bash
+git tag 2.0
+git push origin 2.0
+```
+
+Tags with a suffix such as `2.1-rc1` are published as pre-releases.
 
 For a debug build (OpenGL debug output on the console) configure a separate folder with `-DCMAKE_BUILD_TYPE=Debug`, e.g. `cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug`.
 
@@ -158,6 +174,7 @@ Downloaded automatically by CMake (see `CMakeLists.txt` for the exact versions a
 * [GLFW](https://www.glfw.org) 3.4 (window and input)
 * [GLM](https://github.com/g-truc/glm) 1.0 (math)
 * [Jolt Physics](https://github.com/jrouwe/JoltPhysics) 5.6 (physics, replaces Nvidia PhysX 3.3.4)
+* [RmlUi](https://github.com/mikke89/RmlUi) 6.3 (menus, written in RML and RCSS similar to HTML and CSS, see the `UI` folder)
 * [stb_image](https://github.com/nothings/stb) (image loading, replaces DevIL)
 * [Catch2](https://github.com/catchorg/Catch2) 3.16 (tests only)
 

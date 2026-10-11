@@ -72,29 +72,16 @@ void Light::convertLight(aiLight* light)
 {
 	type = light->mType;
 
-	//position.x = light->mPosition.x;
-	//position.y = light->mPosition.y;
-	//position.z = light->mPosition.z;
 	position = vec3(80.0f, 100.0f, -75.0f);
 
-	//direction.x = light->mDirection.x;
-	//direction.y = light->mDirection.y;
-	//direction.z = light->mDirection.z;
-	//direction = normalize(vec3(0.0f, 0.0f, 0.0f) - position);
 	direction = normalize(vec3(0.0f, -0.8f, 0.3f));
 
-	//ambient.r = light->mColorAmbient.r;
-	//ambient.g = light->mColorAmbient.g;
-	//ambient.b = light->mColorAmbient.b;
 	ambient = vec3(0.5f, 0.5f, 0.5f);
 
-
-	//diffuse = vec3(5.f, 5.f, 5.f);
 	diffuse.r = light->mColorDiffuse.r;
 	diffuse.g = light->mColorDiffuse.g;
 	diffuse.b = light->mColorDiffuse.b;
 
-	//specular = vec3(6.f, 6.f, 6.f);
 	specular.r = light->mColorSpecular.r;
 	specular.g = light->mColorSpecular.g;
 	specular.b = light->mColorSpecular.b;

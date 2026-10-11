@@ -1,4 +1,5 @@
 #version 430 core
+//Renders the scene from the light source into the shadow map, only the depth is needed
 
 layout (location = 0) in vec3 position;
 

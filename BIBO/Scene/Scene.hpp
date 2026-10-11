@@ -6,8 +6,10 @@
 #include <memory>
 #include "Bear.hpp"
 #include "Cube.hpp"
+#include "GameRules.hpp"
 #include "../Util/Util.hpp"
 #include "../Physics/Physics.hpp"
+#include <glm/gtc/quaternion.hpp>
 
 
 using namespace std;
@@ -16,17 +18,41 @@ namespace bibo
 {
 	namespace scene
 	{
+		/**
+		* Scale, rotation and position of a static triangle mesh in the physics world
+		*/
+		struct MeshTransform
+		{
+			float scale;
+			quat rotation;
+			vec3 position;
+		};
+
+		/**
+		* The collision mesh of the terrain must be placed like the rendered terrain.
+		* @param modelMatrix Model matrix of the rendered terrain: uniform scale, rotation (Z-up of Blender/Collada to Y-up) and translation
+		*/
+		MeshTransform terrainTransform(const mat4& modelMatrix);
+
 		class Scene
 		{
 			void initPhysicsBodies();
 			void initAnimatedTextures();
-			void initFinishLine();
+			/**
+			* @param board The finish line (geometry), the trigger goes along it across the track
+			*/
+			void initFinishLine(Geometry* board);
 			//Called when the bear touches a physics body
 			void onBearHit(physics::BodyHandle body);
-			//Counts the checkpoints and the finish line passed by the bear
-			void updateLap(vec3 playerPosition);
-			bool isOnFinishLine(vec3 position);
-			void drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappingEnabledLocation);
+			/**
+			* @param frustum Geometries outside of it are not drawn (nullptr: draw all)
+			* @return Number of drawn geometries
+			*/
+			int draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* frustum);
+			/**
+			* @return false if the geometry is outside of the frustum and was not drawn
+			*/
+			bool drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappingEnabledLocation, const ViewFrustum* frustum);
 
 			GLFWwindow* window;
 			vector<unique_ptr<Geometry>> geometries;
@@ -36,15 +62,14 @@ namespace bibo
 			vector<unique_ptr<Texture>> monitorVideo;
 			vector<unique_ptr<Texture>> waterVideo;
 			vector<unique_ptr<Geometry>> arrows;
-			unique_ptr<Geometry> rotatingRock;
 
 			//special pointers
 			Bear* bear;
 			Geometry* world;
-			Geometry* finishLine;
 			Geometry* monitor1;
 			Geometry* water; //transparent, drawn after the other geometries
 			unique_ptr<Cube> debugCube;
+			unique_ptr<Geometry> rotatingRock;
 
 			//Physics
 			physics::PhysicsWorld* physicsWorld;
@@ -52,19 +77,16 @@ namespace bibo
 			bool shadowMappingEnabled = true;
 			bool normalMappingEnabled = true;
 			bool transparencyEnabled = true;
+			bool viewFrustumCullingEnabled = true;
+			int drawnGeometryCount = 0;
 
-			int userScore = 0;
 			bool gameOver = false;
 			bool gameWon = false;
 
-			//A lap is complete when the bear reaches the finish line after it passed all checkpoints in their order
+			//Index of the checkpoint the bear has to pass next, see rules::passCheckpoint
 			size_t nextCheckpoint = 0;
-			//Invisible trigger at the finish line (in the xz plane, the bear starts on it)
-			vec3 finishLineCenter;
-			vec3 finishLineAcross; //along the finish line, across the track
-			float finishLineHalfWidth = 0.0f;
+			rules::FinishLine finishLine;
 
-			vector<physics::BodyHandle> bodiesFish;
 			vector<physics::BodyHandle> bodiesRock;
 			//Dynamic bodies and their start positions, which they are moved back to by restart()
 			vector<pair<physics::BodyHandle, vec3>> dynamicBodies;
@@ -75,10 +97,8 @@ namespace bibo
 
 		public:
 			Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld);
-			~Scene();
 
 			void update(float time_delta);
-			void draw(Shader* shader, mat4 view, mat4 projection);
 			/**
 			* Starts the run again: the bear, the movable objects and the lap go back to the start (R key, game over menu)
 			*/
@@ -94,10 +114,22 @@ namespace bibo
 			void setTransparencyEnabled(bool transparency);
 			void setNormalMappingEnabled(bool normalMappingEnabled);
 			void setShadowMappingEnabled(bool shadowMappingEnabled);
+			/**
+			* Only the geometries that are (partially) inside of the view frustum of the camera are drawn
+			*/
+			void setViewFrustumCullingEnabled(bool viewFrustumCullingEnabled);
 			bool isTransparencyEnabled();
 			bool isNormalMappingEnabled();
 			bool isShadowMappingEnabled();
-			int getUserScore();
+			bool isViewFrustumCullingEnabled();
+			/**
+			* @return Number of geometries drawn by the last renderFromCamera
+			*/
+			int getDrawnGeometryCount();
+			/**
+			* @return Number of geometries in the scene
+			*/
+			int getGeometryCount();
 			int getCheckpointsPassed();
 			int getCheckpointCount();
 			bool isGameOver();

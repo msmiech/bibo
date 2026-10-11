@@ -100,7 +100,6 @@ void Shader::loadShader(const string& shader,
 	glCompileShader(handle);
 
 	GLint succeeded;
-	//glGetProgramiv(programHandle, GL_LINK_STATUS, &succeded);
 	glGetShaderiv(handle, GL_COMPILE_STATUS, &succeeded);
 	if (!succeeded || !glIsShader(handle)) {
 		GLint logSize;
@@ -133,7 +132,6 @@ void Shader::link() {
 	if (!succeeded) {
 		GLint logSize;
 		glGetProgramiv(programHandle, GL_INFO_LOG_LENGTH, &logSize);
-		//
 		auto msg = make_unique<char[]>(logSize);
 		glGetProgramInfoLog(programHandle, logSize, nullptr, msg.get());
 

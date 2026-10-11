@@ -28,16 +28,6 @@ vector<unique_ptr<Light>> util::retrieveLightFromScene(GLFWwindow& window, Shade
 		printf("Scene does not contain lights\n");
 	}
 	for (unsigned int i = 0; i < scene->mNumLights; ++i) {
-		switch (scene->mLights[i]->mType)
-		{
-		case aiLightSource_POINT:
-			break;
-		case aiLightSource_DIRECTIONAL:
-			break;
-		case aiLightSource_UNDEFINED: break;
-		case aiLightSource_SPOT: break;
-		default: break;
-		}
 		lights.push_back(make_unique<Light>(window, shader, scene->mLights[i]));
 	}
 

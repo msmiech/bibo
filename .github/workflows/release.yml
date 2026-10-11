@@ -32,7 +32,7 @@ jobs:
             xvfb xauth libgl1-mesa-dri
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBIBO_BUILD_TESTS=OFF # the tests run in the Build workflow
 
       - name: Build
         run: cmake --build build --parallel
@@ -91,7 +91,7 @@ jobs:
             ninja:p
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBIBO_BUILD_TESTS=OFF # the tests run in the Build workflow
 
       - name: Build
         run: cmake --build build --parallel

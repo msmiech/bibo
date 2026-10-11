@@ -80,7 +80,6 @@ unique_ptr<ui::Menu> menu;
 
 unique_ptr<Shader> mainShader;
 unique_ptr<Shader> depthShader;
-unique_ptr<Shader> debugShader;
 unique_ptr<Shader> textShader;
 unique_ptr<Shader> lightShader;
 unique_ptr<Shader> blurShader;
@@ -118,8 +117,6 @@ GLuint textVBO;
 //Quad VAO/VBO for screen (space) drawing
 GLuint quadVAO = 0;
 GLuint quadVBO;
-//Options that are not part of the settings
-//float hdrExposure = 1.0f;
 string lastMessage = "";
 float messageTimeLeft = 0;
 
@@ -224,7 +221,6 @@ void initialize()
 	});
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 	glfwSetWindowFocusCallback(window, windowFocusCallback);
-	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwMakeContextCurrent(window);
 
 	//GLEW initialization
@@ -419,9 +415,6 @@ void initShaders()
 	//Main Shader (Pass 2)
 	cout << "Main shader..." << endl;
 	mainShader = make_unique<Shader>("Shader/main_shader.vert", "Shader/main_shader.frag");
-	//Debug Shader
-	cout << "Debug shader..." << endl;
-	debugShader = make_unique<Shader>("Shader/debug_depth_shader.vert", "Shader/debug_depth_shader.frag");
 	//Text Shader
 	cout << "Text shader..." << endl;
 	textShader = make_unique<Shader>("Shader/text_shader.vert", "Shader/text_shader.frag");
@@ -784,14 +777,9 @@ void gameLoop()
 {
 	auto time = glfwGetTime();
 	while (!glfwWindowShouldClose(window)) {
-		//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 		auto time_new = glfwGetTime();
 		time_delta = static_cast<float>(time_new - time);
 		time = time_new;
-
-		//cout << "frametime: " << time_delta * 1000 << "ms"
-		//	<< "   = " << 1.0 / time_delta << " fps" << endl;
 
 		glfwPollEvents();
 
@@ -844,9 +832,6 @@ void draw() {
 	//Drawing entire scene in depthShader
 	glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
 
-	//glEnable(GL_POLYGON_OFFSET_FILL);
-	//glPolygonOffset(3.f, 0.f);
-
 	glClear(GL_DEPTH_BUFFER_BIT);
 	gameScene->renderFromLightSource(depthShader.get());
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -860,7 +845,6 @@ void draw() {
 		// 1. Render scene into floating point framebuffer
 		glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
 	}
-	//glClearColor(0.35f, 0.36f, 0.37f, 0.5f);
 	glViewport(0, 0, windowWidth, windowHeight);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//Rendering light sources (opaque, before the scene with its transparent water)
@@ -916,21 +900,9 @@ void draw() {
 		glBindTexture(GL_TEXTURE_2D, blurColorbuffers[!bloomBlurHorizontal]);
 		glUniform1i(postProcessingShader->getUniformLocation("hdrEnabled"), settings.hdr);
 		glUniform1i(postProcessingShader->getUniformLocation("bloomEnabled"), bloom);
-		//glUniform1f(postProcessingShader->getUniformLocation("hdrExposure"), hdrExposure);
 		renderQuad();
 	}
 
-
-	//textRendering();
-
-
-	////Debug Shadow Mapping///
-	//debugShader->enable();
-	//glUniform1f(debugShader->getUniformLocation("near_plane"), 1.0f);
-	//glUniform1f(debugShader->getUniformLocation("far_plane"), 75.0f);
-	//glActiveTexture(GL_TEXTURE0); //since it only has one sampler
-	//glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
-	//renderQuad();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -1124,6 +1096,9 @@ void textRendering()
 	{
 		renderText(textShader.get(), "FPS: " + to_string(1.f / time_delta).substr(0, 4), windowWidth / 10.f, windowHeight - 1.f * windowHeight / 10.f, 0.6f, vec3(0.9, 0.5f, 0.5f));
 		renderText(textShader.get(), "Frametime: " + to_string(time_delta).substr(0, 5), windowWidth / 3.f, windowHeight - 1.f * windowHeight / 10.f, 0.6f, vec3(0.9, 0.5f, 0.5f));
+		//Fewer objects are drawn with view frustum culling (F8)
+		string drawnObjects = to_string(gameScene->getDrawnGeometryCount()) + "/" + to_string(gameScene->getGeometryCount());
+		renderText(textShader.get(), "Objects: " + drawnObjects, windowWidth * 0.62f, windowHeight - 1.f * windowHeight / 10.f, 0.6f, vec3(0.9, 0.5f, 0.5f));
 	}
 
 	//Lap progress (the finish line only counts after all checkpoints)
@@ -1227,6 +1202,14 @@ void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod
 		messageTimeLeft = 3;
 	}
 
+	if (key == GLFW_KEY_F8 && action == GLFW_PRESS)
+	{
+		bool viewFrustumCullingEnabled = !gameScene->isViewFrustumCullingEnabled();
+		gameScene->setViewFrustumCullingEnabled(viewFrustumCullingEnabled);
+		lastMessage = "View Frustum Culling enabled: " + to_string(viewFrustumCullingEnabled);
+		messageTimeLeft = 3;
+	}
+
 	if (key == GLFW_KEY_F9 && action == GLFW_PRESS)
 	{
 		settings.transparency = !settings.transparency;
@@ -1248,26 +1231,4 @@ void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod
 		lastMessage = "Bloom (requries HDR) enabled: " + to_string(settings.bloom);
 		messageTimeLeft = 3;
 	}
-
-	/*if (hdrEnabled && glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS)
-	{
-	hdrExposure = hdrExposure + 0.1f;
-	if (hdrExposure > 6)
-	{
-	hdrExposure = 0.5;
-	}
-	lastMessage = "HDR Exposure: " + to_string(hdrExposure);
-	messageTimeLeft = 3;
-	}
-
-	if (hdrEnabled && glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS)
-	{
-	hdrExposure = hdrExposure - 0.1f;
-	if (hdrExposure < 0.5)
-	{
-	hdrExposure = 6;
-	}
-	lastMessage = "HDR Exposure: " + to_string(hdrExposure);
-	messageTimeLeft = 3;
-	}*/
 }

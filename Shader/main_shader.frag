@@ -40,7 +40,6 @@ uniform sampler2D normalMap;
 uniform vec3 worldEye;
 uniform bool shadowMappingEnabled;
 uniform bool normalMappingEnabled;
-uniform bool bloomEnabled;
 uniform bool textureTransparent;
 
 layout (location = 0) out vec4 fragColor;
@@ -157,8 +156,6 @@ void main()
 	{
 		shadow = ShadowCalculation(fragPosLightSpace, N, L);
 	}
-    //float shadow = shadowMappingEnabled ? ShadowCalculation(fragPosLightSpace, N, L) : 0.0;
-    //vec3 lightResult = (ambient + (1.0 - shadow) * (diffuse + specular)) * textureColor;    
 	vec4 lightResult = vec4((ambient + (1.0 - shadow) * (diffuse + specular)), 1.0) * textureColor;
 	fragColor = lightResult;
 

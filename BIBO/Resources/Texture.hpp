@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include <GL/glew.h>
 
 using namespace std;
@@ -42,6 +43,11 @@ namespace bibo
 		* Random grey pixels with dark scan lines, looks like the static of an analog TV
 		*/
 		static unique_ptr<Texture> createNoise(int size, unsigned int seed, int unit);
+		/**
+		* RGBA pixels of createCheckerboard and createNoise (4 bytes per pixel, row by row)
+		*/
+		static vector<unsigned char> checkerboardPixels(int size, int squares);
+		static vector<unsigned char> noisePixels(int size, unsigned int seed);
 
 		void bind(int unit, bool bilinear, unsigned int mipMappingQuality);
 		void bind(int unit);

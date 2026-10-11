@@ -32,4 +32,3 @@ namespace bibo
 		};
 	}
 }
-#define SCENE_OBJECT

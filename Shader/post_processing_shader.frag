@@ -7,7 +7,6 @@ in vec2 fragUV;
 
 layout(binding = 0) uniform sampler2D sceneTex; //Our rendered scene from main shader as texture (in this sampler)
 layout(binding = 1) uniform sampler2D bloomTex;
-//uniform vec2 uvOffset[25];
 uniform bool hdrEnabled;
 uniform bool bloomEnabled;
 

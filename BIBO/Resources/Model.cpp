@@ -1,12 +1,44 @@
 #include "Model.hpp"
-#include <string>
-#include "../Util/Console.hpp"
+#include <iostream>
+#include <fstream>
 #include "../Util/Util.hpp"
 
 using namespace bibo;
 using namespace resources;
 using namespace util;
 
+
+/**
+* Model constructor to load model/scene information from a file
+*
+* @path to file which should be loaded.
+* @nodeName Name of the node that should be loaded
+*/
+Model::Model(Shader* shader, const char* path, const char* nodeName, Texture* texture)
+{
+	Assimp::Importer importer;
+
+	ifstream fin(path);
+	if (!fin.fail()) {
+		fin.close();
+	}
+	else
+	{
+		printf("Couldn't open file: %s\n", path);
+		printf("%s\n", importer.GetErrorString());
+	}
+
+	auto scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+
+
+	if (!scene) {
+		printf("Unable to load model: %s\n", importer.GetErrorString());
+		return;
+	}
+
+	init(shader, scene, nodeName, texture);
+
+}
 
 Model::Model(Shader* shader, const aiScene* scene, const char* nodeName, Texture* texture)
 {
@@ -15,22 +47,19 @@ Model::Model(Shader* shader, const aiScene* scene, const char* nodeName, Texture
 
 void Model::init(Shader* shader, const aiScene* scene, const char* nodeName, Texture* texture)
 {
-	aiMatrix4x4 vertexRotationAroundUpAxis;
-	aiMatrix4x4::RotationZ(radians(-180.0f), vertexRotationAroundUpAxis);
-
-
 	auto node = scene->mRootNode;
 	if (!node)
 	{
-		fatalError("The model has no root node");
+		printf("There is no root node!");
+		return;
 	}
-	string name = nodeName ? nodeName : "(root)";
 	if (nodeName)
 	{
 		node = node->FindNode(nodeName);
 		if (!node)
 		{
-			fatalError("Could not find the node " + name + " in the model");
+			printf("Could not find/load node: %s\n", nodeName);
+			return;
 		}
 	}
 
@@ -40,11 +69,37 @@ void Model::init(Shader* shader, const aiScene* scene, const char* nodeName, Tex
 
 	tranformationMat = ConvertMatrix(transformation);
 
-	createMeshes(shader, scene, node, texture, vertexRotationAroundUpAxis);
-	//The game accesses the first mesh, e.g. to change its material
-	if (meshes.empty())
+	createMeshes(shader, scene, node, texture);
+	computeBoundingSphere();
+}
+
+void Model::computeBoundingSphere()
+{
+	vec3 minimum(numeric_limits<float>::max());
+	vec3 maximum(numeric_limits<float>::lowest());
+	for (const Mesh* mesh : meshes)
 	{
-		fatalError("The node " + name + " of the model has no meshes");
+		for (unsigned int i = 0; mesh->vertices && i < mesh->numVertices; ++i)
+		{
+			vec3 vertex(mesh->vertices[i * 3], mesh->vertices[i * 3 + 1], mesh->vertices[i * 3 + 2]);
+			minimum = glm::min(minimum, vertex);
+			maximum = glm::max(maximum, vertex);
+		}
+	}
+	if (minimum.x > maximum.x)
+	{
+		return; //no vertices
+	}
+
+	boundingSphereCenter = 0.5f * (minimum + maximum);
+	boundingSphereRadius = 0.0f;
+	for (const Mesh* mesh : meshes)
+	{
+		for (unsigned int i = 0; mesh->vertices && i < mesh->numVertices; ++i)
+		{
+			vec3 vertex(mesh->vertices[i * 3], mesh->vertices[i * 3 + 1], mesh->vertices[i * 3 + 2]);
+			boundingSphereRadius = std::max(boundingSphereRadius, glm::distance(boundingSphereCenter, vertex));
+		}
 	}
 }
 
@@ -62,7 +117,7 @@ Model::~Model()
 /**
 *	Creates model meshes
 **/
-void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node, Texture* texture, aiMatrix4x4 vertexRotationAroundUpAxis)
+void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node, Texture* texture)
 {
 	if (node->mNumChildren == 0)
 	{
@@ -87,27 +142,14 @@ void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node, Tex
 						meshMaterial.diffuse = vec3(diffuse.r, diffuse.g, diffuse.b);
 					}
 
-
 					aiColor4D specular;
 					if (aiGetMaterialColor(assimpMaterial, AI_MATKEY_COLOR_SPECULAR, &specular) == AI_SUCCESS)
 					{
 						meshMaterial.specular = vec3(specular.r, specular.g, specular.b);
-
 					}
-
-					//aiColor4D emission;
-					//if (aiGetMaterialColor(assimpMaterial, AI_MATKEY_COLOR_EMISSIVE, &emission) == AI_SUCCESS)
-					//{
-					// not relevant for us at the moment
-					//}
-
-					float shininess = 32.0f;
-					//unsigned int max;
-					//aiGetMaterialFloatArray(assimpMaterial, AI_MATKEY_SHININESS, &shininess, &max); //TODO ?
-					meshMaterial.shininess = shininess;
 				}
 			}
-			meshes.push_back(new Mesh(shader, assimpMesh, meshMaterial, texture, vertexRotationAroundUpAxis));
+			meshes.push_back(new Mesh(shader, assimpMesh, meshMaterial, texture));
 		}
 	}
 	else
@@ -134,27 +176,14 @@ void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node, Tex
 							meshMaterial.diffuse = vec3(diffuse.r, diffuse.g, diffuse.b);
 						}
 
-
 						aiColor4D specular;
 						if (aiGetMaterialColor(assimpMaterial, AI_MATKEY_COLOR_SPECULAR, &specular) == AI_SUCCESS)
 						{
 							meshMaterial.specular = vec3(specular.r, specular.g, specular.b);
-
 						}
-
-						//aiColor4D emission;
-						//if (aiGetMaterialColor(assimpMaterial, AI_MATKEY_COLOR_EMISSIVE, &emission) == AI_SUCCESS)
-						//{
-						// not relevant for us at the moment
-						//}
-
-						float shininess = 32.0f;
-						//unsigned int max;
-						//aiGetMaterialFloatArray(assimpMaterial, AI_MATKEY_SHININESS, &shininess, &max); //TODO ?
-						meshMaterial.shininess = shininess;
 					}
 				}
-				meshes.push_back(new Mesh(shader, assimpMesh, meshMaterial, texture, vertexRotationAroundUpAxis));
+				meshes.push_back(new Mesh(shader, assimpMesh, meshMaterial, texture));
 			}
 		}
 	}

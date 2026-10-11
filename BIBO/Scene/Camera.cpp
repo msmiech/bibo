@@ -6,8 +6,7 @@ using namespace scene;
 double previousX;
 double previousY;
 
-Camera::Camera(vec3 position, vec3 direction, vec3 up, Shader* shader, GLFWwindow& window) : SceneObject(window),
-shader(shader),
+Camera::Camera(vec3 position, vec3 direction, vec3 up, GLFWwindow& window) : SceneObject(window),
 position(position),
 direction(direction),
 up(up)
@@ -45,7 +44,6 @@ void Camera::onMouseMoved(double mouseX, double mouseY, float time_delta)
 
 	this->direction = normalize(direction);
 	this->right = normalize(cross(direction, up));
-	//this->up = normalize(cross(direction, right));
 }
 
 void Camera::update(float time_delta)
@@ -122,9 +120,22 @@ mat4 Camera::getViewMatrix()
 mat4 Camera::getProjectionMatrix()
 {
 	return perspective(radians(aperture), //OEffnungswinkel der Kamera
-		static_cast<float>(windowWidth) / static_cast<float>(windowHeight), //screen ratio
+		getAspectRatio(),
 		zNear,
 		zFar);
+}
+
+ViewFrustum Camera::getViewFrustum()
+{
+	ViewFrustum frustum;
+	frustum.setCamInternals(aperture, getAspectRatio(), zNear, zFar);
+	frustum.setCamDef(position, position + direction, up);
+	return frustum;
+}
+
+float Camera::getAspectRatio()
+{
+	return static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
 }
 
 void Camera::setViewportSize(int width, int height)

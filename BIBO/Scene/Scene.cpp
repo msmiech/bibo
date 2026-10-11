@@ -1,8 +1,6 @@
 ﻿#include "Scene.hpp"
 #include <algorithm>
 #include <cmath>
-#include <iterator>
-#include <glm/gtc/constants.hpp>
 #include "../Util/Console.hpp"
 
 using namespace bibo;
@@ -11,23 +9,13 @@ using namespace scene;
 namespace
 {
 	const char* const TRACK_FILE = "Model/SnowTerrain/track1.dae";
+}
 
-	/**
-	* Checkpoints along the track in driving direction (x and z in world coordinates, where the salmon of the model are placed).
-	* Going backwards from the start reaches them in the wrong order, so the bear has to go around the whole track.
-	*/
-	const vec2 CHECKPOINTS[] = {
-		vec2(51.2f, -35.7f),
-		vec2(6.0f, -58.6f),
-		vec2(-7.8f, -101.6f),
-		vec2(-59.4f, -71.2f),
-		vec2(-66.0f, 1.8f),
-		vec2(-55.3f, 76.9f),
-		vec2(31.3f, 77.1f),
-		vec2(80.7f, 11.6f)
-	};
-	const float CHECKPOINT_RADIUS = 12.0f; //more than half the width of the track, so the bear cannot go around a checkpoint
-	const float FINISH_LINE_HALF_DEPTH = 1.5f; //more than the bear moves in a frame, so it cannot step over the finish line
+MeshTransform scene::terrainTransform(const mat4& modelMatrix)
+{
+	//Jolt only scales triangle meshes uniformly, so the scale of the x axis is used for all axes
+	float scale = length(vec3(modelMatrix[0]));
+	return { scale, quat_cast(mat3(modelMatrix) / scale), vec3(modelMatrix[3]) };
 }
 
 Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld) : window(window), physicsWorld(physicsWorld)
@@ -53,7 +41,7 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	{
 		util::fatalError(string("There is no light source in ") + TRACK_FILE);
 	}
-	camera = make_unique<Camera>(vec3(0.0f, 1.0f, 2.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), shader, *window);
+	camera = make_unique<Camera>(vec3(0.0f, 1.0f, 2.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), *window);
 
 	textures.push_back(Texture::createCheckerboard(256, 8, 0)); //0, chequered flag (generated, no image file)
 	Texture* checkerboardTexPtr = textures[0].get();
@@ -80,22 +68,16 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 
 	debugCube = make_unique<Cube>(mat4(1.0f), shader, *window, textures[6].get());
 
-	/*geometries[1].get()->modelMatrix = scale(geometries[1].get()->modelMatrix, vec3(2.0f, 2.0f, 2.0f));
-	geometries[1].get()->modelMatrix = translate(geometries[1].get()->modelMatrix, vec3(0.3f, 0.5f, 2.5f));*/
-
 
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Boden", textures[3].get()));//1
 	world = geometries[1].get();
 
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "FinishLine", checkerboardTexPtr));//2
-	finishLine = geometries[2].get();
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock1", textures[5].get(), textures[9].get())); //3
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock2", textures[5].get(), textures[9].get())); //4
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock3", textures[5].get(), textures[9].get())); //5
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock4", textures[5].get(), textures[9].get())); //6
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock5", textures[5].get(), textures[9].get())); //7
-	//geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "salmon1", textures[5].get())); //10
-	//geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "salmon3", textures[5].get())); //11
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock6", textures[5].get(), textures[9].get())); //8
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock7", textures[5].get(), textures[9].get())); //9
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock8", textures[5].get(), textures[9].get())); //10
@@ -109,7 +91,6 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Cube", textures[6].get(), textures[7].get())); //17
 
 	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Monitor1", checkerboardTexPtr)); //18
-	//geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Monitor2", checkerboardTexPtr)); //19
 
 	monitor1 = geometries[18].get();
 	Material monitorMaterial;
@@ -125,23 +106,11 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil2", checkerboardTexPtr)); //20
 	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil3", checkerboardTexPtr)); //21
 	initPhysicsBodies();
-	initFinishLine();
+	initFinishLine(geometries[2].get());
 
 	rotatingRock = make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock1", textures[5].get(), textures[9].get());
 	rotatingRock->modelMatrix = translate(rotatingRock->modelMatrix, vec3(10, 25, 1));
 }
-
-Scene::~Scene()
-{
-	bear = nullptr;
-	debugCube = nullptr;
-	world = nullptr;
-	finishLine = nullptr;
-	water = nullptr;
-	geometries.clear();
-	lights.clear();
-}
-
 
 void Scene::update(float time_delta) {
 	physicsWorld->update(time_delta);
@@ -172,38 +141,19 @@ void Scene::update(float time_delta) {
 	rotatingRock->modelMatrix = rotate(rotatingRock->modelMatrix, radians(90.0f) * time_delta, vec3(1, 1, 0));
 
 	vec3 playerPosition = bear->getPosition();
-	if (playerPosition.y < -1.1f)
+	if (rules::hasFallenOff(playerPosition))
 	{
 		gameOver = true;
 	}
 	else
 	{
-		updateLap(playerPosition);
+		nextCheckpoint = rules::passCheckpoint(playerPosition, nextCheckpoint);
+		if (rules::hasCompletedLap(nextCheckpoint, playerPosition, finishLine))
+		{
+			gameWon = true;
+		}
 	}
 	}
-}
-
-void Scene::updateLap(vec3 playerPosition)
-{
-	size_t checkpointCount = std::size(CHECKPOINTS);
-	if (nextCheckpoint < checkpointCount &&
-		distance(vec2(playerPosition.x, playerPosition.z), CHECKPOINTS[nextCheckpoint]) <= CHECKPOINT_RADIUS)
-	{
-		++nextCheckpoint;
-	}
-	if (nextCheckpoint == checkpointCount && isOnFinishLine(playerPosition))
-	{
-		gameWon = true;
-	}
-}
-
-bool Scene::isOnFinishLine(vec3 position)
-{
-	vec3 offset = position - finishLineCenter;
-	offset.y = 0.0f; //the bear may also jump over it
-	float acrossDistance = dot(offset, finishLineAcross);
-	float alongDistance = length(offset - acrossDistance * finishLineAcross);
-	return std::abs(acrossDistance) <= finishLineHalfWidth && alongDistance <= FINISH_LINE_HALF_DEPTH;
 }
 
 void Scene::restart()
@@ -222,17 +172,18 @@ void Scene::renderFromCamera(Shader* shader)
 {
 	mat4 view = camera->getViewMatrix();
 	mat4 projection = camera->getProjectionMatrix();
-	draw(shader, view, projection);
+	ViewFrustum frustum = camera->getViewFrustum();
+	drawnGeometryCount = draw(shader, view, projection, viewFrustumCullingEnabled ? &frustum : nullptr);
 }
 
 void Scene::renderFromLightSource(Shader* shader)
 {
 	GLfloat near_plane = 1.0f, far_plane = 75.0f;
 	mat4 lightProjectionMatrix = ortho(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
-	//mat4 lightViewMatrix = lookAt(lights[0]->getPosition(), vec3(0, 0, 0), vec3(0, 1, 0));
 	vec3 lightViewEye = bear->getPosition() + vec3(0.0f, 40.0f, 0.0f);
 	mat4 lightViewMatrix = lookAt(lightViewEye, lightViewEye + lights[0]->getDirection(), vec3(0, 1, 0));
-	draw(shader, lightViewMatrix, lightProjectionMatrix);
+	//Everything casts shadows, also what the camera does not see
+	draw(shader, lightViewMatrix, lightProjectionMatrix, nullptr);
 }
 
 void Scene::renderLightSourcesOnly(Shader* shader)
@@ -252,10 +203,8 @@ void Scene::renderLightSourcesOnly(Shader* shader)
 	}
 }
 
-void Scene::draw(Shader* shader, mat4 view, mat4 projection)
+int Scene::draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* frustum)
 {
-	//shader->enable(); Assuming this happens before
-
 	GLuint modelLocation = shader->getUniformLocation("model");
 	GLuint viewLocation = shader->getUniformLocation("view");
 	GLuint projectionLocation = shader->getUniformLocation("projection");
@@ -269,7 +218,6 @@ void Scene::draw(Shader* shader, mat4 view, mat4 projection)
 	mat4 lightProjectionMatrix = ortho(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
 	vec3 lightViewEye = bear->getPosition() + vec3(0.0f, 40.0f, 0.0f);
 	mat4 lightViewMatrix = lookAt(lightViewEye, lightViewEye + lights[0]->getDirection(), vec3(0, 1, 0));
-	//mat4 lightViewMatrix = lookAt(vec3(0.0f, 40.0f, 25.0f), vec3(0, 0, 0), vec3(0, 1, 0));
 	mat4 lightSpaceMatrix = lightProjectionMatrix * lightViewMatrix;
 
 
@@ -306,14 +254,15 @@ void Scene::draw(Shader* shader, mat4 view, mat4 projection)
 
 	lights[0]->loadUniforms(shader);
 
+	int drawnGeometries = 0;
 	for (unsigned int i = 0; i < geometries.size(); ++i)
 	{
-		if (geometries[i].get() != water)
+		if (geometries[i].get() != water && drawGeometry(shader, geometries[i].get(), normalMappingEnabledLocation, frustum))
 		{
-			drawGeometry(shader, geometries[i].get(), normalMappingEnabledLocation);
+			++drawnGeometries;
 		}
 	}
-	drawGeometry(shader, rotatingRock.get(), normalMappingEnabledLocation);
+	drawGeometry(shader, rotatingRock.get(), normalMappingEnabledLocation, frustum);
 
 
 	if (normalMappingEnabledLocation != 0xFFFFFFFF) {
@@ -342,16 +291,24 @@ void Scene::draw(Shader* shader, mat4 view, mat4 projection)
 			glUniform1i(textureTransparentLocation, true);
 		}
 	}
-	drawGeometry(shader, water, normalMappingEnabledLocation);
+	if (drawGeometry(shader, water, normalMappingEnabledLocation, frustum))
+	{
+		++drawnGeometries;
+	}
 	glDisable(GL_BLEND);
 	if (textureTransparentLocation != 0xFFFFFFFF)
 	{
 		glUniform1i(textureTransparentLocation, false);
 	}
+	return drawnGeometries;
 }
 
-void Scene::drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappingEnabledLocation)
+bool Scene::drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappingEnabledLocation, const ViewFrustum* frustum)
 {
+	if (frustum && !geometry->isVisible(*frustum))
+	{
+		return false;
+	}
 	if (normalMappingEnabledLocation != 0xFFFFFFFF)
 	{
 		glUniform1i(normalMappingEnabledLocation, normalMappingEnabled && geometry->getHasNormalMap());
@@ -361,6 +318,7 @@ void Scene::drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappin
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
+	return true;
 }
 
 void Scene::setViewportSize(int width, int height)
@@ -401,6 +359,16 @@ bool Scene::isNormalMappingEnabled()
 	return normalMappingEnabled;
 }
 
+void Scene::setViewFrustumCullingEnabled(bool viewFrustumCullingEnabled)
+{
+	this->viewFrustumCullingEnabled = viewFrustumCullingEnabled;
+}
+
+bool Scene::isViewFrustumCullingEnabled()
+{
+	return viewFrustumCullingEnabled;
+}
+
 bool Scene::isGameOver()
 {
 	return gameOver;
@@ -412,9 +380,14 @@ bool Scene::isGameWon()
 }
 
 
-int Scene::getUserScore()
+int Scene::getDrawnGeometryCount()
 {
-	return userScore;
+	return drawnGeometryCount;
+}
+
+int Scene::getGeometryCount()
+{
+	return static_cast<int>(geometries.size());
 }
 
 int Scene::getCheckpointsPassed()
@@ -424,7 +397,7 @@ int Scene::getCheckpointsPassed()
 
 int Scene::getCheckpointCount()
 {
-	return static_cast<int>(std::size(CHECKPOINTS));
+	return static_cast<int>(rules::CHECKPOINT_COUNT);
 }
 
 
@@ -445,47 +418,37 @@ void Scene::initPhysicsBodies()
 
 	Geometry* geomBox2 = geometries[17].get();
 	physics::BodyHandle box2 = physicsWorld->createDynamicBox(geomBox2->getPosition(), vec3(0.8f), 1.0f);
-	geomBox2->setStatic(false);
-	geomBox2->setDynamicBody(physicsWorld, box2);
+	geomBox2->setPhysicsBody(physicsWorld, box2);
 	dynamicBodies.emplace_back(box2, geomBox2->getPosition());
 
 	for (int i = 3; i <= 14; i++)
 	{
 		Geometry* geomRock = geometries[i].get();
 		physics::BodyHandle rock = physicsWorld->createStaticSphere(geomRock->getPosition(), 0.7f);
-		geomRock->setStatic(true);
-		geomRock->setStaticBody(physicsWorld, rock);
+		geomRock->setPhysicsBody(physicsWorld, rock);
 		bodiesRock.push_back(rock);
 	}
 
 
 
-	//The terrain is a static triangle mesh with the transformation of the rendered terrain (scaled and rotated from Z-up to Y-up)
+	//The terrain is a static triangle mesh, placed like the rendered terrain
 	Mesh* worldMesh = world->getModel()->meshes[0];
-	mat3 worldRotationScale = mat3(world->modelMatrix);
-	float worldScale = length(worldRotationScale[0]); //uniform
+	MeshTransform worldTransform = terrainTransform(world->modelMatrix);
 	physicsWorld->createStaticMesh(worldMesh->vertices, worldMesh->numVertices, worldMesh->indices, worldMesh->numFaces,
-		worldScale, world->getPosition(), quat_cast(worldRotationScale / worldScale));
+		worldTransform.scale, worldTransform.position, worldTransform.rotation);
 
 	physicsWorld->optimizeBroadPhase();
 }
 
-/**
-* The finish line is a board across the track (along the x axis of its model). The trigger has its width and is
-* deeper than the board, so that the bear cannot step over it in one frame.
-*/
-void Scene::initFinishLine()
+void Scene::initFinishLine(Geometry* board)
 {
-	Mesh* finishLineMesh = finishLine->getModel()->meshes[0];
+	Mesh* boardMesh = board->getModel()->meshes[0];
 	float halfLength = 0.0f;
-	for (unsigned int i = 0; i < finishLineMesh->numVertices; ++i)
+	for (unsigned int i = 0; i < boardMesh->numVertices; ++i)
 	{
-		halfLength = std::max(halfLength, std::abs(finishLineMesh->vertices[i * 3]));
+		halfLength = std::max(halfLength, std::abs(boardMesh->vertices[i * 3]));
 	}
-	vec3 across = vec3(finishLine->modelMatrix[0]);
-	finishLineCenter = finishLine->getPosition();
-	finishLineHalfWidth = halfLength * length(across);
-	finishLineAcross = normalize(vec3(across.x, 0.0f, across.z));
+	finishLine = rules::finishLine(board->modelMatrix, halfLength);
 }
 
 void Scene::initAnimatedTextures()
@@ -519,24 +482,8 @@ void Scene::initAnimatedTextures()
 **/
 void Scene::onBearHit(physics::BodyHandle body)
 {
-
-	/*
-	for (int i = 0; i < bodiesFish.size(); i++)
-	{
-	if (body == bodiesFish[i])
-	{
-	geometries[index]->drawable = false;
-	physicsWorld->removeBody(body);
-	userScore += 1;
-	}
-	}*/
-
 	if (find(bodiesRock.begin(), bodiesRock.end(), body) != bodiesRock.end())
 	{
 		gameOver = true;
 	}
-
-	//TODO implement fish collision
-	//cout << "Bear hit shape" << endl;
-
 }

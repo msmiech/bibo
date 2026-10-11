@@ -125,6 +125,17 @@ set(JPH_USE_DX12 OFF) # GPU compute (hair simulation) is not used
 set(JPH_USE_VK OFF)
 set(JPH_USE_MTL OFF)
 set(JPH_USE_CPU_COMPUTE OFF)
+# Jolt enables AVX2, FMA, F16C, ... by default and passes the compiler flags on to the game, so the executable would crash
+# on x86-64 CPUs without them. SSE2 is part of every x86-64 CPU and fast enough for the few bodies of the game.
+set(USE_SSE4_1 OFF)
+set(USE_SSE4_2 OFF)
+set(USE_AVX OFF)
+set(USE_AVX2 OFF)
+set(USE_AVX512 OFF)
+set(USE_LZCNT OFF)
+set(USE_TZCNT OFF)
+set(USE_F16C OFF)
+set(USE_FMADD OFF)
 FetchContent_Declare(JoltPhysics
 	URL https://github.com/jrouwe/JoltPhysics/archive/refs/tags/v5.6.0.tar.gz
 	URL_HASH SHA256=6e069ee0172478cc78182047aac87e5310ba14a67a53348ae14cc37801fd3f8e
@@ -164,16 +175,12 @@ add_executable(BIBO
 	BIBO/Main.cpp
 	BIBO/Physics/Physics.cpp
 	BIBO/Physics/Physics.hpp
-	BIBO/Resources/AABB.cpp
-	BIBO/Resources/AABB.hpp
 	BIBO/Resources/Material.cpp
 	BIBO/Resources/Material.hpp
 	BIBO/Resources/Mesh.cpp
 	BIBO/Resources/Mesh.hpp
 	BIBO/Resources/Model.cpp
 	BIBO/Resources/Model.hpp
-	BIBO/Resources/Plane.cpp
-	BIBO/Resources/Plane.hpp
 	BIBO/Resources/Shader.cpp
 	BIBO/Resources/Shader.hpp
 	BIBO/Resources/Texture.cpp
@@ -192,8 +199,6 @@ add_executable(BIBO
 	BIBO/Scene/Scene.hpp
 	BIBO/Scene/SceneObject.cpp
 	BIBO/Scene/SceneObject.hpp
-	BIBO/Scene/ViewFrustum.cpp
-	BIBO/Scene/ViewFrustum.hpp
 	BIBO/UI/Menu.cpp
 	BIBO/UI/Menu.hpp
 	BIBO/Util/Console.hpp
@@ -232,8 +237,10 @@ if(MSVC)
 	set_property(TARGET BIBO PROPERTY VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:BIBO>)
 endif()
 
-# The game loads its assets relative to the working directory, so they are copied next to the executable
-set(BIBO_ASSET_DIRS Font Model Shader Texture UI)
+# The game loads its assets relative to the working directory, so they are copied next to the executable.
+# Of the Model folder only the scene and the credits are needed, the other files are the sources of the models (~100 MB).
+set(BIBO_ASSET_DIRS Font Shader Texture UI)
+set(BIBO_MODEL_FILES Model/readme.txt Model/SnowTerrain/track1.dae)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.26)
 	set(BIBO_COPY_DIRECTORY copy_directory_if_different)
 else()
@@ -245,6 +252,16 @@ foreach(asset_dir IN LISTS BIBO_ASSET_DIRS)
 			${CMAKE_CURRENT_SOURCE_DIR}/${asset_dir} $<TARGET_FILE_DIR:BIBO>/${asset_dir}
 		COMMENT "Copying ${asset_dir}/ next to the executable"
 		VERBATIM)
+endforeach()
+foreach(model_file IN LISTS BIBO_MODEL_FILES)
+	cmake_path(GET model_file PARENT_PATH model_dir)
+	add_custom_command(TARGET BIBO POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BIBO>/${model_dir}
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			${CMAKE_CURRENT_SOURCE_DIR}/${model_file} $<TARGET_FILE_DIR:BIBO>/${model_dir}
+		COMMENT "Copying ${model_file} next to the executable"
+		VERBATIM)
+	install(FILES ${model_file} DESTINATION ${model_dir})
 endforeach()
 
 install(TARGETS BIBO RUNTIME DESTINATION .)

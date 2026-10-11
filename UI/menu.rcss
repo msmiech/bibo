@@ -121,9 +121,9 @@ button:active
 }
 
 
-/* ---------- Pause menu: dialog in the middle of the dimmed scene ---------- */
+/* ---------- Pause and game over menu: dialog in the middle of the dimmed scene ---------- */
 
-#pause-menu
+#pause-menu, #game-over-menu
 {
 	display: flex;
 	justify-content: center;

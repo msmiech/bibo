@@ -5,38 +5,10 @@ using namespace bibo;
 using namespace scene;
 
 
-Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture) : SceneObject(modelMatrix, window)
+Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture, Texture* normalMapTexture)
+	: SceneObject(modelMatrix, window), model(make_unique<Model>(shader, assimpScene, nodeName, texture)), normalMap(normalMapTexture)
 {
-	hasNormalMap = false;
-	normalMap = nullptr;
-	model = new Model(shader, assimpScene, nodeName, texture);
-	this->modelMatrix = model->getTranformationMat() * modelMatrix;
-}
-
-Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* filePath, const char* nodeName, Texture* texture)
-	: SceneObject(modelMatrix, window)
-{
-	hasNormalMap = false;
-	normalMap = nullptr;
-	model = new Model(shader, filePath, nodeName, texture);
-	this->modelMatrix = model->getTranformationMat() * modelMatrix;
-}
-
-Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* filePath, const char* nodeName, Texture* texture, Texture* normalMapTexture)
-	: SceneObject(modelMatrix, window), normalMap(normalMapTexture)
-{
-	hasNormalMap = true;
-	model = new Model(shader, filePath, nodeName, texture);
-	this->modelMatrix = model->getTranformationMat() * modelMatrix;
-
-}
-
-Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* filePath, Texture* texture)
-	: SceneObject(modelMatrix, window)
-{
-	hasNormalMap = false;
-	normalMap = nullptr;
-	model = new Model(shader, filePath, texture);
+	hasNormalMap = normalMapTexture != nullptr;
 	this->modelMatrix = model->getTranformationMat() * modelMatrix;
 }
 
@@ -72,7 +44,7 @@ void Geometry::draw(Shader* shader)
 
 Model* Geometry::getModel()
 {
-	return model;
+	return model.get();
 }
 
 bool Geometry::isStatic()

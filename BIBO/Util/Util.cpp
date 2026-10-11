@@ -1,6 +1,5 @@
 #include "Util.hpp"
 #include <cstdio>
-#include <fstream>
 #include <assimp/postprocess.h>
 
 using namespace bibo;
@@ -9,43 +8,24 @@ using namespace scene;
 using namespace std;
 
 
-const aiScene* util::loadSceneFromFile(const char* file)
+ScenePtr util::loadSceneFromFile(const char* file)
 {
 	Assimp::Importer importer;
-
-	ifstream fin(file);
-	if (!fin.fail()) {
-		fin.close();
-	}
-	else
-	{
-		printf("Couldn't open file: %s\n", file);
-		printf("%s\n", importer.GetErrorString());
-	}
-
-	auto scene = importer.ReadFile(file, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
-
-
+	auto scene = importer.ReadFile(file, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
 	if (!scene) {
-		printf("Unable to load model: %s\n", importer.GetErrorString());
+		printf("Unable to load model %s: %s\n", file, importer.GetErrorString());
 		return nullptr;
 	}
 	//The importer owns the scene and would delete it at the end of this function
-	return importer.GetOrphanedScene();
+	return ScenePtr(importer.GetOrphanedScene());
 }
 
-vector<unique_ptr<Light>> util::retrieveLightFromScene(GLFWwindow& window, Shader* shader, const char* file)
+vector<unique_ptr<Light>> util::retrieveLightFromScene(GLFWwindow& window, Shader* shader, const aiScene* scene)
 {
 	vector<unique_ptr<Light>> lights;
-	Assimp::Importer importer;
-	auto scene = importer.ReadFile(file, 0);
-	if (!scene) {
-		printf("Unable to laod mesh: %s\n", importer.GetErrorString());
-		return lights;
-	}
 	if (!scene->HasLights())
 	{
-		printf("Scene does not contain lights: %s\n", importer.GetErrorString());
+		printf("Scene does not contain lights\n");
 	}
 	for (unsigned int i = 0; i < scene->mNumLights; ++i) {
 		switch (scene->mLights[i]->mType)

@@ -251,6 +251,14 @@ glm::mat4 PhysicsWorld::getTransform(BodyHandle body) const
 	return transform;
 }
 
+void PhysicsWorld::resetBody(BodyHandle body, glm::vec3 position, glm::quat rotation)
+{
+	JPH::BodyInterface& bodyInterface = impl->system.GetBodyInterface();
+	JPH::BodyID bodyID(body);
+	bodyInterface.SetPositionAndRotation(bodyID, JPH::RVec3(toJolt(position)), toJolt(rotation), JPH::EActivation::Activate);
+	bodyInterface.SetLinearAndAngularVelocity(bodyID, JPH::Vec3::sZero(), JPH::Vec3::sZero());
+}
+
 struct CharacterController::Impl : public JPH::CharacterContactListener
 {
 	Impl(PhysicsWorld::Impl& world, HitCallback onHit, float stepOffset) : world(world), onHit(std::move(onHit)), stepOffset(stepOffset)
@@ -320,4 +328,15 @@ bool CharacterController::move(glm::vec3 displacement, float time_delta)
 glm::vec3 CharacterController::getPosition() const
 {
 	return toGlm(JPH::Vec3(impl->character->GetPosition()));
+}
+
+void CharacterController::setPosition(glm::vec3 position)
+{
+	impl->character->SetPosition(JPH::RVec3(toJolt(position)));
+	impl->character->SetLinearVelocity(JPH::Vec3::sZero());
+	//Updates the ground state (e.g. on the ground after a fall) for the next move
+	JPH::PhysicsSystem& system = impl->world.system;
+	impl->character->RefreshContacts(system.GetDefaultBroadPhaseLayerFilter(Layers::MOVING),
+		system.GetDefaultLayerFilter(Layers::MOVING),
+		{}, {}, impl->world.tempAllocator);
 }

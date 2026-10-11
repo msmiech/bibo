@@ -37,10 +37,14 @@ namespace bibo
 			void createMeshes(Shader* shader, const aiScene* scene, aiNode* node, Texture* texture, aiMatrix4x4 vertexRotationAroundUpAxis);
 			void init(Shader* shader, const aiScene* scene, const char* nodeName, Texture* texture);
 		public:
-			Model(Shader* shader, const char *filename, const char * nodeName, Texture* tex);
+			/**
+			* Copies the meshes of a node of the scene (or of the root node if nodeName is nullptr) to the graphics memory.
+			* The scene is not needed anymore afterwards. The program exits if the node or its meshes are missing.
+			*/
 			Model(Shader* shader, const aiScene* scene, const char * nodeName, Texture* tex);
-			Model(Shader* shader, const char *filename, Texture* tex);
 			~Model();
+			Model(const Model&) = delete;
+			Model& operator=(const Model&) = delete;
 
 			void transformNode(aiMatrix4x4 *result, aiNode* rootNode);
 			mat4 getTranformationMat(){ return tranformationMat; }

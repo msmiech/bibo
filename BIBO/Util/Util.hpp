@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 
 #include <assimp/Importer.hpp>
+#include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include "../Scene/Light.hpp"
 #include "../Resources/Shader.hpp"
@@ -22,11 +23,18 @@ namespace bibo
 
 	namespace util
 	{
+		struct SceneDeleter
+		{
+			void operator()(const aiScene* scene) const { aiReleaseImport(scene); }
+		};
+		using ScenePtr = unique_ptr<const aiScene, SceneDeleter>;
+
 		/**
-		* @return The loaded scene, which is owned by the caller (delete it when no longer needed) or nullptr
+		* Loads a model file once, so that several models can be created from its nodes
+		* @return The loaded scene or nullptr
 		*/
-		const aiScene* loadSceneFromFile(const char* file);
-		vector<unique_ptr<Light>> retrieveLightFromScene(GLFWwindow& window, Shader* shader, const char* file);
+		ScenePtr loadSceneFromFile(const char* file);
+		vector<unique_ptr<Light>> retrieveLightFromScene(GLFWwindow& window, Shader* shader, const aiScene* scene);
 		mat4 ConvertMatrix(aiMatrix4x4 in);
 	}
 }

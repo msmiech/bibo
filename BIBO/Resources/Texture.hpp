@@ -48,7 +48,8 @@ namespace bibo
 		void bind();
 		void unbind();
 		GLuint getHandle(){ return handle; }
-		bool repeat = false;
+		//Repeated by default: models like the bear have texture coordinates outside of [0, 1]
+		bool repeat = true;
 	};
 }
 

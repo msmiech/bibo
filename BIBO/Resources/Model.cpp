@@ -1,50 +1,12 @@
 #include "Model.hpp"
-#include <iostream>
-#include <fstream>
-#include <cassert>
+#include <string>
+#include "../Util/Console.hpp"
 #include "../Util/Util.hpp"
 
 using namespace bibo;
 using namespace resources;
 using namespace util;
 
-
-/**
-* Model constructor to load model/scene information from a file
-*
-* @path to file which should be loaded.
-* @nodeName Name of the node that should be loaded
-*/
-Model::Model(Shader* shader, const char* path, const char* nodeName, Texture* texture)
-{
-	Assimp::Importer importer;
-
-	ifstream fin(path);
-	if (!fin.fail()) {
-		fin.close();
-	}
-	else
-	{
-		printf("Couldn't open file: %s\n", path);
-		printf("%s\n", importer.GetErrorString());
-	}
-
-	auto scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
-
-
-	if (!scene) {
-		printf("Unable to load model: %s\n", importer.GetErrorString());
-		return;
-	}
-
-	init(shader, scene, nodeName, texture);
-
-}
-
-Model::Model(Shader* shader, const char* filename, Texture* texture) : Model(shader, filename, nullptr, texture)
-{
-	//Just calling the other constructor
-}
 
 Model::Model(Shader* shader, const aiScene* scene, const char* nodeName, Texture* texture)
 {
@@ -60,16 +22,15 @@ void Model::init(Shader* shader, const aiScene* scene, const char* nodeName, Tex
 	auto node = scene->mRootNode;
 	if (!node)
 	{
-		printf("There is no root node!");
-		return;
+		fatalError("The model has no root node");
 	}
+	string name = nodeName ? nodeName : "(root)";
 	if (nodeName)
 	{
 		node = node->FindNode(nodeName);
 		if (!node)
 		{
-			printf("Could not find/load node: %s\n", nodeName);
-			return;
+			fatalError("Could not find the node " + name + " in the model");
 		}
 	}
 
@@ -80,6 +41,11 @@ void Model::init(Shader* shader, const aiScene* scene, const char* nodeName, Tex
 	tranformationMat = ConvertMatrix(transformation);
 
 	createMeshes(shader, scene, node, texture, vertexRotationAroundUpAxis);
+	//The game accesses the first mesh, e.g. to change its material
+	if (meshes.empty())
+	{
+		fatalError("The node " + name + " of the model has no meshes");
+	}
 }
 
 /**

@@ -52,7 +52,6 @@ namespace bibo
 			Mesh& operator=(const Mesh&) = delete;
 			void draw(Shader* shader);
 
-			aiMesh* source;
 			unsigned int numVertices;
 			unsigned int numFaces;
 			float* vertices = nullptr;

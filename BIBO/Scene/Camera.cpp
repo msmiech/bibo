@@ -50,9 +50,12 @@ void Camera::onMouseMoved(double mouseX, double mouseY, float time_delta)
 
 void Camera::update(float time_delta)
 {
-	if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) {
+	//Toggled once per key press, not in every frame while the key is held
+	bool lockKeyPressed = glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS;
+	if (lockKeyPressed && !lockKeyWasPressed) {
 		locked = !locked;
 	}
+	lockKeyWasPressed = lockKeyPressed;
 	if (!locked)
 	{
 		auto velocity = speed * time_delta;

@@ -17,18 +17,21 @@ namespace bibo
 	{
 		class Geometry : public SceneObject
 		{
-			Model* model;
+			unique_ptr<Model> model;
 			bool collidable = false;
 			bool physicsStatic = true;
 			physics::PhysicsWorld* physicsWorld = nullptr;
 			physics::BodyHandle physicsBody = physics::INVALID_BODY;
 		public:
-			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture);
-			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* file, const char* nodeName, Texture* texture);
-			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* file, Texture* texture);
-			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* file, const char* nodeName, Texture* texture, Texture* normalMapTexture);
+			/**
+			* @param assimpScene Loaded once for all geometries, see util::loadSceneFromFile
+			* @param normalMapTexture nullptr for geometries without normal map
+			*/
+			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture, Texture* normalMapTexture = nullptr);
 
 			virtual ~Geometry();
+			Geometry(const Geometry&) = delete;
+			Geometry& operator=(const Geometry&) = delete;
 
 			virtual void update(float time_delta);
 			virtual void draw(Shader* shader);

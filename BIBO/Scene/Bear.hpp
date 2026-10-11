@@ -15,13 +15,16 @@ namespace bibo
 		class Bear : public Geometry
 		{
 		public:
-			Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, Texture* texture, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit);
+			Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, Texture* texture, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit);
 			virtual ~Bear();
 
 			void update(float time_delta) override;
 			void draw(Shader* shader) override;
 			vec3 getDirection() override;
 
+			/**
+			* Moves the bear back to its start position and direction (e.g. when the game is restarted)
+			*/
 			void reset();
 		private:
 			mat4 initialTransform;

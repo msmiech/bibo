@@ -3,7 +3,7 @@
 using namespace bibo;
 using namespace resources;
 
-Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, aiMatrix4x4 transformation) : shader(shader), material(material), texture(texture), source(mesh)
+Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture, aiMatrix4x4 transformation) : shader(shader), material(material), texture(texture)
 {
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);

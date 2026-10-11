@@ -18,7 +18,7 @@ MeshTransform scene::terrainTransform(const mat4& modelMatrix)
 	return { scale, quat_cast(mat3(modelMatrix) / scale), vec3(modelMatrix[3]) };
 }
 
-Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld) : window(window), physicsWorld(physicsWorld)
+Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld) : window(window), mainShader(shader), physicsWorld(physicsWorld)
 {
 	shader->enable();
 
@@ -57,14 +57,9 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	textures.push_back(make_unique<Texture>("Texture/ground07n.jpg", 2)); //9
 	initAnimatedTextures();
 
-	geometries.push_back(make_unique<Bear>(mat4(1.0f), shader, *window, trackScene, textures[1].get(), physicsWorld, [this](physics::BodyHandle body) { onBearHit(body); })); //0
+	geometries.push_back(make_unique<Bear>(*window, trackScene, physicsWorld, [this](const physics::CharacterController::Hit& hit) { onBearHit(hit); })); //0
 	bear = static_cast<Bear*>(geometries[0].get());
-	Material bearMaterial;
-	bearMaterial.ambient = vec3(0.8f, 0.8f, 0.8f);
-	bearMaterial.diffuse = vec3(0.8f, 0.8f, 0.8f);
-	bearMaterial.specular = vec3(0.8f, 0.8f, 0.8f);
-	bearMaterial.shininess = 10.0f;
-	bear->getModel()->meshes[0]->setMaterial(bearMaterial);
+	shader->enable(); //the bear compiled its own shaders
 
 	debugCube = make_unique<Cube>(mat4(1.0f), shader, *window, textures[6].get());
 
@@ -107,6 +102,14 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil3", checkerboardTexPtr)); //21
 	initPhysicsBodies();
 	initFinishLine(geometries[2].get());
+
+	//The fur lies on the rocks when the bear runs into one
+	vector<fur::SphereCollider> rocks;
+	for (int i = 3; i <= 14; i++)
+	{
+		rocks.push_back({ geometries[i]->getPosition(), 0.8f });
+	}
+	bear->setObstacles(rocks);
 
 	rotatingRock = make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock1", textures[5].get(), textures[9].get());
 	rotatingRock->modelMatrix = translate(rotatingRock->modelMatrix, vec3(10, 25, 1));
@@ -173,7 +176,7 @@ void Scene::renderFromCamera(Shader* shader)
 	mat4 view = camera->getViewMatrix();
 	mat4 projection = camera->getProjectionMatrix();
 	ViewFrustum frustum = camera->getViewFrustum();
-	drawnGeometryCount = draw(shader, view, projection, viewFrustumCullingEnabled ? &frustum : nullptr);
+	drawnGeometryCount = draw(shader, view, projection, viewFrustumCullingEnabled ? &frustum : nullptr, shader == mainShader);
 }
 
 void Scene::renderFromLightSource(Shader* shader)
@@ -183,7 +186,7 @@ void Scene::renderFromLightSource(Shader* shader)
 	vec3 lightViewEye = bear->getPosition() + vec3(0.0f, 40.0f, 0.0f);
 	mat4 lightViewMatrix = lookAt(lightViewEye, lightViewEye + lights[0]->getDirection(), vec3(0, 1, 0));
 	//Everything casts shadows, also what the camera does not see
-	draw(shader, lightViewMatrix, lightProjectionMatrix, nullptr);
+	draw(shader, lightViewMatrix, lightProjectionMatrix, nullptr, false);
 }
 
 void Scene::renderLightSourcesOnly(Shader* shader)
@@ -203,7 +206,7 @@ void Scene::renderLightSourcesOnly(Shader* shader)
 	}
 }
 
-int Scene::draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* frustum)
+int Scene::draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* frustum, bool shadedBear)
 {
 	GLuint modelLocation = shader->getUniformLocation("model");
 	GLuint viewLocation = shader->getUniformLocation("view");
@@ -257,7 +260,23 @@ int Scene::draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* f
 	int drawnGeometries = 0;
 	for (unsigned int i = 0; i < geometries.size(); ++i)
 	{
-		if (geometries[i].get() != water && drawGeometry(shader, geometries[i].get(), normalMappingEnabledLocation, frustum))
+		if (geometries[i].get() == bear && shadedBear)
+		{
+			if (!frustum || bear->isVisible(*frustum))
+			{
+				BearRenderContext context;
+				context.view = view;
+				context.projection = projection;
+				context.lightSpaceMatrix = lightSpaceMatrix;
+				context.eye = camera->getPosition();
+				context.light = lights[0].get();
+				context.shadowMappingEnabled = shadowMappingEnabled;
+				bear->drawShaded(context);
+				shader->enable(); //the uniforms of the main shader are kept
+				++drawnGeometries;
+			}
+		}
+		else if (geometries[i].get() != water && drawGeometry(shader, geometries[i].get(), normalMappingEnabledLocation, frustum))
 		{
 			++drawnGeometries;
 		}
@@ -478,12 +497,17 @@ void Scene::initAnimatedTextures()
 }
 
 /**
-* Bear collision callback!
+* Bear collision callback: the rocks knock the bear down, it tumbles and gets up again (the time is lost)
 **/
-void Scene::onBearHit(physics::BodyHandle body)
+void Scene::onBearHit(const physics::CharacterController::Hit& hit)
 {
-	if (find(bodiesRock.begin(), bodiesRock.end(), body) != bodiesRock.end())
+	if (find(bodiesRock.begin(), bodiesRock.end(), hit.body) != bodiesRock.end())
 	{
-		gameOver = true;
+		bear->knockDown(hit);
 	}
+}
+
+bool Scene::isBearKnockedDown()
+{
+	return bear->isKnockedDown();
 }

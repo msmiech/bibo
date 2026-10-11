@@ -6,6 +6,12 @@ Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complet
 ![alt text](Screenshots/bibo_screenshot.PNG)
 
 ## Features
+* The player character is a young brown bear (see [The bear](#the-bear) below)
+  * Skeleton with inverse kinematics: procedural walking and bounding with the paws planted on the terrain, the body follows slopes and leans into turns
+  * Strand based fur that is generated on the GPU and reacts to movement, wind, the ground, obstacles and hits
+  * Detailed face: eyes with iris and pupil that look around and blink with their eyelids, a jaw, tongue and teeth, ears and tail that swing
+  * Running into a rock knocks the bear over: it tumbles as a ragdoll until it lies still, then gets up, shakes its fur and runs on
+  * Idle animations when it stands still for a while: it sits down and stretches (and sticks its tongue out), or sits down and yawns
 * Freely movable camera
   * Locked mode = following the player's character (default)
   * Unlocked mode = 3d flying camera (hold left mouse button)
@@ -22,11 +28,11 @@ Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complet
 * Main menu, pause menu, game over menu (restart the run or back to the main menu) and settings menu (based on RmlUi, usable with mouse or keyboard)
   * Graphics settings (VSync, HDR, bloom, shadows, normal mapping, transparency, texture filtering, mipmapping, wireframe)
   * Resolution and window mode (windowed, fullscreen or borderless)
-* Supports complex models (like the bear, see copyright in files)
+* Supports complex models (Collada scenes and skinned glTF models)
 * Multiple light sources
 * HDR
 * Bloom
-* Animations
+* Animations (procedural skeletal animation of the bear, animated objects)
 * Transparency
 * Shadow Maps
 * Animated textures (e.g. water)
@@ -107,7 +113,7 @@ To use the libraries of the distribution instead of downloading them, also insta
 Not supported: the game requires OpenGL 4.3, macOS only provides OpenGL 4.1.
 
 ### Running and distributing
-The build copies the game assets (`Font`, `Shader`, `Texture`, `UI` and the scene `Model/SnowTerrain/track1.dae`) next to the executable, and the game loads them from the current folder, so always start it from the build folder.
+The build copies the game assets (`Font`, `Shader`, `Texture`, `UI`, the scene `Model/SnowTerrain/track1.dae` and the bear `Model/BearCub/BearCub.glb`) next to the executable, and the game loads them from the current folder, so always start it from the build folder.
 The game starts in the main menu, ESC opens the pause menu during the game.
 The settings menu saves the settings to `settings.cfg` in the current folder (a text file, delete it to reset the settings).
 The command line arguments `BIBO [width height [fullscreen]]` override the saved resolution and window mode: width and height of the window in pixels and `1` for fullscreen (default: `800 600 0`).
@@ -146,8 +152,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests are in the `tests` folder:
-* `unit`: game rules (falling off the track, checkpoints in their order, the finish line), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions), the view frustum (compared with the camera matrices for random cameras), math helpers and the generated textures
-* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart and the collision mesh of the terrain matches the rendered terrain
+* `unit`: game rules (falling off the track, checkpoints in their order, the finish line), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions, ray casts, ragdolls falling and coming to rest with connected joints), animation (transforms, forward kinematics, two bone IK, springs), the fur (guide hairs lag behind, hang down, lie on the ground and on obstacles, hits ruffle them; strand placement), the view frustum (compared with the camera matrices for random cameras), math helpers and the generated textures
+* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart and the collision mesh of the terrain matches the rendered terrain; the bear model (its skeleton matches its skinning, it stands on the ground and fits its capsule, fur and bare skin, eyes, mouth, tongue, teeth and claws) and the bear in action (paws planted while it runs, knocked down by a rock it tumbles, gets up and runs again, rolling over from its back, idle animations and how moving interrupts them, blinking and looking around)
 * `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the camera and the whole scene (e.g. culling never removes a visible pixel). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
   On Linux servers without a graphics card they run on a virtual X server with Mesa's software renderer: `xvfb-run -a ctest --test-dir build --output-on-failure`
 
@@ -168,9 +174,36 @@ This project was originally written in C++11 using Microsoft Visual Studio 2013.
 It now uses C++17 and CMake, and builds with GCC, Clang, MinGW-w64 and MSVC on Windows and Linux.
 For hardware graphics (modern) OpenGL 4.3 (core profile) is used.
 It was developed for Windows 8.1 and Windows 10 and tested using Nvidia GeForce graphics hardware
+### The bear
+**Model.** `Model/BearCub/BearCub.glb` is generated by a Blender script, so it can be changed and rebuilt (Blender 4.2 or newer, tested with 5.2):
+
+```bash
+blender --background --factory-startup --python tools/build_bear_cub.py
+```
+
+The body is a signed distance field of soft-blended primitives (see `PRIMITIVES` in the script) with the mouth carved out of it;
+its surface is extracted and remeshed into evenly sized quads. Eyes, eyelids, nose, tongue, teeth and claws are separate meshes.
+The skeleton has a spine chain, a head with jaw, tongue, eyes, eyelids and ears, legs with two IK bones each plus a paw, and a tail;
+the skin weights come from Blender's automatic weights (the jaw's from its shape). The mouth is modelled open, the game closes it with the jaw.
+The vertex colors hold the fur color and the fur length (alpha), the eyes the direction from their center (iris and pupil are drawn by the shader).
+The script also saves `Model/BearCub/BearCub.blend` to look at the result, and `--preview <folder>` renders preview images.
+
+**Animation** (`BIBO/Scene/BearRig.cpp`, `BIBO/Animation`): there are no animation clips, the pose is computed every frame.
+When walking and bounding, the paws are planted where they land (found with ray casts) and the legs reach them with two bone inverse kinematics;
+the body bobs with the steps, follows the ground and leans into turns. Ears and tail are springs, the eyes make saccades and blink with their lids.
+The idle animations (stretching, yawning) and getting up are key poses of the body, the paws and the face, also solved with IK.
+
+**Fur** (`BIBO/Scene/Fur.cpp`, `Shader/bear_fur.*`): every vertex of the skin has a guide hair, a damped spring that lags behind when the body
+accelerates, hangs down, moves in the wind, lies on the ground and on rocks and is ruffled by hits (simulated on the CPU).
+60000 strands are generated on the GPU from the skinned vertices (no vertex buffer, only the triangle and the position on it per strand):
+each strand is a curved, camera facing ribbon that interpolates the guide hairs of its triangle, shaded with Kajiya-Kay highlights.
+Further away fewer, wider strands are drawn.
+
+**Ragdoll** (`BIBO/Scene/BearCharacter.cpp`): a hit on a rock starts a Jolt ragdoll (capsules with swing-twist and hinge joints) from the current pose and
+velocities. When it lies still, the bear rolls over if it is on its back, pushes itself up, shakes its fur and gets back the control.
 ### Libraries and Dependencies
 Downloaded automatically by CMake (see `CMakeLists.txt` for the exact versions and checksums):
-* [Assimp](https://github.com/assimp/assimp) 6.0 (model loading)
+* [Assimp](https://github.com/assimp/assimp) 6.0 (model loading: Collada for the track, glTF for the bear)
 * [FreeType](https://freetype.org) 2.14 (text rendering)
 * [GLEW](https://github.com/nigels-com/glew) 2.3 (OpenGL function loading)
 * [GLFW](https://www.glfw.org) 3.4 (window and input)
@@ -190,7 +223,8 @@ Downloaded automatically by CMake (see `CMakeLists.txt` for the exact versions a
 * lighthouse3d.com/tutorials
 * learncpp.com
 ### Assets
-* BearBrown - http://tf3dm.com/3d-model/bear-98965.html
+* BearCub (the player character): made for this game, generated by [tools/build_bear_cub.py](tools/build_bear_cub.py) (see [The bear](#the-bear))
+* BearBrown (the bear of earlier versions, still in the track file but no longer used) - http://tf3dm.com/3d-model/bear-98965.html
 * SnowTerrain - http://tf3dm.com/3d-model/snowy-terrain-46334.html
 * Rock - http://tf3dm.com/3d-model/rock-86533.html
 * Salmon - http://tf3dm.com/3d-model/salmon-44387.html

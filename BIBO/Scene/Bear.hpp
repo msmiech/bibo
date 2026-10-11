@@ -1,25 +1,44 @@
 #pragma once
 #include "Geometry.hpp"
+#include "BearCharacter.hpp"
+#include "BearRenderer.hpp"
 #include "../Physics/Physics.hpp"
+#include "../Resources/SkinnedModel.hpp"
 #include <memory>
+#include <vector>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 namespace bibo
 {
 	namespace scene
 	{
-		class Scene;
-
+		/**
+		* The player character: a young brown bear (Model/BearCub/BearCub.glb) with a skeleton, procedural animation,
+		* fur strands and a ragdoll (see BearCharacter, BearRig, BearRenderer). Controlled with the arrow keys and SPACE.
+		*/
 		class Bear : public Geometry
 		{
 		public:
-			Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, Texture* texture, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit);
-			virtual ~Bear();
+			static const char* const MODEL_FILE;
+			static constexpr std::size_t STRAND_COUNT = 60000;
+
+			/**
+			* @param assimpScene The track: the bear starts where its node BearBody is
+			* @param onHit Called when the bear touches a body (e.g. to knock it down)
+			*/
+			Bear(GLFWwindow& window, const aiScene* assimpScene, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit);
+			~Bear() override;
 
 			void update(float time_delta) override;
+			/**
+			* Draws the surface of the bear with the given shader (e.g. into the shadow map)
+			*/
 			void draw(Shader* shader) override;
+			/**
+			* Draws the bear with its fur (in the main pass)
+			*/
+			void drawShaded(const BearRenderContext& context);
+			vec3 getPosition() override;
 			vec3 getDirection() override;
 			bool isVisible(const ViewFrustum& frustum) override;
 
@@ -28,24 +47,30 @@ namespace bibo
 			*/
 			void reset();
 			/**
+			* The bear tumbles as a ragdoll, then gets up again (e.g. after running into a rock)
+			*/
+			void knockDown(const physics::CharacterController::Hit& hit);
+			/**
+			* @return true while the bear tumbles or gets up (the player cannot control it)
+			*/
+			bool isKnockedDown() const;
+			/**
+			* Obstacles that the fur lies on
+			*/
+			void setObstacles(const std::vector<fur::SphereCollider>& obstacles);
+			BearCharacter& getCharacter() { return *character; }
+			/**
 			* Shape and movement limits of the bear's physics capsule
 			*/
 			static physics::CharacterControllerDesc characterControllerDesc(vec3 position);
+
 		private:
-			mat4 initialTransform;
-			vec3 direction;
+			void uploadIfChanged();
 
-			unique_ptr<physics::CharacterController> characterController;
-
-			Geometry leftHand;
-			vec3 leftHandOffSet;
-			Geometry rightHand;
-			vec3 rightHandOffSet;
-			Geometry leftLeg;
-			vec3 leftLegOffSet;
-			Geometry rightLeg;
-			vec3 rightLegOffSet;
-
+			std::unique_ptr<resources::SkinnedModel> model;
+			std::unique_ptr<BearCharacter> character;
+			std::unique_ptr<BearRenderer> renderer;
+			unsigned int uploadedVersion = 0;
 		};
 	}
 }

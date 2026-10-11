@@ -54,9 +54,10 @@ else()
 		URL_HASH SHA256=6775e47231a446fd086d660ecc18bcd076531cfedd912fbd66e576b118607001
 		SYSTEM)
 
-	# Assimp: model loading (only the Collada importer is needed)
+	# Assimp: model loading (Collada for the track, glTF for the bear)
 	set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF)
 	set(ASSIMP_BUILD_COLLADA_IMPORTER ON)
+	set(ASSIMP_BUILD_GLTF_IMPORTER ON)
 	set(ASSIMP_NO_EXPORT ON)
 	set(ASSIMP_BUILD_TESTS OFF)
 	set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
@@ -174,6 +175,10 @@ target_link_libraries(bibo_rmlui_backend PUBLIC RmlUi::Core glfw GLEW::GLEW)
 # ---------------------------------------------------------------------------
 # Everything except main() is a library, so that the tests use exactly the same code as the game
 add_library(bibo_core STATIC
+	BIBO/Animation/InverseKinematics.cpp
+	BIBO/Animation/InverseKinematics.hpp
+	BIBO/Animation/Skeleton.cpp
+	BIBO/Animation/Skeleton.hpp
 	BIBO/Physics/Physics.cpp
 	BIBO/Physics/Physics.hpp
 	BIBO/Resources/Material.hpp
@@ -185,14 +190,24 @@ add_library(bibo_core STATIC
 	BIBO/Resources/Plane.hpp
 	BIBO/Resources/Shader.cpp
 	BIBO/Resources/Shader.hpp
+	BIBO/Resources/SkinnedModel.cpp
+	BIBO/Resources/SkinnedModel.hpp
 	BIBO/Resources/Texture.cpp
 	BIBO/Resources/Texture.hpp
 	BIBO/Scene/Bear.cpp
 	BIBO/Scene/Bear.hpp
+	BIBO/Scene/BearCharacter.cpp
+	BIBO/Scene/BearCharacter.hpp
+	BIBO/Scene/BearRenderer.cpp
+	BIBO/Scene/BearRenderer.hpp
+	BIBO/Scene/BearRig.cpp
+	BIBO/Scene/BearRig.hpp
 	BIBO/Scene/Camera.cpp
 	BIBO/Scene/Camera.hpp
 	BIBO/Scene/Cube.cpp
 	BIBO/Scene/Cube.hpp
+	BIBO/Scene/Fur.cpp
+	BIBO/Scene/Fur.hpp
 	BIBO/Scene/GameRules.hpp
 	BIBO/Scene/Geometry.cpp
 	BIBO/Scene/Geometry.hpp
@@ -248,9 +263,9 @@ if(MSVC)
 endif()
 
 # The game loads its assets relative to the working directory, so they are copied next to the executable.
-# Of the Model folder only the scene and the credits are needed, the other files are the sources of the models (~100 MB).
+# Of the Model folder only the scene, the bear and the credits are needed, the other files are the sources of the models (~100 MB).
 set(BIBO_ASSET_DIRS Font Shader Texture UI)
-set(BIBO_MODEL_FILES Model/readme.txt Model/SnowTerrain/track1.dae)
+set(BIBO_MODEL_FILES Model/readme.txt Model/SnowTerrain/track1.dae Model/BearCub/BearCub.glb)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.26)
 	set(BIBO_COPY_DIRECTORY copy_directory_if_different)
 else()

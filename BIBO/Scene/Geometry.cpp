@@ -27,6 +27,11 @@ Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const c
 	this->modelMatrix = model->getTranformationMat() * modelMatrix;
 }
 
+Geometry::Geometry(mat4 modelMatrix, GLFWwindow& window)
+	: SceneObject(modelMatrix, window), normalMap(nullptr), hasNormalMap(false)
+{
+}
+
 void Geometry::requireMeshes(const char* nodeName)
 {
 	if (model->meshes.empty())

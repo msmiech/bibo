@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <memory>
+#include <string>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -13,6 +15,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "Resources/Model.hpp"
+#include "Resources/SkinnedModel.hpp"
 #include "Util/Util.hpp"
 
 namespace bibo::test
@@ -40,14 +43,16 @@ namespace bibo::test
 			{ "Shader/text_shader.vert", "Shader/text_shader.frag" },
 			{ "Shader/light_source_shader.vert", "Shader/light_source_shader.frag" },
 			{ "Shader/gaussian_blur_shader.vert", "Shader/gaussian_blur_shader.frag" },
-			{ "Shader/post_processing_shader.vert", "Shader/post_processing_shader.frag" } };
+			{ "Shader/post_processing_shader.vert", "Shader/post_processing_shader.frag" },
+			{ "Shader/bear_skin.vert", "Shader/bear_skin.frag" },
+			{ "Shader/bear_fur.vert", "Shader/bear_fur.frag" } };
 		return programs;
 	}
 
 	const std::vector<std::string>& gameNodeNames()
 	{
 		static const std::vector<std::string> names = {
-			"BearBody", "LeftHand", "RightHand", "LeftLeg", "RightLeg",
+			"BearBody",
 			"Boden", "FinishLine", "Torus", "Water", "Cube", "Monitor1",
 			"Rock1", "Rock2", "Rock3", "Rock4", "Rock5", "Rock6", "Rock7", "Rock8", "Rock9", "Rock10", "Rock11", "Rock12",
 			"Pfeil0", "Pfeil1", "Pfeil2", "Pfeil3" };
@@ -71,6 +76,17 @@ namespace bibo::test
 			FAIL("Could not load " << TRACK_FILE << ": " << importer.GetErrorString());
 		}
 		return *scene;
+	}
+
+	const resources::SkinnedModel& bearModel()
+	{
+		static std::string error;
+		static std::unique_ptr<resources::SkinnedModel> model = resources::SkinnedModel::load(assetPath(BEAR_FILE).string(), error);
+		if (!model)
+		{
+			FAIL("Could not load " << BEAR_FILE << ": " << error);
+		}
+		return *model;
 	}
 
 	aiNode& trackNode(const std::string& name)

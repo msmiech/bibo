@@ -11,14 +11,19 @@ add_executable(bibo_tests
 	TestSupport.cpp
 	TestSupport.hpp
 	# Game logic, no assets or graphics card needed
+	unit/AnimationTest.cpp
 	unit/CharacterControllerTest.cpp
+	unit/FurTest.cpp
 	unit/GameRulesTest.cpp
 	unit/MathTest.cpp
 	unit/PhysicsWorldTest.cpp
+	unit/RagdollTest.cpp
 	unit/TextureGeneratorTest.cpp
 	unit/ViewFrustumTest.cpp
 	# Content of the asset files, no graphics card needed
 	assets/AssetFilesTest.cpp
+	assets/BearCharacterTest.cpp
+	assets/BearModelTest.cpp
 	assets/TrackAssetTest.cpp
 	assets/TrackPhysicsTest.cpp
 	# Need an OpenGL 4.3 context, skipped if there is none (e.g. no display)

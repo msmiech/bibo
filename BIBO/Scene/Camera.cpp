@@ -106,10 +106,10 @@ void Camera::setTarget(SceneObject* targetObject)
 	vec3 targetDirection = targetObject->getDirection();
 	this->direction = normalize(targetPosition + 3.f * targetDirection - position);
 
-	mat4 targetModelMatrix = targetObject->modelMatrix;
-	mat4 translationMatrix = translate(targetModelMatrix, vec3(-1.0f, 6.0f, 4.0f)); //This translation is adapted to collada/rootnode patch
-
-	position = vec3(translationMatrix * vec4(1.0f));
+	//7 units behind the target and 5 above it, along its horizontal direction (it does not tilt with the target)
+	vec3 horizontal(targetDirection.x, 0.0f, targetDirection.z);
+	vec3 behind = length(horizontal) > 1e-4f ? -normalize(horizontal) : vec3(0.0f, 0.0f, 1.0f);
+	position = targetPosition + 7.0f * behind + vec3(0.0f, 5.0f, 0.0f);
 }
 
 mat4 Camera::getViewMatrix()

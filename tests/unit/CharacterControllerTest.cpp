@@ -40,7 +40,7 @@ namespace
 		BodyHandle ground;
 		CharacterControllerDesc desc = Bear::characterControllerDesc(vec3(0.0f, GROUND_TOP + 3.0f, 0.0f));
 		std::vector<BodyHandle> touchedBodies;
-		CharacterController bear{ world, desc, [this](BodyHandle body) { touchedBodies.push_back(body); } };
+		CharacterController bear{ world, desc, [this](const CharacterController::Hit& hit) { touchedBodies.push_back(hit.body); } };
 		//Height of the center of the capsule when the bear stands on the ground
 		const float standingHeight = GROUND_TOP + 0.5f * desc.height + desc.radius;
 

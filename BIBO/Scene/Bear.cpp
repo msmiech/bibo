@@ -1,254 +1,123 @@
 #include "Bear.hpp"
-#include <cmath>
-#include <iostream>
-#include <glm/gtx/rotate_vector.hpp>
+#include "../Util/Console.hpp"
 #include "../Util/Util.hpp"
 
 using namespace bibo;
 using namespace scene;
 
-//movement attributes (per second)
-const float forwardVelocity = 10.f, backwardVelocity = -7.5f, maxJumpTime = 0.5f;
-//The jump and the fall were tuned at 60 FPS: rising by 10 per second minus the gravity of 2 frames, falling by 0.981 per frame and second of falling
-const float jumpVelocity = 10.f - 2.f * 0.981f, gravity = -0.981f * 60.f;
-float jumpTimeLeft = 0, totalFallingTime = 0;
-bool standingOnGround = false;
+const char* const Bear::MODEL_FILE = "Model/BearCub/BearCub.glb";
 
-//animation attributes
-float frontAngle = 0.0f;
-float backAngle = 0.0f;
-float rotationYAngle = 0.0f;
-bool reverseAnim = false;
-bool characterMoved = false;
-bool characterRotated = false;
-bool characterJumped = false;
-
-Bear::Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, Texture* texture, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit)
-	: Geometry(modelMatrix, shader, window, assimpScene, "BearBody", texture), initialTransform(this->modelMatrix), direction(vec3(0.0f, 0.0f, -1.0f)),
-	leftHand(mat4(1.f), shader, window, assimpScene, "LeftHand", texture),
-	rightHand(mat4(1.f), shader, window, assimpScene, "RightHand", texture),
-	leftLeg(mat4(1.f), shader, window, assimpScene, "LeftLeg", texture),
-	rightLeg(mat4(1.f), shader, window, assimpScene, "RightLeg", texture)
+namespace
 {
+	glm::vec3 startPosition(const aiScene* track)
+	{
+		//The node of the bear in the track is only used as start position (center of the character capsule)
+		aiNode* node = track ? track->mRootNode->FindNode("BearBody") : nullptr;
+		if (!node)
+		{
+			util::fatalError("The track has no node BearBody (start position of the bear)");
+		}
+		aiMatrix4x4 transformation = node->mTransformation;
+		resources::Model::transformNode(&transformation, node);
+		return glm::vec3(util::ConvertMatrix(transformation)[3]);
+	}
 
-	vec3 position = SceneObject::getPosition();
-	float temp;
-	leftHandOffSet = leftHand.getPosition() - position;
-	temp = leftHandOffSet.y;
-	leftHandOffSet.y = leftHandOffSet.z;
-	leftHandOffSet.z = temp;
-	leftHandOffSet.x = leftHandOffSet.x + 0.7f;
-	rightHandOffSet = rightHand.getPosition() - position;
-	temp = rightHandOffSet.y;
-	rightHandOffSet.y = rightHandOffSet.z;
-	rightHandOffSet.z = temp;
-	rightHandOffSet.x = rightHandOffSet.x + 0.7f;
-	leftLegOffSet = leftLeg.getPosition() - position;
-	temp = leftLegOffSet.y;
-	leftLegOffSet.y = leftLegOffSet.z;
-	leftLegOffSet.z = temp;
-	leftLegOffSet.x = leftLegOffSet.x + 1.25f;
-	rightLegOffSet = rightLeg.getPosition() - position;
-	temp = rightLegOffSet.y;
-	rightLegOffSet.y = rightLegOffSet.z;
-	rightLegOffSet.z = temp;
-	rightLegOffSet.x = rightLegOffSet.x - 1.25f;
-
-	characterController = make_unique<physics::CharacterController>(*physicsWorld, characterControllerDesc(position), std::move(onHit));
-
-	Material legMaterial;
-	legMaterial.ambient = vec3(0.8f, 0.8f, 0.8f);
-	legMaterial.diffuse = vec3(0.8f, 0.8f, 0.8f);
-	legMaterial.specular = vec3(0.87f, 1.0f, 0.65f);
-	legMaterial.shininess = 10.0f;
-	leftLeg.getModel()->meshes[0]->setMaterial(legMaterial);
-	rightLeg.getModel()->meshes[0]->setMaterial(legMaterial);
-	leftHand.getModel()->meshes[0]->setMaterial(legMaterial);
-	rightHand.getModel()->meshes[0]->setMaterial(legMaterial);
+	std::unique_ptr<resources::SkinnedModel> loadModel()
+	{
+		std::string error;
+		std::unique_ptr<resources::SkinnedModel> model = resources::SkinnedModel::load(Bear::MODEL_FILE, error);
+		if (!model)
+		{
+			util::fatalError(std::string("Could not load ") + Bear::MODEL_FILE + ": " + error);
+		}
+		BearRig rig(model->skeleton);
+		if (!rig.isValid())
+		{
+			util::fatalError(std::string("The skeleton of ") + Bear::MODEL_FILE + " has no bones " + rig.getMissingBones());
+		}
+		return model;
+	}
 }
 
-Bear::~Bear()
+Bear::Bear(GLFWwindow& window, const aiScene* assimpScene, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit)
+	: Geometry(mat4(1.0f), window), model(loadModel())
 {
+	//The bear starts looking along -z
+	character = std::make_unique<BearCharacter>(*physicsWorld, *model, startPosition(assimpScene), vec3(0.0f, 0.0f, -1.0f), std::move(onHit));
+	renderer = std::make_unique<BearRenderer>(*model, STRAND_COUNT);
+	modelMatrix[3] = vec4(character->getPosition(), 1.0f);
 }
+
+Bear::~Bear() = default;
 
 physics::CharacterControllerDesc Bear::characterControllerDesc(vec3 position)
 {
-	physics::CharacterControllerDesc desc; //A controller is a kinematic capsule, moved by the game logic
-	desc.position = position; //initial position
-	desc.contactOffset = 0.05f; //controller skin within which contacts generated
-	desc.stepOffset = 1.0f; //max obstacle height the character can climb
-	desc.slopeLimit = radians(45.0f); // max slope the character can walk
-	desc.radius = 1.0f; //radius of the capsule
-	desc.height = 0.6f; //height of the controller
-	return desc;
+	return BearCharacter::characterControllerDesc(position);
 }
 
 void Bear::update(float time_delta)
 {
-	auto rightKey = glfwGetKey(window, GLFW_KEY_RIGHT);
-	auto leftKey = glfwGetKey(window, GLFW_KEY_LEFT);
-	auto forwardKey = glfwGetKey(window, GLFW_KEY_UP);
-	auto backKey = glfwGetKey(window, GLFW_KEY_DOWN);
-	auto jumpKey = glfwGetKey(window, GLFW_KEY_SPACE);
-	characterMoved = false;
-	characterRotated = false;
-	characterJumped = false;
+	BearInput input;
+	input.forward = (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS ? 1.0f : 0.0f) - (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS ? 1.0f : 0.0f);
+	input.turn = (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS ? 1.0f : 0.0f) - (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS ? 1.0f : 0.0f);
+	input.jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+	character->update(time_delta, input);
+	modelMatrix[3] = vec4(character->getPosition(), 1.0f);
+}
 
-	/*
-	 The controller is moved once per frame with characterController->move(displacement, time_delta):
-	 the first parameter is the displacement (direction and distance) of this frame, the result tells
-	 whether the bear stands on the ground after the move (collision below the capsule).*/
-
-	vec3 displacement(0.0f);
-
-	if (rightKey == GLFW_PRESS)
+void Bear::uploadIfChanged()
+{
+	if (uploadedVersion != character->getVersion())
 	{
-		modelMatrix = rotate(modelMatrix, radians(-90.0f) * time_delta, vec3(0.0f, 0.0f, 1.0f));
-		direction = glm::rotateY(direction, radians(-90.0f) * time_delta);
-		direction = normalize(direction);
-		characterRotated = true;
-		rotationYAngle -= 100 * time_delta;
-	}
-	if (leftKey == GLFW_PRESS)
-	{
-		modelMatrix = rotate(modelMatrix, radians(90.0f) * time_delta, vec3(0.0f, 0.0f, 1.0f));
-		direction = glm::rotateY(direction, radians(90.0f) * time_delta);
-		direction = normalize(direction);
-		characterRotated = true;
-		rotationYAngle += 100 * time_delta;
-	}
-	if (forwardKey == GLFW_PRESS)
-	{
-		displacement += direction * forwardVelocity * time_delta;
-		if (reverseAnim)
-		{
-			frontAngle -= 125 * time_delta;
-			backAngle += 125 * time_delta;
-		}
-		else
-		{
-			frontAngle += 150 * time_delta;
-			backAngle -= 150 * time_delta;
-		}
-		characterMoved = true;
-	}
-	if (backKey == GLFW_PRESS)
-	{
-		displacement += direction * backwardVelocity * time_delta;
-		if (reverseAnim)
-		{
-			frontAngle += 100 * time_delta;
-			backAngle -= 100 * time_delta;
-		}
-		else
-		{
-			frontAngle -= 100 * time_delta;
-			backAngle += 100 * time_delta;
-		}
-		characterMoved = true;
-	}
-	//The bear rises while SPACE is held (at most maxJumpTime), the next jump is only possible after landing
-	if (jumpKey == GLFW_PRESS && jumpTimeLeft > 0)
-	{
-		jumpTimeLeft -= time_delta;
-		totalFallingTime = 0.0f;
-		displacement.y += jumpVelocity * time_delta;
-		characterJumped = true;
-	}
-	else
-	{
-		if (!standingOnGround)
-		{
-			jumpTimeLeft = 0.0f; //SPACE was released in the air
-		}
-		//The longer the bear falls, the faster it falls (on the ground the controller ignores the downward movement)
-		totalFallingTime += time_delta;
-		displacement.y += gravity * totalFallingTime * time_delta;
-	}
-
-	standingOnGround = characterController->move(displacement, time_delta);
-	if (standingOnGround && !characterJumped)
-	{
-		jumpTimeLeft = maxJumpTime;
-		totalFallingTime = 1.0f; //falls quickly when walking over an edge
-	}
-
-	setPosition(characterController->getPosition());
-
-	if (std::abs(frontAngle) > 50.f || std::abs(backAngle) > 50.f)
-	{
-		frontAngle = frontAngle > 0 ? 50.f : -50.f;
-		backAngle = backAngle > 0 ? 50.f : -50.f;
-		reverseAnim = !reverseAnim;
-	}
-	if (std::abs(rotationYAngle) > 50.f)
-	{
-		rotationYAngle = rotationYAngle > 0 ? 45.f : -45.f;
-	}
-
-	leftHand.modelMatrix = translate(modelMatrix, leftHandOffSet);
-	leftLeg.modelMatrix = translate(modelMatrix, leftLegOffSet);
-	rightHand.modelMatrix = translate(modelMatrix, rightHandOffSet);
-	rightLeg.modelMatrix = translate(modelMatrix, rightLegOffSet);
-
-	if (characterJumped)
-	{
-		//Optional: Display jump animation
-	}
-	else if (characterMoved)
-	{
-		leftHand.modelMatrix = rotate(leftHand.modelMatrix, radians(frontAngle), vec3(1, 0, 0));
-		rightHand.modelMatrix = rotate(rightHand.modelMatrix, radians(frontAngle), vec3(1, 0, 0));
-		leftLeg.modelMatrix = rotate(leftLeg.modelMatrix, radians(backAngle), vec3(1, 0, 0));
-		rightLeg.modelMatrix = rotate(rightLeg.modelMatrix, radians(backAngle), vec3(1, 0, 0));
-	}
-	else if (characterRotated)
-	{
-		leftHand.modelMatrix = rotate(leftHand.modelMatrix, radians(rotationYAngle), vec3(0, 0, 1));
-		rightHand.modelMatrix = rotate(rightHand.modelMatrix, radians(rotationYAngle), vec3(0, 0, 1));
-		leftLeg.modelMatrix = rotate(leftLeg.modelMatrix, radians(rotationYAngle), vec3(0, 0, 1));
-		rightLeg.modelMatrix = rotate(rightLeg.modelMatrix, radians(rotationYAngle), vec3(0, 0, 1));
-	}
-	else
-	{
-		frontAngle = 0.f;
-		backAngle = 0.f;
-		rotationYAngle = 0.f;
+		renderer->upload(character->getPositions(), character->getNormals(), character->getFurOffsets(), character->getCombDirections());
+		uploadedVersion = character->getVersion();
 	}
 }
 
 void Bear::draw(Shader* shader)
 {
-	rightHand.draw(shader);
-	leftHand.draw(shader);
-	leftLeg.draw(shader);
-	rightLeg.draw(shader);
+	uploadIfChanged();
+	renderer->drawSurface(shader);
+}
 
-	Geometry::draw(shader);
+void Bear::drawShaded(const BearRenderContext& context)
+{
+	uploadIfChanged();
+	renderer->drawShaded(context, character->getBoundsCenter());
+}
+
+vec3 Bear::getPosition()
+{
+	return character->getPosition();
 }
 
 vec3 Bear::getDirection()
 {
-	return direction;
+	return character->getDirection();
 }
 
 bool Bear::isVisible(const ViewFrustum& frustum)
 {
-	//The limbs stick out of the body
-	return Geometry::isVisible(frustum) || leftHand.isVisible(frustum) || rightHand.isVisible(frustum) || leftLeg.isVisible(frustum) || rightLeg.isVisible(frustum);
+	return frustum.sphereInFrustum(character->getBoundsCenter(), character->getBoundsRadius()) != ViewFrustum::OUTSIDE;
 }
 
 void Bear::reset()
 {
-	this->modelMatrix = initialTransform;
-	direction = vec3(0.0f, 0.0f, -1.0f);
-	characterController->setPosition(SceneObject::getPosition());
+	character->reset();
+	modelMatrix[3] = vec4(character->getPosition(), 1.0f);
+}
 
-	jumpTimeLeft = 0.0f;
-	totalFallingTime = 0.0f;
-	standingOnGround = false;
-	frontAngle = 0.0f;
-	backAngle = 0.0f;
-	rotationYAngle = 0.0f;
-	reverseAnim = false;
+void Bear::knockDown(const physics::CharacterController::Hit& hit)
+{
+	character->knockDown(hit);
+}
+
+bool Bear::isKnockedDown() const
+{
+	return character->getState() != BearCharacter::State::CONTROL;
+}
+
+void Bear::setObstacles(const std::vector<fur::SphereCollider>& obstacles)
+{
+	character->setObstacles(obstacles);
 }

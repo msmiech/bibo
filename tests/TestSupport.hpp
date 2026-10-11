@@ -18,6 +18,11 @@ struct GLFWwindow;
 struct aiNode;
 struct aiScene;
 
+namespace bibo::resources
+{
+	class SkinnedModel;
+}
+
 namespace bibo::test
 {
 	/**
@@ -53,7 +58,7 @@ namespace bibo::test
 	const char* const TRACK_FILE = "Model/SnowTerrain/track1.dae";
 
 	/**
-	* Nodes of the track file that the game loads (Scene and Bear)
+	* Nodes of the track file that the game loads (Scene, and the start position of the Bear)
 	*/
 	const std::vector<std::string>& gameNodeNames();
 
@@ -66,6 +71,13 @@ namespace bibo::test
 	* The track file loaded with Assimp like the game does (Model), only loaded once per test run
 	*/
 	const aiScene& trackScene();
+
+	const char* const BEAR_FILE = "Model/BearCub/BearCub.glb";
+
+	/**
+	* The model of the bear loaded like the game does (SkinnedModel), only loaded once per test run
+	*/
+	const resources::SkinnedModel& bearModel();
 
 	/**
 	* @return The node with this name in the track, fails the test if there is none

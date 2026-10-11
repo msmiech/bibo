@@ -104,7 +104,7 @@ namespace
 		Run moveBear(vec3 start, float seconds, vec3 velocity)
 		{
 			Run run;
-			CharacterController bear(world, Bear::characterControllerDesc(start), [&](BodyHandle body) { run.touchedBodies.push_back(body); });
+			CharacterController bear(world, Bear::characterControllerDesc(start), [&](const CharacterController::Hit& hit) { run.touchedBodies.push_back(hit.body); });
 			for (int i = 0; i < static_cast<int>(seconds / FRAME); ++i)
 			{
 				world.update(FRAME);

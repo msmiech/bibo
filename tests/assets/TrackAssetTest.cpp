@@ -134,13 +134,3 @@ TEST_CASE("The checkpoints are apart from each other and from the start", "[asse
 		}
 	}
 }
-
-TEST_CASE("The limbs of the bear are next to its body", "[assets]")
-{
-	//Bear::Bear: the limbs are positioned relative to the body
-	const vec3 body = startPosition("BearBody");
-	const std::string limb = GENERATE(values<std::string>({ "LeftHand", "RightHand", "LeftLeg", "RightLeg" }));
-	CAPTURE(limb);
-
-	CHECK(glm::distance(startPosition(limb), body) < 3.0f);
-}

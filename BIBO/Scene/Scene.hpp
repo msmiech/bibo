@@ -42,19 +42,21 @@ namespace bibo
 			* @param board The finish line (geometry), the trigger goes along it across the track
 			*/
 			void initFinishLine(Geometry* board);
-			//Called when the bear touches a physics body
-			void onBearHit(physics::BodyHandle body);
+			//Called when the bear touches a physics body: obstacles (rocks) knock it down
+			void onBearHit(const physics::CharacterController::Hit& hit);
 			/**
 			* @param frustum Geometries outside of it are not drawn (nullptr: draw all)
+			* @param shadedBear The bear is drawn with its own shaders and its fur (main pass), otherwise with the given shader
 			* @return Number of drawn geometries
 			*/
-			int draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* frustum);
+			int draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* frustum, bool shadedBear);
 			/**
 			* @return false if the geometry is outside of the frustum and was not drawn
 			*/
 			bool drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappingEnabledLocation, const ViewFrustum* frustum);
 
 			GLFWwindow* window;
+			Shader* mainShader;
 			vector<unique_ptr<Geometry>> geometries;
 			vector<unique_ptr<Light>> lights;
 			unique_ptr<Camera> camera;
@@ -126,6 +128,10 @@ namespace bibo
 			* @return Number of geometries drawn by the last renderFromCamera
 			*/
 			int getDrawnGeometryCount();
+			/**
+			* @return true while the bear tumbles after running into an obstacle or gets up again
+			*/
+			bool isBearKnockedDown();
 			/**
 			* @return Number of geometries in the scene
 			*/

@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -15,6 +16,17 @@ namespace bibo
 		*/
 		using BodyHandle = std::uint32_t;
 		const BodyHandle INVALID_BODY = 0xffffffff;
+
+		/**
+		* Where a ray hits the first body
+		*/
+		struct RayHit
+		{
+			BodyHandle body = INVALID_BODY;
+			glm::vec3 position = glm::vec3(0.0f);
+			glm::vec3 normal = glm::vec3(0.0f, 1.0f, 0.0f); //surface normal of the body at the hit
+			float fraction = 1.0f; //position = origin + fraction * ray
+		};
 
 		/**
 		* Physics simulation based on Jolt Physics (https://github.com/jrouwe/JoltPhysics).
@@ -53,9 +65,16 @@ namespace bibo
 			* Moves a dynamic body to the given position and rotation and stops it (e.g. when the game is restarted)
 			*/
 			void resetBody(BodyHandle body, glm::vec3 position, glm::quat rotation);
+			/**
+			* Finds the first body on the way from origin to origin + ray (e.g. the ground under the feet of the bear)
+			* @param staticOnly Only static bodies (terrain, rocks), no dynamic bodies (boxes, ragdolls)
+			* @return false if the ray does not hit a body
+			*/
+			bool castRay(glm::vec3 origin, glm::vec3 ray, RayHit& hit, bool staticOnly = false) const;
 
 		private:
 			friend class CharacterController;
+			friend class Ragdoll;
 			struct Impl;
 			std::unique_ptr<Impl> impl;
 		};
@@ -78,9 +97,18 @@ namespace bibo
 		{
 		public:
 			/**
+			* Contact of the character with a body
+			*/
+			struct Hit
+			{
+				BodyHandle body = INVALID_BODY;
+				glm::vec3 position = glm::vec3(0.0f); //where the character touches the body
+				glm::vec3 normal = glm::vec3(0.0f, 1.0f, 0.0f); //contact normal, pointing from the body towards the character
+			};
+			/**
 			* Called whenever the character starts touching a body
 			*/
-			using HitCallback = std::function<void(BodyHandle)>;
+			using HitCallback = std::function<void(const Hit&)>;
 
 			CharacterController(PhysicsWorld& world, const CharacterControllerDesc& desc, HitCallback onHit);
 			~CharacterController();
@@ -97,6 +125,82 @@ namespace bibo
 			* Moves the character to the given position without colliding with the world on the way (e.g. when the game is restarted)
 			*/
 			void setPosition(glm::vec3 position);
+
+		private:
+			struct Impl;
+			std::unique_ptr<Impl> impl;
+		};
+
+		/**
+		* Joint between a ragdoll part and its parent part, in the space of the bind transforms of the parts
+		*/
+		struct RagdollJoint
+		{
+			enum Type
+			{
+				SWING_TWIST, //ball joint with a cone limit (hips, shoulders, spine, neck)
+				HINGE //rotates only around one axis (knees, elbows)
+			};
+			Type type = SWING_TWIST;
+			glm::vec3 position = glm::vec3(0.0f);
+			glm::vec3 twistAxis = glm::vec3(1.0f, 0.0f, 0.0f); //swing twist: along the child part; hinge: rotation axis
+			glm::vec3 planeAxis = glm::vec3(0.0f, 1.0f, 0.0f); //perpendicular to the twist axis
+			float swingAngle = 0.5f; //swing twist: half angle of the cone (radians)
+			float twistAngle = 0.3f; //swing twist: twist limit in both directions
+			float minAngle = -1.0f, maxAngle = 1.0f; //hinge: limits around the axis
+			float friction = 1.0f; //torque that slows down the joint when it moves (N m)
+		};
+
+		/**
+		* Rigid body of a ragdoll: a capsule that moves like a bone of a skeleton
+		*/
+		struct RagdollPart
+		{
+			int parent = -1; //index of the parent part, -1 for the root part (parents come before their children)
+			glm::mat4 bindTransform = glm::mat4(1.0f); //transform of the part (its bone) when the joints are relaxed
+			glm::vec3 capsuleStart = glm::vec3(0.0f), capsuleEnd = glm::vec3(0.0f, 1.0f, 0.0f); //in the same space as bindTransform
+			float radius = 0.1f;
+			float mass = 1.0f;
+			RagdollJoint joint; //to the parent part
+		};
+
+		/**
+		* Bodies connected by joints that fall and tumble like a limp body (e.g. the bear after it ran into a rock).
+		* The bodies are only part of the physics world while the ragdoll is active.
+		*/
+		class Ragdoll
+		{
+		public:
+			Ragdoll(PhysicsWorld& world, const std::vector<RagdollPart>& parts);
+			~Ragdoll();
+			Ragdoll(const Ragdoll&) = delete;
+			Ragdoll& operator=(const Ragdoll&) = delete;
+
+			/**
+			* Adds the bodies to the physics world
+			* @param transforms World transform of every part (rotation and translation)
+			* @param velocities Linear velocity of every part
+			* @param angularVelocity Spin of the whole ragdoll
+			*/
+			void activate(const std::vector<glm::mat4>& transforms, const std::vector<glm::vec3>& velocities, glm::vec3 angularVelocity);
+			/**
+			* Removes the bodies from the physics world
+			*/
+			void deactivate();
+			bool isActive() const;
+			std::size_t getPartCount() const;
+			/**
+			* @param transforms Current world transform of every part
+			*/
+			void getTransforms(std::vector<glm::mat4>& transforms) const;
+			/**
+			* @return The highest linear speed of all parts (m/s), for detecting when the ragdoll comes to rest
+			*/
+			float getMaxLinearSpeed() const;
+			/**
+			* @return The highest angular speed of all parts (rad/s)
+			*/
+			float getMaxAngularSpeed() const;
 
 		private:
 			struct Impl;

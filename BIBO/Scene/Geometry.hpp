@@ -53,6 +53,11 @@ namespace bibo
 			Texture* normalMap;
 			bool hasNormalMap;
 			bool getHasNormalMap();
+		protected:
+			/**
+			* For geometries that create and draw their meshes themselves (getModel returns nullptr, draw, update and isVisible must be overridden)
+			*/
+			Geometry(mat4 modelMatrix, GLFWwindow& window);
 		};
 	}
 }

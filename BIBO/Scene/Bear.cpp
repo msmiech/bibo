@@ -7,9 +7,12 @@
 using namespace bibo;
 using namespace scene;
 
-//movement attributes
-const float forwardVelocity = 10.f, backwardVelocity = -7.5f, jumpVelocity = 10.f, gravity = -0.981f, maxJumpTime = 0.5f, maxJumpTimeOut = 0.33f;
-float jumpTimeLeft = 0, totalFallingTime = 0, jumpTimeOut = 0.0f;
+//movement attributes (per second)
+const float forwardVelocity = 10.f, backwardVelocity = -7.5f, maxJumpTime = 0.5f;
+//The jump and the fall were tuned at 60 FPS: rising by 10 per second minus the gravity of 2 frames, falling by 0.981 per frame and second of falling
+const float jumpVelocity = 10.f - 2.f * 0.981f, gravity = -0.981f * 60.f;
+float jumpTimeLeft = 0, totalFallingTime = 0;
+bool standingOnGround = false;
 
 //animation attributes
 float frontAngle = 0.0f;
@@ -20,12 +23,12 @@ bool characterMoved = false;
 bool characterRotated = false;
 bool characterJumped = false;
 
-Bear::Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, Texture* texture, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit)
-	: Geometry(modelMatrix, shader, window, "Model/SnowTerrain/track1.dae", "BearBody", texture), direction(vec3(0.0f, 0.0f, -1.0f)),
-	leftHand(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "LeftHand", texture)),
-	rightHand(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "RightHand", texture)),
-	leftLeg(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "LeftLeg", texture)),
-	rightLeg(Geometry(mat4(1.f), shader, window, "Model/SnowTerrain/track1.dae", "RightLeg", texture))
+Bear::Bear(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, Texture* texture, physics::PhysicsWorld* physicsWorld, physics::CharacterController::HitCallback onHit)
+	: Geometry(modelMatrix, shader, window, assimpScene, "BearBody", texture), initialTransform(this->modelMatrix), direction(vec3(0.0f, 0.0f, -1.0f)),
+	leftHand(mat4(1.f), shader, window, assimpScene, "LeftHand", texture),
+	rightHand(mat4(1.f), shader, window, assimpScene, "RightHand", texture),
+	leftLeg(mat4(1.f), shader, window, assimpScene, "LeftLeg", texture),
+	rightLeg(mat4(1.f), shader, window, assimpScene, "RightLeg", texture)
 {
 
 	vec3 position = SceneObject::getPosition();
@@ -92,11 +95,11 @@ void Bear::update(float time_delta)
 	characterJumped = false;
 
 	/*
-	 The controller is moved with characterController->move(direction * speed * time_delta, time_delta):
+	 The controller is moved once per frame with characterController->move(displacement, time_delta):
 	 the first parameter is the displacement (direction and distance) of this frame, the result tells
 	 whether the bear stands on the ground after the move (collision below the capsule).*/
 
-	bool standingOnGround = false;
+	vec3 displacement(0.0f);
 
 	if (rightKey == GLFW_PRESS)
 	{
@@ -116,78 +119,58 @@ void Bear::update(float time_delta)
 	}
 	if (forwardKey == GLFW_PRESS)
 	{
-		if (characterController)
+		displacement += direction * forwardVelocity * time_delta;
+		if (reverseAnim)
 		{
-			standingOnGround = characterController->move(direction * forwardVelocity * time_delta, time_delta);
-			if (reverseAnim)
-			{
-				frontAngle -= 125 * time_delta;
-				backAngle += 125 * time_delta;
-			}
-			else
-			{
-				frontAngle += 150 * time_delta;
-				backAngle -= 150 * time_delta;
-			}
-			characterMoved = true;
-
+			frontAngle -= 125 * time_delta;
+			backAngle += 125 * time_delta;
 		}
+		else
+		{
+			frontAngle += 150 * time_delta;
+			backAngle -= 150 * time_delta;
+		}
+		characterMoved = true;
 	}
 	if (backKey == GLFW_PRESS)
 	{
-		if (characterController)
+		displacement += direction * backwardVelocity * time_delta;
+		if (reverseAnim)
 		{
-			standingOnGround = characterController->move(direction * backwardVelocity * time_delta, time_delta);
-			if (reverseAnim)
-			{
-				frontAngle += 100 * time_delta;
-				backAngle -= 100 * time_delta;
-			}
-			else
-			{
-				frontAngle -= 100 * time_delta;
-				backAngle += 100 * time_delta;
-			}
-			characterMoved = true;
+			frontAngle += 100 * time_delta;
+			backAngle -= 100 * time_delta;
 		}
-	}
-	if (jumpKey == GLFW_PRESS)
-	{
-		if (characterController && jumpTimeLeft > 0)
+		else
 		{
-			jumpTimeLeft -= time_delta;
-			if (jumpTimeLeft <= 0)
-			{
-  				jumpTimeOut = maxJumpTimeOut;
-			}
-			if(!characterJumped) {
-				totalFallingTime = time_delta;
-			}
-			standingOnGround = characterController->move(vec3(0.0f, jumpVelocity * time_delta, 0.0f), time_delta);
-			characterJumped = true;
+			frontAngle -= 100 * time_delta;
+			backAngle += 100 * time_delta;
 		}
+		characterMoved = true;
 	}
-	else characterJumped = false;
-
-	if (!standingOnGround) //bear is airborne
+	//The bear rises while SPACE is held (at most maxJumpTime), the next jump is only possible after landing
+	if (jumpKey == GLFW_PRESS && jumpTimeLeft > 0)
 	{
+		jumpTimeLeft -= time_delta;
+		totalFallingTime = 0.0f;
+		displacement.y += jumpVelocity * time_delta;
+		characterJumped = true;
+	}
+	else
+	{
+		if (!standingOnGround)
+		{
+			jumpTimeLeft = 0.0f; //SPACE was released in the air
+		}
+		//The longer the bear falls, the faster it falls (on the ground the controller ignores the downward movement)
 		totalFallingTime += time_delta;
-		if (jumpTimeOut > 0)
-		{
-			jumpTimeOut -= time_delta;
-		}
-		characterController->move(vec3(0.0f, gravity * totalFallingTime, 0.0f), time_delta);
+		displacement.y += gravity * totalFallingTime * time_delta;
 	}
-	if (standingOnGround)
+
+	standingOnGround = characterController->move(displacement, time_delta);
+	if (standingOnGround && !characterJumped)
 	{
 		jumpTimeLeft = maxJumpTime;
-		jumpTimeOut = 0.0f;
-		totalFallingTime = 1.0f;
-	}
-	if (jumpTimeOut <= 0 && !characterJumped)
-	{
-		jumpTimeOut = 0.0f;
-		jumpTimeLeft = maxJumpTime;
+		totalFallingTime = 1.0f; //falls quickly when walking over an edge
 	}
 
 	setPosition(characterController->getPosition());
@@ -253,4 +236,19 @@ bool Bear::isVisible(const ViewFrustum& frustum)
 {
 	//The limbs stick out of the body
 	return Geometry::isVisible(frustum) || leftHand.isVisible(frustum) || rightHand.isVisible(frustum) || leftLeg.isVisible(frustum) || rightLeg.isVisible(frustum);
+}
+
+void Bear::reset()
+{
+	this->modelMatrix = initialTransform;
+	direction = vec3(0.0f, 0.0f, -1.0f);
+	characterController->setPosition(SceneObject::getPosition());
+
+	jumpTimeLeft = 0.0f;
+	totalFallingTime = 0.0f;
+	standingOnGround = false;
+	frontAngle = 0.0f;
+	backAngle = 0.0f;
+	rotationYAngle = 0.0f;
+	reverseAnim = false;
 }

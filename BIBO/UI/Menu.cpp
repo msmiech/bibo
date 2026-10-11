@@ -82,6 +82,7 @@ struct Menu::Impl : public Rml::EventListener
 
 	Rml::ElementDocument* mainMenu = nullptr;
 	Rml::ElementDocument* pauseMenu = nullptr;
+	Rml::ElementDocument* gameOverMenu = nullptr;
 	Rml::ElementDocument* settingsMenu = nullptr;
 	Rml::ElementDocument* visibleMenu = nullptr;
 	Rml::ElementDocument* settingsOpenedFrom = nullptr;
@@ -92,6 +93,8 @@ struct Menu::Impl : public Rml::EventListener
 	vector<display::Resolution> resolutions;
 	Rml::Vector<Rml::String> resolutionNames;
 	bool displayChanged = false;
+
+	bool gameWon = false; //title of the game over menu
 };
 
 Menu::Impl::Impl(GLFWwindow* window, Settings& settings, function<void(MenuAction)> onAction)
@@ -122,6 +125,7 @@ Menu::Impl::Impl(GLFWwindow* window, Settings& settings, function<void(MenuActio
 	bindDataModel();
 	mainMenu = loadDocument("UI/main_menu.rml");
 	pauseMenu = loadDocument("UI/pause_menu.rml");
+	gameOverMenu = loadDocument("UI/game_over.rml");
 	settingsMenu = loadDocument("UI/settings.rml");
 }
 
@@ -163,6 +167,7 @@ void Menu::Impl::bindDataModel()
 	constructor.Bind("resolution", &resolution);
 	constructor.Bind("resolutions", &resolutionNames);
 	constructor.Bind("display_changed", &displayChanged);
+	constructor.Bind("game_won", &gameWon);
 
 	auto action = [this](MenuAction menuAction) {
 		return [this, menuAction](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) { pendingActions.push_back(menuAction); };
@@ -170,6 +175,8 @@ void Menu::Impl::bindDataModel()
 	constructor.BindEventCallback("start", action(MenuAction::Start));
 	constructor.BindEventCallback("resume", action(MenuAction::Resume));
 	constructor.BindEventCallback("quit", action(MenuAction::Quit));
+	constructor.BindEventCallback("restart", action(MenuAction::Restart));
+	constructor.BindEventCallback("main_menu", action(MenuAction::MainMenu));
 	constructor.BindEventCallback("settings", [this](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) { showSettings(); });
 	constructor.BindEventCallback("back", [this](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) { back(); });
 	constructor.BindEventCallback("apply_display", [this](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) { applyDisplay(); });
@@ -210,7 +217,7 @@ void Menu::Impl::ProcessEvent(Rml::Event& event)
 
 void Menu::Impl::show(Rml::ElementDocument* document, Rml::FocusFlag focus)
 {
-	for (Rml::ElementDocument* menu : { mainMenu, pauseMenu, settingsMenu })
+	for (Rml::ElementDocument* menu : { mainMenu, pauseMenu, gameOverMenu, settingsMenu })
 	{
 		if (menu && menu != document)
 		{
@@ -333,6 +340,16 @@ void Menu::showMainMenu()
 void Menu::showPauseMenu()
 {
 	impl->show(impl->pauseMenu);
+}
+
+void Menu::showGameOverMenu(bool won)
+{
+	impl->gameWon = won;
+	if (impl->model)
+	{
+		impl->model.DirtyVariable("game_won");
+	}
+	impl->show(impl->gameOverMenu);
 }
 
 void Menu::hide()

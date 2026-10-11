@@ -90,6 +90,19 @@ namespace bibo::test
 		return util::ConvertMatrix(transformation);
 	}
 
+	scene::rules::FinishLine trackFinishLine()
+	{
+		aiNode& node = trackNode("FinishLine");
+		REQUIRE(node.mNumMeshes > 0);
+		const aiMesh* mesh = trackScene().mMeshes[node.mMeshes[0]];
+		float halfLength = 0.0f;
+		for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
+		{
+			halfLength = std::max(halfLength, std::abs(mesh->mVertices[i].x));
+		}
+		return scene::rules::finishLine(nodeModelMatrix(node), halfLength);
+	}
+
 	Clipped clip(const glm::mat4& viewProjection, glm::vec3 point)
 	{
 		glm::dvec4 clipped = glm::dmat4(viewProjection) * glm::dvec4(point, 1.0);

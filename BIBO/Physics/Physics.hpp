@@ -49,6 +49,10 @@ namespace bibo
 			* @return Current position and rotation of the body as model matrix
 			*/
 			glm::mat4 getTransform(BodyHandle body) const;
+			/**
+			* Moves a dynamic body to the given position and rotation and stops it (e.g. when the game is restarted)
+			*/
+			void resetBody(BodyHandle body, glm::vec3 position, glm::quat rotation);
 
 		private:
 			friend class CharacterController;
@@ -89,6 +93,10 @@ namespace bibo
 			*/
 			bool move(glm::vec3 displacement, float time_delta);
 			glm::vec3 getPosition() const;
+			/**
+			* Moves the character to the given position without colliding with the world on the way (e.g. when the game is restarted)
+			*/
+			void setPosition(glm::vec3 position);
 
 		private:
 			struct Impl;

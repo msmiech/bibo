@@ -72,13 +72,10 @@ namespace
 		PhysicsWorld world;
 		std::vector<BodyHandle> rocks;
 		const vec3 bearStart = startPosition("BearBody");
-		const vec3 goal = startPosition("Cube"); //Scene::update: the goal is geometry 17
-		const float wallZ = bearStart.z + 3.0f;
 
 		TrackPhysics()
 		{
 			world.createStaticBox(vec3(0.0f, -6.0f, 0.0f), vec3(1000.0f, 1.0f, 1000.0f)); //ground
-			world.createStaticBox(vec3(bearStart.x, bearStart.y, wallZ), vec3(7.0f, 7.0f, 0.01f)); //wall
 			for (int i = 1; i <= 12; ++i)
 			{
 				rocks.push_back(world.createStaticSphere(startPosition("Rock" + std::to_string(i)), ROCK_RADIUS));
@@ -137,22 +134,25 @@ TEST_CASE("The bear starts standing on the terrain without touching a rock", "[a
 	}
 }
 
-TEST_CASE("The wall behind the start blocks the shortcut to the goal", "[assets][physics][bear][rules]")
+TEST_CASE("Going backwards from the start neither passes a checkpoint nor completes the lap", "[assets][physics][bear][rules]")
 {
-	//The race is a lap: the goal is right behind the start
+	//There is no wall behind the start: the finish line is a trigger and the checkpoints have to be passed in their order
 	TrackPhysics track;
-	REQUIRE(track.goal.z > track.wallZ);
-	vec3 towardsGoal = glm::normalize(vec3(track.goal.x - track.bearStart.x, 0.0f, track.goal.z - track.bearStart.z));
+	const rules::FinishLine finishLine = trackFinishLine();
+	const vec3 backwards(0.0f, 0.0f, 1.0f); //the bear starts looking along -z (Bear::Bear)
 
-	TrackPhysics::Run run = track.moveBear(track.bearStart, 3.0f, BACKWARD_SPEED * towardsGoal + DOWN);
+	TrackPhysics::Run run = track.moveBear(track.bearStart, 1.5f, BACKWARD_SPEED * backwards + DOWN);
 
-	CAPTURE(track.bearStart, track.goal, run.end());
+	CAPTURE(track.bearStart, run.end());
+	CHECK(run.end().z > track.bearStart.z + 5.0f); //walks past where the wall was (3 units behind the start)
+	CHECK_FALSE(rules::isOnFinishLine(run.end(), finishLine));
+	std::size_t nextCheckpoint = 0;
 	for (const vec3& position : run.path)
 	{
-		REQUIRE_FALSE(rules::hasReachedGoal(position, track.goal));
+		nextCheckpoint = rules::passCheckpoint(position, nextCheckpoint);
+		REQUIRE_FALSE(rules::hasCompletedLap(nextCheckpoint, position, finishLine));
 	}
-	CHECK(run.end().z < track.wallZ);
-	CHECK(glm::distance(run.end(), track.bearStart) > 1.0f); //walked until the wall
+	CHECK(nextCheckpoint == 0);
 }
 
 TEST_CASE("Next to the track the bear falls onto the ground box and the game is lost", "[assets][physics][bear][rules]")

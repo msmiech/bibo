@@ -1,8 +1,15 @@
 ﻿#include "Scene.hpp"
 #include <algorithm>
+#include <cmath>
+#include "../Util/Console.hpp"
 
 using namespace bibo;
 using namespace scene;
+
+namespace
+{
+	const char* const TRACK_FILE = "Model/SnowTerrain/track1.dae";
+}
 
 MeshTransform scene::terrainTransform(const mat4& modelMatrix)
 {
@@ -21,7 +28,19 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	// Clear the screen
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	lights = util::retrieveLightFromScene(*window, shader, "Model/SnowTerrain/track1.dae");
+	//All geometries are nodes of the same scene file, which is only loaded once (it is ~20 MB of XML)
+	util::ScenePtr track = util::loadSceneFromFile(TRACK_FILE);
+	if (!track)
+	{
+		util::fatalError(string("Could not load ") + TRACK_FILE);
+	}
+	const aiScene* trackScene = track.get();
+
+	lights = util::retrieveLightFromScene(*window, shader, trackScene);
+	if (lights.empty())
+	{
+		util::fatalError(string("There is no light source in ") + TRACK_FILE);
+	}
 	camera = make_unique<Camera>(vec3(0.0f, 1.0f, 2.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), *window);
 
 	textures.push_back(Texture::createCheckerboard(256, 8, 0)); //0, chequered flag (generated, no image file)
@@ -38,7 +57,7 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	textures.push_back(make_unique<Texture>("Texture/ground07n.jpg", 2)); //9
 	initAnimatedTextures();
 
-	geometries.push_back(make_unique<Bear>(mat4(1.0f), shader, *window, textures[1].get(), physicsWorld, [this](physics::BodyHandle body) { onBearHit(body); })); //0
+	geometries.push_back(make_unique<Bear>(mat4(1.0f), shader, *window, trackScene, textures[1].get(), physicsWorld, [this](physics::BodyHandle body) { onBearHit(body); })); //0
 	bear = static_cast<Bear*>(geometries[0].get());
 	Material bearMaterial;
 	bearMaterial.ambient = vec3(0.8f, 0.8f, 0.8f);
@@ -50,28 +69,28 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	debugCube = make_unique<Cube>(mat4(1.0f), shader, *window, textures[6].get());
 
 
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Boden", textures[3].get()));//1
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Boden", textures[3].get()));//1
 	world = geometries[1].get();
 
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "FinishLine", checkerboardTexPtr));//2
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock1", textures[5].get(), textures[9].get())); //3
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock2", textures[5].get(), textures[9].get())); //4
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock3", textures[5].get(), textures[9].get())); //5
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock4", textures[5].get(), textures[9].get())); //6
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock5", textures[5].get(), textures[9].get())); //7
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock6", textures[5].get(), textures[9].get())); //8
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock7", textures[5].get(), textures[9].get())); //9
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock8", textures[5].get(), textures[9].get())); //10
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock9", textures[5].get(), textures[9].get())); //11
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock10", textures[5].get(), textures[9].get())); //12
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock11", textures[5].get(), textures[9].get())); //13
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock12", textures[5].get(), textures[9].get())); //14
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Torus", textures[3].get())); //15
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Water", textures[8].get())); //16
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "FinishLine", checkerboardTexPtr));//2
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock1", textures[5].get(), textures[9].get())); //3
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock2", textures[5].get(), textures[9].get())); //4
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock3", textures[5].get(), textures[9].get())); //5
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock4", textures[5].get(), textures[9].get())); //6
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock5", textures[5].get(), textures[9].get())); //7
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock6", textures[5].get(), textures[9].get())); //8
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock7", textures[5].get(), textures[9].get())); //9
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock8", textures[5].get(), textures[9].get())); //10
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock9", textures[5].get(), textures[9].get())); //11
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock10", textures[5].get(), textures[9].get())); //12
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock11", textures[5].get(), textures[9].get())); //13
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock12", textures[5].get(), textures[9].get())); //14
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Torus", textures[3].get())); //15
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Water", textures[8].get())); //16
 	water = geometries[16].get();
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Cube", textures[6].get(), textures[7].get())); //17
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Cube", textures[6].get(), textures[7].get())); //17
 
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Monitor1", checkerboardTexPtr)); //18
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Monitor1", checkerboardTexPtr)); //18
 
 	monitor1 = geometries[18].get();
 	Material monitorMaterial;
@@ -82,13 +101,14 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	monitor1->getModel()->meshes[0]->setMaterial(monitorMaterial);
 
 
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil0", checkerboardTexPtr)); //18
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil1", checkerboardTexPtr)); //19
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil2", checkerboardTexPtr)); //20
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Pfeil3", checkerboardTexPtr)); //21
+	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil0", checkerboardTexPtr)); //18
+	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil1", checkerboardTexPtr)); //19
+	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil2", checkerboardTexPtr)); //20
+	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil3", checkerboardTexPtr)); //21
 	initPhysicsBodies();
+	initFinishLine(geometries[2].get());
 
-	rotatingRock = make_unique<Geometry>(mat4(1.0f), shader, *window, "Model/SnowTerrain/track1.dae", "Rock1", textures[5].get(), textures[9].get());
+	rotatingRock = make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock1", textures[5].get(), textures[9].get());
 	rotatingRock->modelMatrix = translate(rotatingRock->modelMatrix, vec3(10, 25, 1));
 }
 
@@ -96,8 +116,7 @@ void Scene::update(float time_delta) {
 	physicsWorld->update(time_delta);
 	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
 	{
-		gameOver = false;
-		gameWon = false;
+		restart();
 	}
 	if (gameWon != true && gameOver != true){
 	for (unsigned int i = 0; i < geometries.size(); ++i)
@@ -122,16 +141,31 @@ void Scene::update(float time_delta) {
 	rotatingRock->modelMatrix = rotate(rotatingRock->modelMatrix, radians(90.0f) * time_delta, vec3(1, 1, 0));
 
 	vec3 playerPosition = bear->getPosition();
-	vec3 goalPosition = geometries[17]->getPosition();
 	if (rules::hasFallenOff(playerPosition))
 	{
 		gameOver = true;
 	}
-	else if (rules::hasReachedGoal(playerPosition, goalPosition))
+	else
 	{
-		gameWon = true;
+		nextCheckpoint = rules::passCheckpoint(playerPosition, nextCheckpoint);
+		if (rules::hasCompletedLap(nextCheckpoint, playerPosition, finishLine))
+		{
+			gameWon = true;
+		}
 	}
 	}
+}
+
+void Scene::restart()
+{
+	bear->reset();
+	for (const auto& dynamicBody : dynamicBodies)
+	{
+		physicsWorld->resetBody(dynamicBody.first, dynamicBody.second, quat(1.0f, 0.0f, 0.0f, 0.0f));
+	}
+	nextCheckpoint = 0;
+	gameOver = false;
+	gameWon = false;
 }
 
 void Scene::renderFromCamera(Shader* shader)
@@ -223,50 +257,12 @@ int Scene::draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* f
 	int drawnGeometries = 0;
 	for (unsigned int i = 0; i < geometries.size(); ++i)
 	{
-		auto gameObject = geometries[i].get();
-		if (frustum && !gameObject->isVisible(*frustum))
+		if (geometries[i].get() != water && drawGeometry(shader, geometries[i].get(), normalMappingEnabledLocation, frustum))
 		{
-			continue;
-		}
-		++drawnGeometries;
-
-		if (i == 16)
-		{
-			if (transparencyEnabled)
-			{
-				glEnable(GL_BLEND);
-				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-				if (textureTransparentLocation != 0xFFFFFFFF)
-				{
-					glUniform1i(textureTransparentLocation, true);
-				}
-			}
-		}
-		if (normalMappingEnabledLocation != 0xFFFFFFFF) {
-
-			glUniform1i(normalMappingEnabledLocation, normalMappingEnabled && gameObject->getHasNormalMap());
-		}
-
-		gameObject->draw(shader);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glDisable(GL_BLEND);
-		if (textureTransparentLocation != 0xFFFFFFFF)
-		{
-			glUniform1i(textureTransparentLocation, false);
+			++drawnGeometries;
 		}
 	}
-
-	if (!frustum || rotatingRock->isVisible(*frustum))
-	{
-		if (normalMappingEnabledLocation != 0xFFFFFFFF) {
-
-			glUniform1i(normalMappingEnabledLocation, normalMappingEnabled && rotatingRock->getHasNormalMap());
-		}
-		rotatingRock->draw(shader);
-	}
+	drawGeometry(shader, rotatingRock.get(), normalMappingEnabledLocation, frustum);
 
 
 	if (normalMappingEnabledLocation != 0xFFFFFFFF) {
@@ -284,7 +280,45 @@ int Scene::draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* f
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+	//The transparent water is drawn last, so that the geometry behind it is already in the depth buffer and blended with it
+	if (transparencyEnabled)
+	{
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		if (textureTransparentLocation != 0xFFFFFFFF)
+		{
+			glUniform1i(textureTransparentLocation, true);
+		}
+	}
+	if (drawGeometry(shader, water, normalMappingEnabledLocation, frustum))
+	{
+		++drawnGeometries;
+	}
+	glDisable(GL_BLEND);
+	if (textureTransparentLocation != 0xFFFFFFFF)
+	{
+		glUniform1i(textureTransparentLocation, false);
+	}
 	return drawnGeometries;
+}
+
+bool Scene::drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappingEnabledLocation, const ViewFrustum* frustum)
+{
+	if (frustum && !geometry->isVisible(*frustum))
+	{
+		return false;
+	}
+	if (normalMappingEnabledLocation != 0xFFFFFFFF)
+	{
+		glUniform1i(normalMappingEnabledLocation, normalMappingEnabled && geometry->getHasNormalMap());
+	}
+	geometry->draw(shader);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	return true;
 }
 
 void Scene::setViewportSize(int width, int height)
@@ -356,6 +390,16 @@ int Scene::getGeometryCount()
 	return static_cast<int>(geometries.size());
 }
 
+int Scene::getCheckpointsPassed()
+{
+	return static_cast<int>(nextCheckpoint);
+}
+
+int Scene::getCheckpointCount()
+{
+	return static_cast<int>(rules::CHECKPOINT_COUNT);
+}
+
 
 void Scene::initPhysicsBodies()
 {
@@ -365,17 +409,17 @@ void Scene::initPhysicsBodies()
 
 
 	//2) Create cube
-	physics::BodyHandle box = physicsWorld->createDynamicBox(bear->getPosition() - vec3(0.0f, -10.0f, 5.0f), vec3(0.4f), 1.0f);
+	vec3 boxPosition = bear->getPosition() - vec3(0.0f, -10.0f, 5.0f);
+	physics::BodyHandle box = physicsWorld->createDynamicBox(boxPosition, vec3(0.4f), 1.0f);
 	debugCube->setPhysicsBody(physicsWorld, box);
+	dynamicBodies.emplace_back(box, boxPosition);
 
-	//2) Create Wall
-	physicsWorld->createStaticBox(bear->getPosition() - vec3(0.0f, 0, -3.0f), vec3(7.0f, 7.0f, 0.01f));
-
-
+	//There is no wall at the start: the finish line is a trigger (see initFinishLine) and the checkpoints keep the bear from going backwards
 
 	Geometry* geomBox2 = geometries[17].get();
 	physics::BodyHandle box2 = physicsWorld->createDynamicBox(geomBox2->getPosition(), vec3(0.8f), 1.0f);
 	geomBox2->setPhysicsBody(physicsWorld, box2);
+	dynamicBodies.emplace_back(box2, geomBox2->getPosition());
 
 	for (int i = 3; i <= 14; i++)
 	{
@@ -394,6 +438,17 @@ void Scene::initPhysicsBodies()
 		worldTransform.scale, worldTransform.position, worldTransform.rotation);
 
 	physicsWorld->optimizeBroadPhase();
+}
+
+void Scene::initFinishLine(Geometry* board)
+{
+	Mesh* boardMesh = board->getModel()->meshes[0];
+	float halfLength = 0.0f;
+	for (unsigned int i = 0; i < boardMesh->numVertices; ++i)
+	{
+		halfLength = std::max(halfLength, std::abs(boardMesh->vertices[i * 3]));
+	}
+	finishLine = rules::finishLine(board->modelMatrix, halfLength);
 }
 
 void Scene::initAnimatedTextures()

@@ -22,12 +22,21 @@ namespace bibo
 			unique_ptr<Model> model;
 			physics::PhysicsWorld* physicsWorld = nullptr;
 			physics::BodyHandle physicsBody = physics::INVALID_BODY;
+			//The game uses the meshes (e.g. for the physics and the materials), it cannot run without them
+			void requireMeshes(const char* nodeName);
 		public:
-			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture);
+			/**
+			* The program exits if the node does not exist or has no meshes.
+			* @param assimpScene Loaded once for all geometries, see util::loadSceneFromFile
+			* @param normalMapTexture nullptr for geometries without normal map
+			*/
+			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture, Texture* normalMapTexture = nullptr);
 			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* file, const char* nodeName, Texture* texture);
 			Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* file, const char* nodeName, Texture* texture, Texture* normalMapTexture);
 
 			virtual ~Geometry();
+			Geometry(const Geometry&) = delete;
+			Geometry& operator=(const Geometry&) = delete;
 
 			virtual void update(float time_delta);
 			virtual void draw(Shader* shader);

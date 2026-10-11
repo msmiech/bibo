@@ -12,12 +12,14 @@ Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complet
 * Movable objects with physics (based on Jolt Physics, originally Nvidia PhysX)
 * Texture Mapping (including normal maps)
 * Lighting and Materials
+* A lap around the track: the finish line only counts after all checkpoints along the track were passed in order
 * Keyboard controls
   * Arrow keys for navigation
   * Space bar for jumping
+  * R to restart
   * ESC for the pause menu
   * F-Keys for settings and debug features (F1 for help)
-* Main menu, pause menu and settings menu (based on RmlUi, usable with mouse or keyboard)
+* Main menu, pause menu, game over menu (restart the run or back to the main menu) and settings menu (based on RmlUi, usable with mouse or keyboard)
   * Graphics settings (VSync, HDR, bloom, shadows, normal mapping, transparency, texture filtering, mipmapping, wireframe)
   * Resolution and window mode (windowed, fullscreen or borderless)
 * Supports complex models (like the bear, see copyright in files)
@@ -105,7 +107,7 @@ To use the libraries of the distribution instead of downloading them, also insta
 Not supported: the game requires OpenGL 4.3, macOS only provides OpenGL 4.1.
 
 ### Running and distributing
-The build copies the game assets (`Font`, `Model`, `Shader`, `Texture`, `UI`) next to the executable, and the game loads them from the current folder, so always start it from the build folder.
+The build copies the game assets (`Font`, `Shader`, `Texture`, `UI` and the scene `Model/SnowTerrain/track1.dae`) next to the executable, and the game loads them from the current folder, so always start it from the build folder.
 The game starts in the main menu, ESC opens the pause menu during the game.
 The settings menu saves the settings to `settings.cfg` in the current folder (a text file, delete it to reset the settings).
 The command line arguments `BIBO [width height [fullscreen]]` override the saved resolution and window mode: width and height of the window in pixels and `1` for fullscreen (default: `800 600 0`).
@@ -144,8 +146,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests are in the `tests` folder:
-* `unit`: game rules (falling off the track, reaching the goal), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions), the view frustum (compared with the camera matrices for random cameras), math helpers and the generated textures
-* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain, the wall blocks the shortcut to the goal and the collision mesh of the terrain matches the rendered terrain
+* `unit`: game rules (falling off the track, checkpoints in their order, the finish line), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions), the view frustum (compared with the camera matrices for random cameras), math helpers and the generated textures
+* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart and the collision mesh of the terrain matches the rendered terrain
 * `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the camera and the whole scene (e.g. culling never removes a visible pixel). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
   On Linux servers without a graphics card they run on a virtual X server with Mesa's software renderer: `xvfb-run -a ctest --test-dir build --output-on-failure`
 

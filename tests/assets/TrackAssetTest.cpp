@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include <assimp/scene.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -94,15 +96,43 @@ TEST_CASE("The track contains the sun light", "[assets]")
 	CHECK(trackScene().mNumLights >= 1);
 }
 
-TEST_CASE("The bear starts on the track, outside of the finish area", "[assets][rules]")
+TEST_CASE("The bear starts on the finish line, the lap is only complete after all checkpoints", "[assets][rules]")
 {
 	const vec3 bear = startPosition("BearBody");
-	const vec3 goal = startPosition("Cube"); //Scene::update: the goal is geometry 17
+	const rules::FinishLine finishLine = trackFinishLine();
 
-	CAPTURE(bear, goal);
+	CAPTURE(bear, finishLine.center, finishLine.halfWidth);
 	CHECK_FALSE(rules::hasFallenOff(bear));
-	CHECK_FALSE(rules::hasReachedGoal(bear, goal));
-	CHECK_FALSE(rules::hasFallenOff(goal)); //the goal can be reached without falling off
+	CHECK(rules::isOnFinishLine(bear, finishLine)); //the race is a lap
+	CHECK(rules::passCheckpoint(bear, 0) == 0); //no checkpoint at the start
+	CHECK_FALSE(rules::hasCompletedLap(0, bear, finishLine));
+	CHECK(rules::hasCompletedLap(rules::CHECKPOINT_COUNT, bear, finishLine));
+}
+
+TEST_CASE("The finish line goes across the whole track", "[assets][rules]")
+{
+	//The track is about 15 units wide at the finish line and goes along the z axis (the bear starts looking along -z)
+	const rules::FinishLine finishLine = trackFinishLine();
+
+	CAPTURE(finishLine.across, finishLine.halfWidth);
+	CHECK(std::abs(finishLine.across.x) > 0.99f);
+	CHECK(finishLine.halfWidth > 7.0f);
+}
+
+TEST_CASE("The checkpoints are apart from each other and from the start", "[assets][rules]")
+{
+	//Otherwise the bear could pass two checkpoints at once or one at the start
+	const vec3 bear = startPosition("BearBody");
+	const glm::vec2 start(bear.x, bear.z);
+	for (std::size_t i = 0; i < rules::CHECKPOINT_COUNT; ++i)
+	{
+		CAPTURE(i);
+		CHECK(glm::distance(rules::CHECKPOINTS[i], start) > rules::CHECKPOINT_RADIUS);
+		if (i > 0)
+		{
+			CHECK(glm::distance(rules::CHECKPOINTS[i], rules::CHECKPOINTS[i - 1]) > 2.0f * rules::CHECKPOINT_RADIUS);
+		}
+	}
 }
 
 TEST_CASE("The limbs of the bear are next to its body", "[assets]")

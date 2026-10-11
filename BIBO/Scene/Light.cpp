@@ -90,7 +90,8 @@ void Light::convertLight(aiLight* light)
 
 Light::~Light()
 {
-
+	glDeleteBuffers(1, &lightVBO);
+	glDeleteVertexArrays(1, &lightVAO);
 }
 
 void Light::update(float time_delta)

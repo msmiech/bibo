@@ -41,8 +41,14 @@ namespace bibo
 			void init(Shader* shader, const aiScene* scene, const char* nodeName, Texture* texture);
 		public:
 			Model(Shader* shader, const char *filename, const char * nodeName, Texture* tex);
+			/**
+			* Copies the meshes of a node of the scene (or of the root node if nodeName is nullptr) to the graphics memory.
+			* The scene is not needed anymore afterwards. If the node does not exist, the model has no meshes.
+			*/
 			Model(Shader* shader, const aiScene* scene, const char * nodeName, Texture* tex);
 			~Model();
+			Model(const Model&) = delete;
+			Model& operator=(const Model&) = delete;
 
 			/**
 			* @param result Global transformation of the node (its transformation multiplied with the ones of all its parents)

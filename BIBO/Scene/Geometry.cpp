@@ -1,34 +1,38 @@
 #include "Geometry.hpp"
 #include <algorithm>
+#include "../Util/Console.hpp"
 
 using namespace bibo;
 using namespace scene;
 
 
-Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture) : SceneObject(modelMatrix, window)
+Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const aiScene* assimpScene, const char* nodeName, Texture* texture, Texture* normalMapTexture)
+	: SceneObject(modelMatrix, window), model(make_unique<Model>(shader, assimpScene, nodeName, texture)), normalMap(normalMapTexture)
 {
-	hasNormalMap = false;
-	normalMap = nullptr;
-	model = make_unique<Model>(shader, assimpScene, nodeName, texture);
+	hasNormalMap = normalMapTexture != nullptr;
+	requireMeshes(nodeName);
 	this->modelMatrix = model->getTranformationMat() * modelMatrix;
 }
 
 Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* filePath, const char* nodeName, Texture* texture)
-	: SceneObject(modelMatrix, window)
+	: Geometry(modelMatrix, shader, window, filePath, nodeName, texture, nullptr)
 {
-	hasNormalMap = false;
-	normalMap = nullptr;
-	model = make_unique<Model>(shader, filePath, nodeName, texture);
-	this->modelMatrix = model->getTranformationMat() * modelMatrix;
 }
 
 Geometry::Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window, const char* filePath, const char* nodeName, Texture* texture, Texture* normalMapTexture)
-	: SceneObject(modelMatrix, window), normalMap(normalMapTexture)
+	: SceneObject(modelMatrix, window), model(make_unique<Model>(shader, filePath, nodeName, texture)), normalMap(normalMapTexture)
 {
-	hasNormalMap = true;
-	model = make_unique<Model>(shader, filePath, nodeName, texture);
+	hasNormalMap = normalMapTexture != nullptr;
+	requireMeshes(nodeName);
 	this->modelMatrix = model->getTranformationMat() * modelMatrix;
+}
 
+void Geometry::requireMeshes(const char* nodeName)
+{
+	if (model->meshes.empty())
+	{
+		util::fatalError(string("Could not load the node ") + (nodeName ? nodeName : "(root)") + " of the model");
+	}
 }
 
 Geometry::~Geometry()

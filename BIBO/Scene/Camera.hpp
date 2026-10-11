@@ -53,6 +53,7 @@ namespace bibo
 			float zFar = 200.0f;
 
 			bool locked = true;
+			bool lockKeyWasPressed = false;
 		};
 	}
 }

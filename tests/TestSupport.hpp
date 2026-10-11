@@ -12,6 +12,8 @@
 #include <catch2/catch_tostring.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 
+#include "Scene/GameRules.hpp"
+
 struct GLFWwindow;
 struct aiNode;
 struct aiScene;
@@ -74,6 +76,11 @@ namespace bibo::test
 	* Model matrix of a node like the game computes it (Geometry, Model): the global transformation of the node
 	*/
 	glm::mat4 nodeModelMatrix(aiNode& node);
+
+	/**
+	* The trigger at the finish line like Scene::initFinishLine computes it from the FinishLine node
+	*/
+	scene::rules::FinishLine trackFinishLine();
 
 	enum class Clipped { INSIDE, OUTSIDE, BORDER };
 

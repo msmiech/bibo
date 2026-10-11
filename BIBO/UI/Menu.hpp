@@ -13,6 +13,8 @@ namespace bibo
 			Start,           //Main menu: start the game
 			Resume,          //Pause menu: continue the game
 			Quit,            //Main and pause menu: quit the game
+			Restart,         //Game over menu: start the run again
+			MainMenu,        //Game over menu: back to the main menu
 			GraphicsChanged, //Settings menu: a graphics setting was changed (they are applied immediately)
 			ApplyDisplay,    //Settings menu: a new window mode or resolution was applied
 			SettingsClosed   //Settings menu: closed with Back or ESC
@@ -36,6 +38,10 @@ namespace bibo
 
 			void showMainMenu();
 			void showPauseMenu();
+			/**
+			* Shown when the run is over (the bear hit a rock or fell off the track) or won
+			*/
+			void showGameOverMenu(bool won);
 			void hide();
 			/**
 			* Returns from the settings menu to the menu it was opened from (like its Back button)

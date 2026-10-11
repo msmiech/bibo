@@ -38,6 +38,10 @@ namespace bibo
 		{
 			void initPhysicsBodies();
 			void initAnimatedTextures();
+			/**
+			* @param board The finish line (geometry), the trigger goes along it across the track
+			*/
+			void initFinishLine(Geometry* board);
 			//Called when the bear touches a physics body
 			void onBearHit(physics::BodyHandle body);
 			/**
@@ -45,6 +49,10 @@ namespace bibo
 			* @return Number of drawn geometries
 			*/
 			int draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* frustum);
+			/**
+			* @return false if the geometry is outside of the frustum and was not drawn
+			*/
+			bool drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappingEnabledLocation, const ViewFrustum* frustum);
 
 			GLFWwindow* window;
 			vector<unique_ptr<Geometry>> geometries;
@@ -59,7 +67,7 @@ namespace bibo
 			Bear* bear;
 			Geometry* world;
 			Geometry* monitor1;
-			Geometry* water;
+			Geometry* water; //transparent, drawn after the other geometries
 			unique_ptr<Cube> debugCube;
 			unique_ptr<Geometry> rotatingRock;
 
@@ -75,7 +83,13 @@ namespace bibo
 			bool gameOver = false;
 			bool gameWon = false;
 
+			//Index of the checkpoint the bear has to pass next, see rules::passCheckpoint
+			size_t nextCheckpoint = 0;
+			rules::FinishLine finishLine;
+
 			vector<physics::BodyHandle> bodiesRock;
+			//Dynamic bodies and their start positions, which they are moved back to by restart()
+			vector<pair<physics::BodyHandle, vec3>> dynamicBodies;
 
 			float accumulatedVideoTime = 0;
 			int monitorFrame = 0;
@@ -85,6 +99,10 @@ namespace bibo
 			Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld);
 
 			void update(float time_delta);
+			/**
+			* Starts the run again: the bear, the movable objects and the lap go back to the start (R key, game over menu)
+			*/
+			void restart();
 
 			void renderFromCamera(Shader* shader);
 			void renderFromLightSource(Shader* shader);
@@ -112,6 +130,8 @@ namespace bibo
 			* @return Number of geometries in the scene
 			*/
 			int getGeometryCount();
+			int getCheckpointsPassed();
+			int getCheckpointCount();
 			bool isGameOver();
 			bool isGameWon();
 		};

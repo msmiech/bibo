@@ -111,9 +111,9 @@ TEST_CASE_METHOD(BearOnGround, "A frame without duration does not move the bear"
 	CHECK(bear.getPosition() == start);
 }
 
-TEST_CASE_METHOD(BearOnGround, "The bear cannot walk through the thin wall behind it", "[physics][bear]")
+TEST_CASE_METHOD(BearOnGround, "The bear cannot walk through a thin wall", "[physics][bear]")
 {
-	//Scene::initPhysicsBodies: 14 x 14 wall, 2 cm thick, 3 units behind the start of the bear
+	//14 x 14 wall, 2 cm thick, 3 units behind the bear (like the wall that once blocked the way back from the start)
 	const float wallZ = 3.0f;
 	world.createStaticBox(vec3(0.0f, standingHeight, wallZ), vec3(7.0f, 7.0f, 0.01f));
 	land();
@@ -237,7 +237,7 @@ TEST_CASE("The bear stands on gentle slopes and slides down steep ones", "[physi
 TEST_CASE_METHOD(BearOnGround, "Jumping lifts the bear off the ground", "[physics][bear]")
 {
 	land();
-	const float jumpSpeed = 10.0f, maxJumpTime = 0.5f; //Bear.cpp
+	const float jumpSpeed = 10.0f - 2.0f * 0.981f, maxJumpTime = 0.5f; //Bear.cpp (jumpVelocity)
 
 	bool supported = moveFor(maxJumpTime, vec3(0.0f, jumpSpeed, 0.0f));
 

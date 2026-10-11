@@ -48,8 +48,10 @@ void renderQuad();
 void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale, vec3 color);
 void resizeScreenBuffers();
 void applyGraphicsSettings();
-void pauseGame();
+bool pauseGame();
 void resumeGame();
+void showGameOver();
+void restartGame();
 void onMenuAction(ui::MenuAction action);
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
@@ -63,12 +65,15 @@ unsigned int windowWidth = 800; //Size of the framebuffer in pixels
 unsigned int windowHeight = 600;
 GLFWwindow* window;
 float time_delta; //Last frame time
+//Longer frames (e.g. while the window is dragged) slow the game down instead of simulating a few huge steps
+const float MAX_TIME_STEP = 0.1f;
 
 enum GameState
 {
 	MAIN_MENU,
 	PLAYING,
-	PAUSED
+	PAUSED,
+	GAME_OVER //lost or won, the game over menu offers to restart
 };
 GameState gameState = MAIN_MENU;
 unique_ptr<ui::Menu> menu;
@@ -174,7 +179,10 @@ void initialize()
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+#ifndef NDEBUG
+	//Debug output (see initDebug), the extra checks of a debug context can slow down the driver
 	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+#endif
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	//Windowed, full screen or borderless (see settings)
@@ -473,6 +481,8 @@ void initShaders()
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 			cout << "Framebuffer not complete!" << endl;
 	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 
 	//Main Shader
 	mainShader->enable();
@@ -498,16 +508,19 @@ void initShaders()
 	GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
 	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-	//Attaching to shadowFBO
+	//Attaching to shadowFBO (only depth)
 	glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowDepthTexture, 0);
 	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
 
 	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 
 	if (status != GL_FRAMEBUFFER_COMPLETE) {
 		printf("Framebuffer error, status: 0x%x\n", status);
 	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void init(GLFWwindow* window) {
@@ -565,6 +578,15 @@ void onMenuAction(ui::MenuAction action)
 	case ui::MenuAction::Quit:
 		glfwSetWindowShouldClose(window, true);
 		break;
+	case ui::MenuAction::Restart:
+		restartGame();
+		break;
+	case ui::MenuAction::MainMenu:
+		//Start in the main menu begins a new run
+		gameScene->restart();
+		gameState = MAIN_MENU;
+		menu->showMainMenu();
+		break;
 	case ui::MenuAction::GraphicsChanged:
 		applyGraphicsSettings();
 		break;
@@ -582,20 +604,40 @@ void onMenuAction(ui::MenuAction action)
 	}
 }
 
-void pauseGame()
+/**
+* @return false if there is no pause menu (e.g. missing UI folder), the game keeps running then
+*/
+bool pauseGame()
 {
-	gameState = PAUSED;
 	menu->showPauseMenu();
 	if (!menu->isVisible())
 	{
-		glfwSetWindowShouldClose(window, true);
+		return false;
 	}
+	gameState = PAUSED;
+	return true;
 }
 
 void resumeGame()
 {
 	gameState = PLAYING;
 	menu->hide();
+}
+
+//Without menus the game shows GAME OVER or YOU WON and R restarts as in earlier versions
+void showGameOver()
+{
+	menu->showGameOverMenu(gameScene->isGameWon());
+	if (menu->isVisible())
+	{
+		gameState = GAME_OVER;
+	}
+}
+
+void restartGame()
+{
+	gameScene->restart();
+	resumeGame();
 }
 
 
@@ -679,7 +721,7 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 
 void windowFocusCallback(GLFWwindow* window, int focused)
 {
-	//e.g. when switching to another window with Alt+Tab
+	//e.g. when switching to another window with Alt+Tab (without menus the game keeps running)
 	if (!focused && gameState == PLAYING)
 	{
 		pauseGame();
@@ -697,7 +739,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		switch (gameState)
 		{
 		case PLAYING:
-			pauseGame();
+			if (!pauseGame())
+			{
+				glfwSetWindowShouldClose(window, true); //without menus ESC quits as in earlier versions
+			}
 			break;
 		case PAUSED:
 			if (!menu->back())
@@ -706,9 +751,15 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 			}
 			break;
 		case MAIN_MENU:
+		case GAME_OVER:
 			menu->back();
 			break;
 		}
+		return;
+	}
+	if (gameState == GAME_OVER && key == GLFW_KEY_R && action == GLFW_PRESS)
+	{
+		restartGame(); //like during the game
 		return;
 	}
 
@@ -742,11 +793,17 @@ void gameLoop()
 		//Handles the buttons pressed in the menu (e.g. Start changes the game state)
 		menu->update();
 
+		messageTimeLeft = std::max(0.0f, messageTimeLeft - time_delta);
+
 		//Do game logic here, the game stands still while a menu is open
 		if (gameState == PLAYING)
 		{
 			mainShader->enable();
-			update(time_delta);
+			update(std::min(time_delta, MAX_TIME_STEP));
+			if (gameScene->isGameOver() || gameScene->isGameWon())
+			{
+				showGameOver();
+			}
 		}
 		//Do drawing of game here
 		draw();
@@ -779,6 +836,9 @@ void draw() {
 	gameScene->renderFromLightSource(depthShader.get());
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	//The bloom of bright fragments is only added to the scene by the HDR tone mapping (and not in wireframe mode)
+	bool bloom = settings.hdr && settings.bloom && !settings.wireframe;
+
 	////Pass 2 - Main Scene///
 	if (!settings.wireframe)
 	{
@@ -787,17 +847,19 @@ void draw() {
 	}
 	glViewport(0, 0, windowWidth, windowHeight);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	mainShader->enable();
+	//Rendering light sources (opaque, before the scene with its transparent water)
+	lightShader->enable();
+	gameScene->renderLightSourcesOnly(lightShader.get());
 
 	//drawing entire scene in main shader
+	mainShader->enable();
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
 	gameScene->renderFromCamera(mainShader.get());
+	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	//Rendering light sources
-	lightShader->enable();
-	gameScene->renderLightSourcesOnly(lightShader.get());
-	if (!settings.hdr || !settings.bloom || settings.wireframe)
+	glActiveTexture(GL_TEXTURE0);
+	if (!bloom)
 	{
 		textRendering();
 	}
@@ -805,27 +867,29 @@ void draw() {
 
 	if (!settings.wireframe)
 	{
-		// Horizontal/Vertical gaussian blur  
-		bool bloomBlurHorizontal = true, firstPass = true;
-		int gaussPasses = 10; //2 passes: horizontal and vertical (5 horizontal iterations, 5 vertical)
-		blurShader->enable();
-		for (int i = 0; i < gaussPasses; ++i)
+		bool bloomBlurHorizontal = true;
+		if (bloom)
 		{
-			glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[bloomBlurHorizontal]);
-			glUniform1i(blurShader->getUniformLocation("horizontal"), bloomBlurHorizontal);
-			glBindTexture(GL_TEXTURE_2D, firstPass ? colorBuffers[1] : blurColorbuffers[!bloomBlurHorizontal]);  // Bind result of previous framebuffer as texture
-			renderQuad();
-			bloomBlurHorizontal = !bloomBlurHorizontal;
-			if (firstPass)
+			// Horizontal/Vertical gaussian blur
+			bool firstPass = true;
+			int gaussPasses = 10; //2 passes: horizontal and vertical (5 horizontal iterations, 5 vertical)
+			blurShader->enable();
+			for (int i = 0; i < gaussPasses; ++i)
 			{
-				firstPass = false;
+				glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[bloomBlurHorizontal]);
+				glUniform1i(blurShader->getUniformLocation("horizontal"), bloomBlurHorizontal);
+				glBindTexture(GL_TEXTURE_2D, firstPass ? colorBuffers[1] : blurColorbuffers[!bloomBlurHorizontal]);  // Bind result of previous framebuffer as texture
+				renderQuad();
+				bloomBlurHorizontal = !bloomBlurHorizontal;
+				if (firstPass)
+				{
+					firstPass = false;
+				}
 			}
-		}
-		if (settings.hdr)
-		{
+			//The text is added to the scene with the bloom (and therefore not blurred)
 			textRendering();
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		// Rendering colorBuffer to simple quad to get drawing across entire screen and mapping HDR tones
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -835,7 +899,7 @@ void draw() {
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, blurColorbuffers[!bloomBlurHorizontal]);
 		glUniform1i(postProcessingShader->getUniformLocation("hdrEnabled"), settings.hdr);
-		glUniform1i(postProcessingShader->getUniformLocation("bloomEnabled"), settings.bloom);
+		glUniform1i(postProcessingShader->getUniformLocation("bloomEnabled"), bloom);
 		renderQuad();
 	}
 
@@ -965,11 +1029,10 @@ void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_DEPTH_TEST); //The text is always in front of the scene
 
-	// Activate corresponding render state	
+	// Activate corresponding render state
 	shader->enable();
-	glBindRenderbuffer(GL_RENDERBUFFER, depthBloomRBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, windowWidth, windowHeight);
 	glUniform3f(shader->getUniformLocation("textColor"), color.x, color.y, color.z);
 	glActiveTexture(GL_TEXTURE0);
 	glBindVertexArray(textVAO);
@@ -1012,6 +1075,7 @@ void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale
 
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
 }
 
 void textRendering()
@@ -1025,7 +1089,8 @@ void textRendering()
 		renderText(textShader.get(), "Press UP or DOWN (arrow) keys to walk", windowWidth / 10.f, windowHeight - 2.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Press LEFT or RIGHT (arrow) keys to turn left or right", windowWidth / 10.f, windowHeight - 3.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Press SPACE key to jump", windowWidth / 10.f, windowHeight - 4.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
-		renderText(textShader.get(), "Survive the dangerous trial and make it in time!", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "Press R key to restart", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "Pass all checkpoints and make it around the track!", windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 	}
 	if (settings.showFrameTime)
 	{
@@ -1036,16 +1101,26 @@ void textRendering()
 		renderText(textShader.get(), "Objects: " + drawnObjects, windowWidth * 0.62f, windowHeight - 1.f * windowHeight / 10.f, 0.6f, vec3(0.9, 0.5f, 0.5f));
 	}
 
+	//Lap progress (the finish line only counts after all checkpoints)
+	int checkpointsPassed = gameScene->getCheckpointsPassed();
+	int checkpointCount = gameScene->getCheckpointCount();
+	string lapProgress = "Checkpoints: " + to_string(checkpointsPassed) + "/" + to_string(checkpointCount);
+	if (checkpointsPassed == checkpointCount && !gameScene->isGameWon())
+	{
+		lapProgress += " - cross the finish line!";
+	}
+	renderText(textShader.get(), lapProgress, windowWidth / 10.f, 2.f * windowHeight / 10.f, 0.5f, vec3(0.9f, 0.8f, 0.3f));
+
 	if (messageTimeLeft > 0)
 	{
-		messageTimeLeft -= time_delta;
 		renderText(textShader.get(), lastMessage, windowWidth / 10.f, windowHeight / 10.f, 0.4f, vec3(0.7, 0.5f, 0.8f));
 	}
-	else
-	{
-		messageTimeLeft = 0;
-	}
 
+	//The game over menu shows the result if there are menus
+	if (gameState == GAME_OVER)
+	{
+		return;
+	}
 	if (gameScene->isGameWon())
 	{
 		renderText(textShader.get(), "YOU WON!", windowWidth / 2.f - windowWidth / 5.f, windowHeight / 2.f, 0.6f, vec3(1.0, 0.1f, 0.1f));

@@ -17,6 +17,8 @@ namespace bibo
 		public:
 			Light(GLFWwindow& window, Shader* shader, aiLight* light);
 			~Light();
+			Light(const Light&) = delete;
+			Light& operator=(const Light&) = delete;
 			void update(float time_delta) override;
 			void draw(Shader* shader) override;
 			void loadUniforms(Shader* shader);

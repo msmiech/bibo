@@ -151,3 +151,51 @@ TEST_CASE("The bear waits at the start of the race without losing", "[gl][scene]
 		CHECK_THAT(gl.errors(), Catch::Matchers::IsEmpty());
 	}
 }
+
+TEST_CASE("The camera turns around the bear on the track without going into the terrain", "[gl][scene][camera]")
+{
+	GlContext gl;
+	AssetWorkingDirectory assets;
+	Shader mainShader("Shader/main_shader.vert", "Shader/main_shader.frag");
+	PhysicsWorld physicsWorld;
+	Scene scene(&gl.window(), &mainShader, &physicsWorld);
+	const float frame = 1.0f / 60.0f;
+	scene.update(frame);
+
+	bibo::input::PlayerInput input;
+	SECTION("Standing at the start") {}
+	SECTION("Running along the track")
+	{
+		input.move = glm::vec2(0.0f, 1.0f);
+	}
+	SECTION("Jumping")
+	{
+		input.move = glm::vec2(0.2f, 1.0f);
+		input.jump = true;
+	}
+
+	int checked = 0;
+	for (int i = 0; i < 4 * 60 && !scene.isGameOver(); ++i)
+	{
+		//Round and round, low (looking up from the ground) and high
+		input.look = glm::vec2(0.04f, (i / 60) % 2 == 0 ? -0.05f : 0.05f);
+		if (input.jump)
+		{
+			input.jump = (i / 20) % 2 == 0; //presses again and again
+		}
+		scene.update(frame, input);
+		bibo::scene::Camera& camera = scene.getCamera();
+		glm::vec3 position = camera.getPosition();
+		bibo::physics::RayHit hit;
+		//Nothing static (terrain, rocks) above the camera, so it is not below the surface
+		if (physicsWorld.castRay(position + glm::vec3(0.0f, 100.0f, 0.0f), glm::vec3(0.0f, -100.0f, 0.0f), hit, true))
+		{
+			CAPTURE(i, position, hit.position, camera.getPitch());
+			CHECK(hit.position.y < position.y);
+		}
+		//And not in the middle of something
+		CHECK_FALSE(physicsWorld.castSphere(position, glm::vec3(0.0f, 0.01f, 0.0f), 0.1f, hit, true));
+		++checked;
+	}
+	CHECK(checked > 60);
+}

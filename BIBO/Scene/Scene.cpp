@@ -111,17 +111,35 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	}
 	bear->setObstacles(rocks);
 
+	//The camera stays out of the terrain and the rocks
+	camera->setCollisionProbe([this](vec3 from, vec3 to, float radius) {
+		physics::RayHit hit;
+		return this->physicsWorld->castSphere(from, to - from, radius, hit, true) ? hit.fraction : 1.0f;
+	});
+
 	rotatingRock = make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock1", textures[5].get(), textures[9].get());
 	rotatingRock->modelMatrix = translate(rotatingRock->modelMatrix, vec3(10, 25, 1));
 }
 
-void Scene::update(float time_delta) {
+void Scene::update(float time_delta, const input::PlayerInput& player) {
 	physicsWorld->update(time_delta);
 	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
 	{
 		restart();
 	}
 	if (gameWon != true && gameOver != true){
+	//The camera turns first, the bear moves relative to where the camera looks then
+	camera->rotate(player.look.x, player.look.y);
+	camera->zoom(player.zoom);
+	if (player.recenter)
+	{
+		camera->recenter();
+	}
+	BearInput bearInput;
+	bearInput.move = input::cameraRelative(player.move, camera->getForward(), camera->getRight());
+	bearInput.jump = player.jump;
+	bear->setInput(bearInput);
+
 	for (unsigned int i = 0; i < geometries.size(); ++i)
 	{
 		geometries[i]->update(time_delta);
@@ -138,7 +156,7 @@ void Scene::update(float time_delta) {
 
 	if (camera->isLocked())
 	{
-		camera->setTarget(bear);
+		camera->follow(cameraTarget(), time_delta);
 	}
 	camera->update(time_delta);
 	rotatingRock->modelMatrix = rotate(rotatingRock->modelMatrix, radians(90.0f) * time_delta, vec3(1, 1, 0));
@@ -159,9 +177,21 @@ void Scene::update(float time_delta) {
 	}
 }
 
+Camera::FollowTarget Scene::cameraTarget()
+{
+	Camera::FollowTarget target;
+	target.position = bear->getPosition();
+	target.direction = bear->getDirection();
+	target.velocity = bear->getCharacter().getVelocity();
+	target.airborne = bear->getCharacter().isAirborne();
+	return target;
+}
+
 void Scene::restart()
 {
 	bear->reset();
+	bear->setInput(BearInput());
+	camera->snapBehind(cameraTarget());
 	for (const auto& dynamicBody : dynamicBodies)
 	{
 		physicsWorld->resetBody(dynamicBody.first, dynamicBody.second, quat(1.0f, 0.0f, 0.0f, 0.0f));

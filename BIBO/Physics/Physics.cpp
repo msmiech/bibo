@@ -12,7 +12,9 @@
 #include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Collision/ShapeCast.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
@@ -341,6 +343,39 @@ bool PhysicsWorld::castRay(glm::vec3 origin, glm::vec3 ray, RayHit& hit, bool st
 	return true;
 }
 
+bool PhysicsWorld::castSphere(glm::vec3 origin, glm::vec3 ray, float radius, RayHit& hit, bool staticOnly) const
+{
+	JPH::SphereShape sphere(radius);
+	sphere.SetEmbedded(); //on the stack, not reference counted
+	//The contact points of the result are relative to the base offset (the origin)
+	JPH::RShapeCast cast = JPH::RShapeCast::sFromWorldTransform(&sphere, JPH::Vec3::sOne(), JPH::RMat44::sTranslation(JPH::RVec3(toJolt(origin))), toJolt(ray));
+	JPH::ShapeCastSettings settings;
+	JPH::ClosestHitCollisionCollector<JPH::CastShapeCollector> collector;
+	const JPH::NarrowPhaseQuery& query = impl->system.GetNarrowPhaseQuery();
+	JPH::RVec3 base(toJolt(origin));
+	if (staticOnly)
+	{
+		query.CastShape(cast, settings, base, collector,
+			JPH::SpecifiedBroadPhaseLayerFilter(BroadPhaseLayers::NON_MOVING), JPH::SpecifiedObjectLayerFilter(Layers::NON_MOVING));
+	}
+	else
+	{
+		query.CastShape(cast, settings, base, collector);
+	}
+	if (!collector.HadHit())
+	{
+		return false;
+	}
+	const JPH::ShapeCastResult& result = collector.mHit;
+	hit.body = result.mBodyID2.GetIndexAndSequenceNumber();
+	hit.fraction = std::max(result.mFraction, 0.0f);
+	hit.position = origin + toGlm(result.mContactPointOn2);
+	//The penetration axis points from the sphere into the body
+	JPH::Vec3 axis = result.mPenetrationAxis;
+	hit.normal = axis.LengthSq() > 1e-12f ? -toGlm(axis.Normalized()) : -glm::normalize(ray);
+	return true;
+}
+
 struct CharacterController::Impl : public JPH::CharacterContactListener
 {
 	Impl(PhysicsWorld::Impl& world, HitCallback onHit, float stepOffset) : world(world), onHit(std::move(onHit)), stepOffset(stepOffset)
@@ -409,6 +444,11 @@ bool CharacterController::move(glm::vec3 displacement, float time_delta)
 		{}, {}, impl->world.tempAllocator);
 
 	return impl->character->IsSupported();
+}
+
+bool CharacterController::isOnWalkableGround() const
+{
+	return impl->character->GetGroundState() == JPH::CharacterVirtual::EGroundState::OnGround;
 }
 
 glm::vec3 CharacterController::getPosition() const

@@ -7,6 +7,7 @@
 #include "Bear.hpp"
 #include "Cube.hpp"
 #include "GameRules.hpp"
+#include "../Util/Input.hpp"
 #include "../Util/Util.hpp"
 #include "../Physics/Physics.hpp"
 #include <glm/gtc/quaternion.hpp>
@@ -44,6 +45,8 @@ namespace bibo
 			void initFinishLine(Geometry* board);
 			//Called when the bear touches a physics body: obstacles (rocks) knock it down
 			void onBearHit(const physics::CharacterController::Hit& hit);
+			//What the camera follows: the bear
+			Camera::FollowTarget cameraTarget();
 			/**
 			* @param frustum Geometries outside of it are not drawn (nullptr: draw all)
 			* @param shadedBear The bear is drawn with its own shaders and its fur (main pass), otherwise with the given shader
@@ -100,7 +103,16 @@ namespace bibo
 		public:
 			Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld);
 
-			void update(float time_delta);
+			/**
+			* @param player What the player does: moves the bear (relative to the camera), jumps and turns the camera
+			*/
+			void update(float time_delta, const input::PlayerInput& player = {});
+			/**
+			* @return false while the camera flies freely (L), then WASD moves the camera instead of the bear
+			*/
+			bool isCameraLocked() { return camera->isLocked(); }
+			Camera& getCamera() { return *camera; }
+			Bear& getBear() { return *bear; }
 			/**
 			* Starts the run again: the bear, the movable objects and the lap go back to the start (R key, game over menu)
 			*/

@@ -57,10 +57,6 @@ physics::CharacterControllerDesc Bear::characterControllerDesc(vec3 position)
 
 void Bear::update(float time_delta)
 {
-	BearInput input;
-	input.forward = (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS ? 1.0f : 0.0f) - (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS ? 1.0f : 0.0f);
-	input.turn = (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS ? 1.0f : 0.0f) - (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS ? 1.0f : 0.0f);
-	input.jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
 	character->update(time_delta, input);
 	modelMatrix[3] = vec4(character->getPosition(), 1.0f);
 }

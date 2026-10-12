@@ -95,6 +95,9 @@ bool Settings::load(const string& path)
 	read(values, "mipmapping", mipmapping, 0, 2);
 	read(values, "wireframe", wireframe);
 
+	read(values, "camera_sensitivity", cameraSensitivity, 1, 10);
+	read(values, "invert_camera_y", invertCameraY);
+
 	read(values, "show_frame_time", showFrameTime);
 	read(values, "show_help", showHelp);
 	return true;
@@ -122,6 +125,8 @@ bool Settings::save(const string& path) const
 		<< "bilinear_filtering = " << toString(bilinearFiltering) << endl
 		<< "mipmapping = " << mipmapping << endl
 		<< "wireframe = " << toString(wireframe) << endl
+		<< "camera_sensitivity = " << cameraSensitivity << endl
+		<< "invert_camera_y = " << toString(invertCameraY) << endl
 		<< "show_frame_time = " << toString(showFrameTime) << endl
 		<< "show_help = " << toString(showHelp) << endl;
 	return static_cast<bool>(file);

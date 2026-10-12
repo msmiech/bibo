@@ -75,6 +75,27 @@
 				<input type="checkbox" data-checked="wireframe"/>
 			</label>
 
+			<h2>Controls</h2>
+			<div class="row">
+				<span class="label">Camera sensitivity</span>
+				<select data-value="camera_sensitivity">
+					<option value="1">1</option>
+					<option value="2">2</option>
+					<option value="3">3</option>
+					<option value="4">4</option>
+					<option value="5">5</option>
+					<option value="6">6</option>
+					<option value="7">7</option>
+					<option value="8">8</option>
+					<option value="9">9</option>
+					<option value="10">10</option>
+				</select>
+			</div>
+			<label class="row">
+				<span class="label">Invert camera up/down</span>
+				<input type="checkbox" data-checked="invert_camera_y"/>
+			</label>
+
 			<h2>Interface</h2>
 			<label class="row">
 				<span class="label">Show frame time</span>

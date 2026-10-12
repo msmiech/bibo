@@ -71,6 +71,13 @@ namespace bibo
 			* @return false if the ray does not hit a body
 			*/
 			bool castRay(glm::vec3 origin, glm::vec3 ray, RayHit& hit, bool staticOnly = false) const;
+			/**
+			* Moves a sphere from origin to origin + ray and finds the first body it touches (e.g. so that the camera does not go into the terrain)
+			* @param hit position: where the sphere touches the body, fraction: how far the sphere got (0 if it touches a body at the origin)
+			* @param staticOnly Only static bodies (terrain, rocks), no dynamic bodies (boxes, ragdolls)
+			* @return false if the sphere does not touch a body on the way
+			*/
+			bool castSphere(glm::vec3 origin, glm::vec3 ray, float radius, RayHit& hit, bool staticOnly = false) const;
 
 		private:
 			friend class CharacterController;
@@ -120,6 +127,11 @@ namespace bibo
 			* @return true if the character stands on the ground after the move
 			*/
 			bool move(glm::vec3 displacement, float time_delta);
+			/**
+			* @return true if the character stands on ground that is not too steep (see CharacterControllerDesc::slopeLimit),
+			* false in the air or on a slope that it slides down
+			*/
+			bool isOnWalkableGround() const;
 			glm::vec3 getPosition() const;
 			/**
 			* Moves the character to the given position without colliding with the world on the way (e.g. when the game is restarted)

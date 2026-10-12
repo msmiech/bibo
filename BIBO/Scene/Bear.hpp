@@ -14,7 +14,7 @@ namespace bibo
 	{
 		/**
 		* The player character: a young brown bear (Model/BearCub/BearCub.glb) with a skeleton, procedural animation,
-		* fur strands and a ragdoll (see BearCharacter, BearRig, BearRenderer). Controlled with the arrow keys and SPACE.
+		* fur strands and a ragdoll (see BearCharacter, BearRig, BearRenderer). The scene sets what the player wants it to do (setInput).
 		*/
 		class Bear : public Geometry
 		{
@@ -30,6 +30,10 @@ namespace bibo
 			~Bear() override;
 
 			void update(float time_delta) override;
+			/**
+			* What the player wants the bear to do in the next updates
+			*/
+			void setInput(const BearInput& input) { this->input = input; }
 			/**
 			* Draws the surface of the bear with the given shader (e.g. into the shadow map)
 			*/
@@ -71,6 +75,7 @@ namespace bibo
 			std::unique_ptr<BearCharacter> character;
 			std::unique_ptr<BearRenderer> renderer;
 			unsigned int uploadedVersion = 0;
+			BearInput input;
 		};
 	}
 }

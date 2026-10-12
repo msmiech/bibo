@@ -12,11 +12,23 @@ namespace
 {
 	const glm::vec3 UP(0.0f, 1.0f, 0.0f);
 	//Movement (per second): the speeds of the earlier versions, reached smoothly
-	const float FORWARD_SPEED = 10.0f, BACKWARD_SPEED = 7.5f;
+	const float FORWARD_SPEED = BearCharacter::FORWARD_SPEED, BACKWARD_SPEED = 7.5f;
 	const float ACCELERATION = 40.0f, DECELERATION = 50.0f;
-	const float TURN_RATE = glm::radians(90.0f);
-	//The jump and the fall were tuned at 60 FPS: rising by 10 per second minus the gravity of 2 frames, falling by 0.981 per frame and second of falling
-	const float MAX_JUMP_TIME = 0.5f, JUMP_SPEED = 10.0f - 2.0f * 0.981f, GRAVITY = -0.981f * 60.0f;
+	const float TURN_RATE = glm::radians(90.0f); //forward/turn input
+	//Steering towards a direction (move input): quick on the spot, wider curves at full speed. The remaining angle is turned
+	//within about STEER_RESPONSE seconds, so the bear eases out of a turn
+	const float STEER_RATE_STANDING = glm::radians(420.0f), STEER_RATE_RUNNING = glm::radians(220.0f), STEER_RATE_AIR = glm::radians(150.0f);
+	const float STEER_RESPONSE = 0.12f;
+	//Jump: a ballistic arc. Rising with JUMP_GRAVITY reaches JUMP_HEIGHT after JUMP_RISE_TIME, releasing the button early
+	//cuts the rise short (stronger gravity), falling is faster than rising (the fall of the earlier versions)
+	const float JUMP_GRAVITY = 2.0f * BearCharacter::JUMP_HEIGHT / (BearCharacter::JUMP_RISE_TIME * BearCharacter::JUMP_RISE_TIME);
+	const float JUMP_SPEED = JUMP_GRAVITY * BearCharacter::JUMP_RISE_TIME;
+	const float JUMP_CUT_GRAVITY = 2.5f * JUMP_GRAVITY;
+	const float FALL_GRAVITY = 0.981f * 60.0f, MAX_FALL_SPEED = 35.0f;
+	//The bear can still jump shortly after it ran over an edge, and a jump pressed shortly before landing happens on landing
+	const float COYOTE_TIME = 0.12f, JUMP_BUFFER_TIME = 0.15f;
+	//In the air the bear keeps its momentum, the player can only change it a little
+	const float AIR_ACCELERATION = 14.0f;
 	//Ragdoll: it lies still when all parts are slower than this for a moment
 	const float REST_SPEED = 0.35f, REST_ANGULAR_SPEED = 1.2f, REST_TIME = 0.3f;
 	const float MIN_RAGDOLL_TIME = 0.8f, MAX_RAGDOLL_TIME = 4.0f;
@@ -86,7 +98,7 @@ BearCharacter::BearCharacter(physics::PhysicsWorld& world, const resources::Skin
 
 BearCharacter::~BearCharacter() = default;
 
-LocomotionInput BearCharacter::locomotionInput() const
+LocomotionInput BearCharacter::locomotionInput(bool jumped) const
 {
 	LocomotionInput input;
 	input.rootPosition = controller->getPosition() - UP * rootOffset();
@@ -94,6 +106,7 @@ LocomotionInput BearCharacter::locomotionInput() const
 	input.velocity = velocity;
 	input.yawRate = yawRate;
 	input.grounded = standingOnGround;
+	input.jumped = jumped;
 	return input;
 }
 
@@ -103,8 +116,9 @@ void BearCharacter::reset()
 	state = State::CONTROL;
 	direction = startDirection;
 	speed = yawRate = 0.0f;
-	velocity = glm::vec3(0.0f);
-	jumpTimeLeft = fallingTime = 0.0f;
+	velocity = airVelocity = glm::vec3(0.0f);
+	verticalSpeed = airTime = jumpBuffer = fallingTime = 0.0f;
+	jumping = jumpWasHeld = false;
 	standingOnGround = false;
 	knockDownPending = false;
 	stateTime = restTime = protectedTime = idleWaitTime = 0.0f;
@@ -174,49 +188,105 @@ void BearCharacter::update(float timeDelta, const BearInput& input)
 	updateSkin(timeDelta);
 }
 
-void BearCharacter::updateControl(float timeDelta, const BearInput& input)
+float BearCharacter::steer(float timeDelta, const BearInput& input, bool& hasInput)
 {
+	glm::vec3 move(input.move.x, 0.0f, input.move.z);
+	float amount = std::min(glm::length(move), 1.0f);
+	if (amount > 1e-3f)
+	{
+		hasInput = true;
+		glm::vec3 wanted = glm::normalize(move);
+		//Positive: the wanted direction is to the left
+		float angle = std::atan2(glm::cross(direction, wanted).y, glm::dot(direction, wanted));
+		float maxRate = standingOnGround
+			? glm::mix(STEER_RATE_STANDING, STEER_RATE_RUNNING, std::clamp(std::abs(speed) / FORWARD_SPEED, 0.0f, 1.0f))
+			: STEER_RATE_AIR;
+		float targetRate = std::clamp(angle / STEER_RESPONSE, -maxRate, maxRate);
+		yawRate += (targetRate - yawRate) * animation::smoothingFactor(0.03f, timeDelta);
+		if (std::abs(yawRate * timeDelta) > std::abs(angle))
+		{
+			yawRate = angle / timeDelta; //does not turn past the wanted direction
+		}
+		direction = glm::normalize(glm::rotateY(direction, yawRate * timeDelta));
+		//Slows down while turning around (instead of running sideways)
+		float alignment = glm::dot(direction, wanted);
+		return amount * FORWARD_SPEED * std::clamp(0.35f + 0.65f * alignment, 0.0f, 1.0f);
+	}
+
 	yawRate = std::clamp(input.turn, -1.0f, 1.0f) * TURN_RATE;
 	direction = glm::normalize(glm::rotateY(direction, yawRate * timeDelta));
-
 	float forward = std::clamp(input.forward, -1.0f, 1.0f);
-	float targetSpeed = forward >= 0.0f ? forward * FORWARD_SPEED : forward * BACKWARD_SPEED;
-	bool speedingUp = std::abs(targetSpeed) > std::abs(speed) && targetSpeed * speed >= 0.0f;
-	float change = (speedingUp ? ACCELERATION : DECELERATION) * timeDelta;
-	speed += std::clamp(targetSpeed - speed, -change, change);
-	glm::vec3 displacement = direction * speed * timeDelta;
+	hasInput = forward != 0.0f || input.turn != 0.0f;
+	return forward >= 0.0f ? forward * FORWARD_SPEED : forward * BACKWARD_SPEED;
+}
 
-	//The bear rises while SPACE is held (at most MAX_JUMP_TIME), the next jump is only possible after landing
-	bool jumped = false;
-	if (input.jump && jumpTimeLeft > 0.0f)
+void BearCharacter::updateControl(float timeDelta, const BearInput& input)
+{
+	bool hasInput = false;
+	float targetSpeed = steer(timeDelta, input, hasInput);
+	glm::vec3 horizontal;
+	if (standingOnGround)
 	{
-		jumpTimeLeft -= timeDelta;
-		fallingTime = 0.0f;
-		displacement.y += JUMP_SPEED * timeDelta;
-		jumped = true;
+		bool speedingUp = std::abs(targetSpeed) > std::abs(speed) && targetSpeed * speed >= 0.0f;
+		float change = (speedingUp ? ACCELERATION : DECELERATION) * timeDelta;
+		speed += std::clamp(targetSpeed - speed, -change, change);
+		horizontal = airVelocity = direction * speed;
 	}
 	else
 	{
-		if (!standingOnGround)
+		//Without input the bear flies on, with input it changes its course a little
+		if (hasInput)
 		{
-			jumpTimeLeft = 0.0f; //SPACE was released in the air
+			glm::vec3 change = direction * targetSpeed - airVelocity;
+			float maxChange = AIR_ACCELERATION * timeDelta;
+			if (glm::length(change) > maxChange)
+			{
+				change *= maxChange / glm::length(change);
+			}
+			airVelocity += change;
 		}
-		//The longer the bear falls, the faster it falls (on the ground the controller ignores the downward movement)
-		fallingTime += timeDelta;
-		displacement.y += GRAVITY * fallingTime * timeDelta;
+		horizontal = airVelocity;
+		speed = glm::dot(airVelocity, direction); //runs on with this speed after landing
 	}
 
+	//The jump starts when the button is pressed (or was pressed shortly before landing), also shortly after running over an edge
+	bool jumpPressed = input.jump && !jumpWasHeld;
+	jumpWasHeld = input.jump;
+	jumpBuffer = jumpPressed ? JUMP_BUFFER_TIME : std::max(0.0f, jumpBuffer - timeDelta);
+	airTime = standingOnGround ? 0.0f : airTime + timeDelta;
+	bool jumped = false;
+	if (jumpBuffer > 0.0f && !jumping && airTime <= COYOTE_TIME)
+	{
+		verticalSpeed = JUMP_SPEED;
+		jumping = jumped = true;
+		jumpBuffer = 0.0f;
+	}
+	else if (controller->isOnWalkableGround() && !jumping)
+	{
+		verticalSpeed = 0.0f; //the controller keeps the bear on the ground when it walks down a slope
+	}
+	else
+	{
+		//Holding the button until the highest point jumps highest, falling is faster than rising
+		float gravity = verticalSpeed <= 0.0f ? FALL_GRAVITY : (input.jump ? JUMP_GRAVITY : JUMP_CUT_GRAVITY);
+		verticalSpeed = std::max(verticalSpeed - gravity * timeDelta, -MAX_FALL_SPEED);
+	}
+
+	glm::vec3 displacement = (horizontal + UP * verticalSpeed) * timeDelta;
 	glm::vec3 before = controller->getPosition();
 	standingOnGround = controller->move(displacement, timeDelta); //may knock the bear down (onHit)
 	velocity = (controller->getPosition() - before) / timeDelta;
-	if (standingOnGround && !jumped)
+	if (verticalSpeed > 0.0f && velocity.y < 0.5f * verticalSpeed)
 	{
-		jumpTimeLeft = MAX_JUMP_TIME;
-		fallingTime = 1.0f; //falls quickly when walking over an edge
+		verticalSpeed = std::max(velocity.y, 0.0f); //hit something above
+	}
+	if (standingOnGround && verticalSpeed <= 0.0f)
+	{
+		jumping = false; //landed
 	}
 
 	//Idle animations: after standing still for a while, until the player moves the bear again
-	bool hasInput = forward != 0.0f || input.turn != 0.0f || input.jump;
+	hasInput = hasInput || input.jump;
 	if (hasInput)
 	{
 		idleWaitTime = 0.0f;
@@ -231,7 +301,7 @@ void BearCharacter::updateControl(float timeDelta, const BearInput& input)
 		}
 	}
 
-	rig.updateLocomotion(timeDelta, locomotionInput(), probe);
+	rig.updateLocomotion(timeDelta, locomotionInput(jumped), probe);
 	if (knockDownPending)
 	{
 		startRagdoll();
@@ -271,7 +341,8 @@ void BearCharacter::startRagdoll()
 	}
 	ragdoll->activate(transforms, velocities, spin);
 	guideHairs.addImpulse(pendingHit.position, away * 6.0f + UP * 2.0f, 1.0f);
-	speed = 0.0f;
+	speed = verticalSpeed = 0.0f;
+	jumping = false;
 	setState(State::RAGDOLL);
 }
 
@@ -307,7 +378,7 @@ void BearCharacter::updateGettingUp(float timeDelta)
 {
 	//The capsule stays on the ground (it may also be pushed out of an obstacle), the animation follows it
 	fallingTime += timeDelta;
-	standingOnGround = controller->move(UP * (GRAVITY * std::min(fallingTime, 1.0f) * timeDelta), timeDelta);
+	standingOnGround = controller->move(UP * (-FALL_GRAVITY * std::min(fallingTime, 1.0f) * timeDelta), timeDelta);
 	if (standingOnGround)
 	{
 		fallingTime = 0.0f;
@@ -317,7 +388,9 @@ void BearCharacter::updateGettingUp(float timeDelta)
 		state = State::CONTROL;
 		stateTime = 0.0f;
 		protectedTime = PROTECTED_TIME;
-		jumpTimeLeft = 0.0f;
+		airVelocity = glm::vec3(0.0f);
+		verticalSpeed = airTime = jumpBuffer = 0.0f;
+		jumping = false;
 	}
 }
 

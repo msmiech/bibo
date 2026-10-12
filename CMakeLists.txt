@@ -224,6 +224,8 @@ add_library(bibo_core STATIC
 	BIBO/Util/Console.hpp
 	BIBO/Util/Display.cpp
 	BIBO/Util/Display.hpp
+	BIBO/Util/Input.cpp
+	BIBO/Util/Input.hpp
 	BIBO/Util/Settings.cpp
 	BIBO/Util/Settings.hpp
 	BIBO/Util/Util.cpp

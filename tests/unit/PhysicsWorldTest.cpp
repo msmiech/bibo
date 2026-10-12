@@ -193,3 +193,44 @@ TEST_CASE("Physics worlds can be created again and simulate the same way", "[phy
 	CHECK(results[1] == results[0]);
 	CHECK(results[2] == results[0]);
 }
+
+TEST_CASE("A sphere cast stops where the sphere touches the first body", "[physics]")
+{
+	PhysicsWorld world;
+	world.createStaticBox(vec3(0.0f, -1.0f, 0.0f), vec3(50.0f, 1.0f, 50.0f)); //top at y = 0
+	world.optimizeBroadPhase();
+	const float radius = 0.5f;
+	RayHit hit;
+
+	SECTION("Down onto the ground")
+	{
+		REQUIRE(world.castSphere(vec3(0.0f, 5.0f, 0.0f), vec3(0.0f, -10.0f, 0.0f), radius, hit));
+		CHECK_THAT(hit.fraction, WithinAbs((5.0f - radius) / 10.0f, 1e-3f));
+		CHECK_THAT(hit.position, IsNear(vec3(0.0f), 1e-3f));
+		CHECK_THAT(hit.normal, IsNear(vec3(0.0f, 1.0f, 0.0f), 1e-3f));
+	}
+
+	SECTION("Along the ground without touching it")
+	{
+		CHECK_FALSE(world.castSphere(vec3(0.0f, 1.0f, 0.0f), vec3(10.0f, 0.0f, 0.0f), radius, hit));
+	}
+
+	SECTION("A ray would pass a body that the sphere touches")
+	{
+		world.createStaticSphere(vec3(5.0f, 1.0f, 0.7f), 0.4f);
+		RayHit rayHit;
+		CHECK_FALSE(world.castRay(vec3(0.0f, 1.0f, 0.0f), vec3(10.0f, 0.0f, 0.0f), rayHit));
+		REQUIRE(world.castSphere(vec3(0.0f, 1.0f, 0.0f), vec3(10.0f, 0.0f, 0.0f), radius, hit));
+		CHECK(hit.fraction > 0.3f);
+		CHECK(hit.fraction < 0.5f);
+	}
+
+	SECTION("Only static bodies")
+	{
+		world.createDynamicBox(vec3(0.0f, 3.0f, 0.0f), vec3(0.4f), 1.0f);
+		REQUIRE(world.castSphere(vec3(0.0f, 5.0f, 0.0f), vec3(0.0f, -10.0f, 0.0f), radius, hit));
+		CHECK(hit.fraction < 0.2f); //the box
+		REQUIRE(world.castSphere(vec3(0.0f, 5.0f, 0.0f), vec3(0.0f, -10.0f, 0.0f), radius, hit, true));
+		CHECK_THAT(hit.fraction, WithinAbs((5.0f - radius) / 10.0f, 1e-3f)); //the ground
+	}
+}

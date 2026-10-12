@@ -14,6 +14,7 @@
 #include "UI/Menu.hpp"
 #include "Util/Console.hpp"
 #include "Util/Display.hpp"
+#include "Util/Input.hpp"
 #include "Util/Settings.hpp"
 
 using namespace bibo;
@@ -57,6 +58,8 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 void windowFocusCallback(GLFWwindow* window, int focused);
+void joystickCallback(int joystick, int event);
+void handleGamepad();
 
 //vars
 const char* const SETTINGS_FILE = "settings.cfg"; //in the working directory, like the assets
@@ -77,6 +80,8 @@ enum GameState
 };
 GameState gameState = MAIN_MENU;
 unique_ptr<ui::Menu> menu;
+//Keyboard, mouse and gamepad of the player
+unique_ptr<input::Input> controls;
 
 unique_ptr<Shader> mainShader;
 unique_ptr<Shader> depthShader;
@@ -211,11 +216,15 @@ void initialize()
 	});
 	glfwSetScrollCallback(window, [](GLFWwindow*, double, double yOffset) {
 		if (menu && menu->isVisible()) menu->onScroll(yOffset);
+		else if (controls) controls->onScroll(yOffset); //zooms the camera
 	});
-	//The menu always knows where the mouse is, so that it highlights the right button as soon as it opens
+	//The menu always knows where the mouse is, so that it highlights the right button as soon as it opens.
+	//During the game the mouse is captured and turns the camera.
 	glfwSetCursorPosCallback(window, [](GLFWwindow*, double x, double y) {
 		if (menu) menu->onCursorPos(x, y);
+		if (controls) controls->onCursorPos(x, y);
 	});
+	glfwSetJoystickCallback(joystickCallback);
 	glfwSetCursorEnterCallback(window, [](GLFWwindow*, int entered) {
 		if (menu) menu->onCursorEnter(entered == GLFW_TRUE);
 	});
@@ -525,6 +534,7 @@ void initShaders()
 
 void init(GLFWwindow* window) {
 	glEnable(GL_DEPTH_TEST);
+	controls = make_unique<input::Input>(window);
 
 	initShaders();
 	initTextRendering();
@@ -790,8 +800,12 @@ void gameLoop()
 			continue;
 		}
 
+		controls->update();
+		handleGamepad();
 		//Handles the buttons pressed in the menu (e.g. Start changes the game state)
 		menu->update();
+		//The mouse turns the camera during the game and is a normal cursor in the menus
+		controls->setMouseCaptured(gameState == PLAYING && glfwGetWindowAttrib(window, GLFW_FOCUSED));
 
 		messageTimeLeft = std::max(0.0f, messageTimeLeft - time_delta);
 
@@ -822,7 +836,59 @@ void gameLoop()
 }
 
 void update(float time_delta) {
-	gameScene->update(time_delta);
+	//WASD moves the free camera (L) instead of the bear
+	gameScene->update(time_delta, controls->playerInput(time_delta, settings, !gameScene->isCameraLocked()));
+}
+
+/**
+* Start (Options on a DualSense) pauses and resumes the game, the D-pad (or left stick), A (Cross) and B (Circle) work the menus
+* like the arrow keys, ENTER and ESC
+*/
+void handleGamepad()
+{
+	if (!controls->hasGamepad())
+	{
+		return;
+	}
+	if (gameState == PLAYING)
+	{
+		if (controls->wasPressed(GLFW_GAMEPAD_BUTTON_START))
+		{
+			pauseGame();
+		}
+		return;
+	}
+	if (gameState == PAUSED && controls->wasPressed(GLFW_GAMEPAD_BUTTON_START))
+	{
+		resumeGame();
+		return;
+	}
+	for (int key : controls->getMenuKeys())
+	{
+		keyCallback(window, key, 0, GLFW_PRESS, 0);
+		keyCallback(window, key, 0, GLFW_RELEASE, 0);
+	}
+}
+
+void joystickCallback(int joystick, int event)
+{
+	if (event == GLFW_CONNECTED)
+	{
+		const char* name = glfwGetJoystickName(joystick);
+		lastMessage = glfwJoystickIsGamepad(joystick)
+			? string("Gamepad connected: ") + (name ? name : "")
+			: string("Controller without a gamepad mapping: ") + (name ? name : "") + " (add it to " + input::Input::MAPPINGS_FILE + ")";
+		messageTimeLeft = 4;
+	}
+	else if (event == GLFW_DISCONNECTED)
+	{
+		lastMessage = "Gamepad disconnected";
+		messageTimeLeft = 4;
+		if (gameState == PLAYING && menu)
+		{
+			pauseGame(); //e.g. the battery is empty
+		}
+	}
 }
 
 void draw() {
@@ -1086,9 +1152,9 @@ void textRendering()
 	}
 	if (settings.showHelp)
 	{
-		renderText(textShader.get(), "Press UP or DOWN (arrow) keys to walk", windowWidth / 10.f, windowHeight - 2.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
-		renderText(textShader.get(), "Press LEFT or RIGHT (arrow) keys to turn left or right", windowWidth / 10.f, windowHeight - 3.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
-		renderText(textShader.get(), "Press SPACE key to jump", windowWidth / 10.f, windowHeight - 4.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "WASD or arrow keys / left stick to run", windowWidth / 10.f, windowHeight - 2.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "Mouse / right stick to look around, wheel to zoom", windowWidth / 10.f, windowHeight - 3.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "SPACE / Cross or A to jump (hold to jump higher)", windowWidth / 10.f, windowHeight - 4.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Press R key to restart", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Pass all checkpoints and make it around the track!", windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Watch out: the rocks knock the bear over", windowWidth / 10.f, windowHeight - 7.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));

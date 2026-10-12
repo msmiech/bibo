@@ -34,6 +34,16 @@ namespace bibo
 		glm::vec3 cameraRelative(glm::vec2 move, glm::vec3 forward, glm::vec3 right);
 
 		/**
+		* Replaces glfwGetKey for the keys that are held (walking, jumping, the camera):
+		* a key is down when it is pressed on the keyboard or by the demo script (see DemoScript)
+		*/
+		bool isKeyDown(GLFWwindow* window, int key);
+		/**
+		* Presses or releases a key for isKeyDown, e.g. by the demo script
+		*/
+		void setScriptedKey(int key, bool down);
+
+		/**
 		* Keyboard, mouse and gamepads (e.g. Sony DualSense, Xbox Series) via GLFW. Gamepads use the GLFW mappings
 		* (SDL_GameControllerDB), so the buttons are named like on an Xbox controller: A is Cross, B is Circle, Start is Options.
 		* - Keyboard: WASD or arrow keys move the bear, SPACE jumps

@@ -1,5 +1,6 @@
 #include "Input.hpp"
 #include <algorithm>
+#include <bitset>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -18,13 +19,29 @@ namespace
 	//The left stick selects the next entry of a menu when it is pushed this far
 	const float MENU_STICK_THRESHOLD = 0.6f;
 
-	bool keyDown(GLFWwindow* window, int key)
+	//Pressed by the demo script
+	std::bitset<GLFW_KEY_LAST + 1> scriptedKeys;
+
+	bool isValidKey(int key)
 	{
-		return glfwGetKey(window, key) == GLFW_PRESS;
+		return key >= 0 && key <= GLFW_KEY_LAST;
 	}
 }
 
 const char* const Input::MAPPINGS_FILE = "gamecontrollerdb.txt";
+
+bool input::isKeyDown(GLFWwindow* window, int key)
+{
+	return (isValidKey(key) && scriptedKeys[key]) || glfwGetKey(window, key) == GLFW_PRESS;
+}
+
+void input::setScriptedKey(int key, bool down)
+{
+	if (isValidKey(key))
+	{
+		scriptedKeys[key] = down;
+	}
+}
 
 glm::vec2 input::applyDeadZone(glm::vec2 stick, float inner, float outer)
 {
@@ -121,19 +138,19 @@ PlayerInput Input::playerInput(float timeDelta, const Settings& settings, bool f
 
 	//Keyboard: the arrow keys always move the bear, WASD only if it does not move the free camera
 	glm::vec2 keys(0.0f);
-	keys.x = (keyDown(window, GLFW_KEY_RIGHT) ? 1.0f : 0.0f) - (keyDown(window, GLFW_KEY_LEFT) ? 1.0f : 0.0f);
-	keys.y = (keyDown(window, GLFW_KEY_UP) ? 1.0f : 0.0f) - (keyDown(window, GLFW_KEY_DOWN) ? 1.0f : 0.0f);
+	keys.x = (isKeyDown(window, GLFW_KEY_RIGHT) ? 1.0f : 0.0f) - (isKeyDown(window, GLFW_KEY_LEFT) ? 1.0f : 0.0f);
+	keys.y = (isKeyDown(window, GLFW_KEY_UP) ? 1.0f : 0.0f) - (isKeyDown(window, GLFW_KEY_DOWN) ? 1.0f : 0.0f);
 	if (!freeCamera)
 	{
-		keys.x += (keyDown(window, GLFW_KEY_D) ? 1.0f : 0.0f) - (keyDown(window, GLFW_KEY_A) ? 1.0f : 0.0f);
-		keys.y += (keyDown(window, GLFW_KEY_W) ? 1.0f : 0.0f) - (keyDown(window, GLFW_KEY_S) ? 1.0f : 0.0f);
+		keys.x += (isKeyDown(window, GLFW_KEY_D) ? 1.0f : 0.0f) - (isKeyDown(window, GLFW_KEY_A) ? 1.0f : 0.0f);
+		keys.y += (isKeyDown(window, GLFW_KEY_W) ? 1.0f : 0.0f) - (isKeyDown(window, GLFW_KEY_S) ? 1.0f : 0.0f);
 	}
 	keys = glm::clamp(keys, -1.0f, 1.0f);
 	if (glm::length(keys) > 1.0f)
 	{
 		keys = glm::normalize(keys); //diagonal
 	}
-	result.jump = keyDown(window, GLFW_KEY_SPACE);
+	result.jump = isKeyDown(window, GLFW_KEY_SPACE);
 
 	//Mouse
 	if (mouseCaptured)

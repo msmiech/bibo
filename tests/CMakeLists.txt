@@ -13,6 +13,7 @@ add_executable(bibo_tests
 	# Game logic, no assets or graphics card needed
 	unit/AnimationTest.cpp
 	unit/CharacterControllerTest.cpp
+	unit/DemoScriptTest.cpp
 	unit/FurTest.cpp
 	unit/GameRulesTest.cpp
 	unit/InputTest.cpp

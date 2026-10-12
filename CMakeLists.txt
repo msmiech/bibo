@@ -222,8 +222,12 @@ add_library(bibo_core STATIC
 	BIBO/UI/Menu.cpp
 	BIBO/UI/Menu.hpp
 	BIBO/Util/Console.hpp
+	BIBO/Util/DemoScript.cpp
+	BIBO/Util/DemoScript.hpp
 	BIBO/Util/Display.cpp
 	BIBO/Util/Display.hpp
+	BIBO/Util/FrameRecorder.cpp
+	BIBO/Util/FrameRecorder.hpp
 	BIBO/Util/Input.cpp
 	BIBO/Util/Input.hpp
 	BIBO/Util/Settings.cpp

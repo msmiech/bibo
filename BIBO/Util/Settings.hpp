@@ -32,6 +32,10 @@ namespace bibo
 		int mipmapping = 2; //0 = off, 1 = nearest neighbor, 2 = linear
 		bool wireframe = false;
 
+		//Controls
+		int cameraSensitivity = 5; //1 (slow) to 10 (fast), mouse and gamepad
+		bool invertCameraY = false; //pushing the mouse or stick up looks down
+
 		//HUD
 		bool showFrameTime = true;
 		bool showHelp = false;

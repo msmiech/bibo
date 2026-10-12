@@ -340,3 +340,244 @@ TEST_CASE("The eyes blink and look around", "[assets][bear][animation]")
 	CHECK(maxLids > 0.9f); //blinked
 	CHECK(maxGaze - minGaze > 0.05f); //saccades
 }
+
+namespace
+{
+	//Height of the center of the capsule above the ground when the bear stands (BearCharacter::characterControllerDesc)
+	const float STANDING_HEIGHT = 1.35f;
+
+	BearInput jumpInput(bool held, BearInput input = {})
+	{
+		input.jump = held;
+		return input;
+	}
+
+	/**
+	* Jumps on flat ground with the button held for the given time
+	* @return Highest point above the standing height
+	*/
+	float jumpHeight(BearOnGround& scene, float holdSeconds)
+	{
+		float ground = scene.bear->getPosition().y;
+		float highest = 0.0f;
+		for (int frame = 0; frame < 120; ++frame)
+		{
+			scene.run(FRAME, jumpInput(frame * FRAME < holdSeconds));
+			highest = std::max(highest, scene.bear->getPosition().y - ground);
+		}
+		return highest;
+	}
+}
+
+TEST_CASE("Jumping: the longer the button is held, the higher the bear jumps", "[assets][bear][jump]")
+{
+	BearOnGround scene;
+	scene.run(1.0f);
+	REQUIRE_FALSE(scene.bear->isAirborne());
+	REQUIRE_THAT(scene.bear->getPosition().y, WithinAbs(STANDING_HEIGHT, 0.05f));
+
+	float held = jumpHeight(scene, 1.0f);
+	CHECK_THAT(held, WithinAbs(BearCharacter::JUMP_HEIGHT, 0.3f));
+	//Lands again
+	CHECK_FALSE(scene.bear->isAirborne());
+	CHECK_THAT(scene.bear->getPosition().y, WithinAbs(STANDING_HEIGHT, 0.05f));
+
+	float tapped = jumpHeight(scene, FRAME);
+	CHECK(tapped > 1.0f); //still clears a rock
+	CHECK(tapped < 0.6f * held);
+	float half = jumpHeight(scene, 0.5f * BearCharacter::JUMP_RISE_TIME);
+	CHECK(half > tapped);
+	CHECK(half < held);
+}
+
+TEST_CASE("Jumping: holding the button does not jump again after landing", "[assets][bear][jump]")
+{
+	BearOnGround scene;
+	scene.run(1.0f);
+	int takeoffs = 0;
+	bool wasAirborne = false;
+	for (int frame = 0; frame < 3 * 60; ++frame)
+	{
+		scene.run(FRAME, jumpInput(true));
+		if (scene.bear->isAirborne() && !wasAirborne)
+		{
+			++takeoffs;
+		}
+		wasAirborne = scene.bear->isAirborne();
+	}
+	CHECK(takeoffs == 1);
+	CHECK_FALSE(scene.bear->isAirborne());
+}
+
+TEST_CASE("Jumping: pressed shortly before landing, the bear jumps again when it lands", "[assets][bear][jump]")
+{
+	BearOnGround scene;
+	scene.run(1.0f);
+	float ground = scene.bear->getPosition().y;
+	scene.run(FRAME, jumpInput(true));
+	//Falls until it is almost on the ground, then the button is pressed again
+	bool falling = false;
+	for (int frame = 0; frame < 120 && !(falling && scene.bear->getPosition().y - ground < 0.6f); ++frame)
+	{
+		scene.run(FRAME);
+		falling = scene.bear->getVelocity().y < 0.0f;
+	}
+	REQUIRE(scene.bear->isAirborne());
+	float highest = 0.0f;
+	bool landed = false;
+	for (int frame = 0; frame < 60; ++frame)
+	{
+		scene.run(FRAME, jumpInput(true));
+		landed = landed || !scene.bear->isAirborne();
+		if (landed)
+		{
+			highest = std::max(highest, scene.bear->getPosition().y - ground);
+		}
+	}
+	CHECK(highest > 1.0f);
+}
+
+TEST_CASE("Jumping: shortly after running over an edge the bear can still jump", "[assets][bear][jump]")
+{
+	PhysicsWorld world;
+	world.createStaticBox(vec3(0.0f, -1.0f, 0.0f), vec3(5.0f, 1.0f, 5.0f)); //platform with its top at y = 0, ends at z = 5
+	world.createStaticBox(vec3(0.0f, -11.0f, 0.0f), vec3(200.0f, 1.0f, 200.0f)); //10 below
+	world.optimizeBroadPhase();
+	BearCharacter bear(world, bearModel(), vec3(0.0f, 1.4f, 0.0f), vec3(0.0f, 0.0f, 1.0f), nullptr);
+	auto run = [&](BearInput input) {
+		world.update(FRAME);
+		bear.update(FRAME, input);
+	};
+	BearInput forward;
+	forward.forward = 1.0f;
+	for (int frame = 0; frame < 60; ++frame)
+	{
+		run(BearInput());
+	}
+	for (int frame = 0; frame < 120 && !bear.isAirborne(); ++frame)
+	{
+		run(forward);
+	}
+	REQUIRE(bear.isAirborne());
+	CHECK(bear.getPosition().z > 4.0f);
+
+	SECTION("Right after leaving the edge")
+	{
+		run(forward);
+		run(jumpInput(true, forward));
+		run(jumpInput(true, forward));
+		CHECK(bear.getVelocity().y > 5.0f);
+	}
+	SECTION("Too late")
+	{
+		for (int frame = 0; frame < 15; ++frame)
+		{
+			run(forward);
+		}
+		run(jumpInput(true, forward));
+		run(jumpInput(true, forward));
+		CHECK(bear.getVelocity().y < 0.0f);
+	}
+	SECTION("Falling off an edge starts slowly (no sudden drop)")
+	{
+		float speed = bear.getVelocity().y;
+		CHECK(speed > -3.0f); //gravity of a frame or two (earlier versions fell at 59 m/s at once)
+		run(forward);
+		CHECK(bear.getVelocity().y < speed);
+	}
+}
+
+TEST_CASE("Jumping: the legs tuck in, reach for the ground before landing and the paws land where they reached", "[assets][bear][jump][animation]")
+{
+	BearOnGround scene;
+	scene.run(1.0f);
+	scene.run(1.0f, forward()); //at full speed
+	const BearRig& rig = scene.bear->getRig();
+	auto frontPawHeight = [&]() {
+		float root = scene.bear->getPosition().y - STANDING_HEIGHT;
+		return 0.5f * (rig.getFootTarget(BearRig::FRONT_LEFT).y + rig.getFootTarget(BearRig::FRONT_RIGHT).y) - root;
+	};
+
+	float atTop = -1.0f, beforeLanding = -1.0f;
+	std::array<vec3, BearRig::LEG_COUNT> before{};
+	float largestStep = 0.0f;
+	bool landed = false;
+	int framesAfterLanding = 0;
+	for (int frame = 0; frame < 120 && framesAfterLanding < 15; ++frame)
+	{
+		for (int leg = 0; leg < BearRig::LEG_COUNT; ++leg)
+		{
+			before[leg] = rig.getFootTarget(static_cast<BearRig::Leg>(leg));
+		}
+		float vertical = scene.bear->getVelocity().y;
+		scene.run(FRAME, jumpInput(frame < 30, forward()));
+		if (vertical > 0.0f && scene.bear->getVelocity().y <= 0.0f)
+		{
+			atTop = frontPawHeight();
+		}
+		landed = landed || (frame > 5 && !scene.bear->isAirborne());
+		if (!landed)
+		{
+			beforeLanding = frontPawHeight();
+			continue;
+		}
+		//Landing: the paws are put on the ground where they are and go on into the steps, they do not jump
+		++framesAfterLanding;
+		for (int leg = 0; leg < BearRig::LEG_COUNT; ++leg)
+		{
+			vec3 now = rig.getFootTarget(static_cast<BearRig::Leg>(leg));
+			//Sideways and up or down (forward the bear moves 1/6 in a frame)
+			largestStep = std::max(largestStep, glm::length(glm::vec2(now.x - before[leg].x, now.y - before[leg].y)));
+		}
+	}
+	REQUIRE(landed);
+	CHECK(atTop > 0.2f); //tucked in at the highest point
+	CHECK(beforeLanding < 0.1f); //stretched towards the ground
+	CHECK(largestStep < 0.12f);
+
+	//Runs on with all paws on the ground
+	scene.run(0.5f, forward());
+	for (int leg = 0; leg < BearRig::LEG_COUNT; ++leg)
+	{
+		BearRig::Leg l = static_cast<BearRig::Leg>(leg);
+		if (rig.isFootPlanted(l))
+		{
+			CHECK(scene.pawError(l) < 0.12f);
+		}
+	}
+}
+
+TEST_CASE("Steering: the bear turns towards where it should go and runs there", "[assets][bear]")
+{
+	BearOnGround scene; //looks along +z
+	scene.run(0.5f);
+	BearInput right;
+	right.move = vec3(-1.0f, 0.0f, 0.0f); //the model looks along +z, its right is -x
+
+	scene.run(0.2f, right);
+	vec3 turning = scene.bear->getDirection();
+	CHECK(turning.x < -0.2f); //turns right away
+	CHECK(turning.z > 0.0f); //but not at once
+
+	scene.run(1.0f, right);
+	CHECK(scene.bear->getDirection().x < -0.999f);
+	CHECK(scene.bear->getVelocity().x < -8.0f);
+
+	SECTION("Turning around slows the bear down, it does not run sideways")
+	{
+		BearInput back;
+		back.move = vec3(1.0f, 0.0f, 0.0f);
+		scene.run(0.15f, back);
+		CHECK(glm::length(scene.bear->getVelocity()) < 8.0f);
+		scene.run(1.5f, back);
+		CHECK(scene.bear->getDirection().x > 0.999f);
+		CHECK(scene.bear->getVelocity().x > 8.0f);
+	}
+	SECTION("Half way on the stick: slower")
+	{
+		BearInput slow;
+		slow.move = vec3(-0.5f, 0.0f, 0.0f);
+		scene.run(1.0f, slow);
+		CHECK_THAT(scene.bear->getVelocity().x, WithinAbs(-0.5f * BearCharacter::FORWARD_SPEED, 0.5f));
+	}
+}

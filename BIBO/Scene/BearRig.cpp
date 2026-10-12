@@ -452,6 +452,117 @@ void BearRig::plantFeet(const GroundProbe& probe, const Controls& c)
 	}
 }
 
+void BearRig::landFeet(const GroundProbe& probe, const Controls& c)
+{
+	glm::quat yaw = glm::angleAxis(c.yaw, UP);
+	for (int leg = 0; leg < LEG_COUNT; ++leg)
+	{
+		Foot& foot = feet[leg];
+		glm::vec3 neutral = c.rootPosition + yaw * legs[leg].neutral;
+		glm::vec3 offset(foot.position.x - neutral.x, 0.0f, foot.position.z - neutral.z);
+		if (glm::length(offset) > 0.35f)
+		{
+			offset *= 0.35f / glm::length(offset);
+		}
+		glm::vec3 position = neutral + offset;
+		glm::vec3 ground, normal;
+		if (probeGround(probe, position, ground, normal))
+		{
+			position = ground;
+		}
+		else
+		{
+			normal = UP;
+		}
+		foot.position = foot.planted = foot.swingFrom = position;
+		foot.normal = normal;
+		foot.swinging = false;
+		foot.swingProgress = 0.0f;
+	}
+}
+
+void BearRig::updateAirborne(float timeDelta, const LocomotionInput& input, const GroundProbe& probe, Controls& c)
+{
+	const float LAUNCH_DURATION = 0.18f;
+	glm::quat yaw = glm::angleAxis(c.yaw, UP);
+	glm::vec3 horizontalVelocity(input.velocity.x, 0.0f, input.velocity.z);
+	if (airborneTime == 0.0f)
+	{
+		for (Foot& foot : feet)
+		{
+			//A step that started on the ground ends where it was going, the paws push off from there
+			if (foot.swinging)
+			{
+				foot.swinging = false;
+				foot.position = foot.planted;
+			}
+		}
+		for (int leg = 0; leg < LEG_COUNT; ++leg)
+		{
+			feet[leg].swingFrom = feet[leg].position;
+			airOffsets[leg] = feet[leg].position - input.rootPosition;
+		}
+	}
+	airborneTime += timeDelta;
+	lastVerticalSpeed = input.velocity.y;
+	if (launchTime >= 0.0f)
+	{
+		launchTime += timeDelta;
+	}
+	float launch = launchTime >= 0.0f ? 1.0f - smooth(launchTime / LAUNCH_DURATION) : 0.0f;
+
+	//Falling: the legs reach for the ground shortly before the bear lands there (where it will be in a moment)
+	float fallSpeed = std::max(-input.velocity.y, 0.0f);
+	float targetReach = 0.0f;
+	glm::vec3 ahead = input.rootPosition + horizontalVelocity * 0.1f;
+	glm::vec3 ground, normal;
+	if (fallSpeed > 0.5f && probe && probe(ahead + UP * 0.5f, ahead - UP * 12.0f, ground, normal))
+	{
+		float timeToLand = std::max(ahead.y - ground.y, 0.0f) / fallSpeed;
+		targetReach = 1.0f - smooth((timeToLand - 0.06f) / 0.3f);
+	}
+	reach += (targetReach - reach) * smoothingFactor(0.03f, timeDelta);
+
+	//The legs only go into the air pose after a moment in the air (not when the bear runs over a bump), right away when jumping
+	float weight = std::max(smooth((airborneTime - TUCK_DELAY) / 0.12f), launchTime >= 0.0f ? 1.0f : 0.0f);
+	airPose = std::max(airPose, weight);
+	//A long fall spreads the legs
+	float spread = smooth((fallSpeed - 10.0f) / 12.0f) * (1.0f - reach);
+	for (int leg = 0; leg < LEG_COUNT; ++leg)
+	{
+		const LegRig& rig = legs[leg];
+		Foot& foot = feet[leg];
+		//Tucked in: the front paws under the chest, the hind paws under the belly. Reaching: the front legs stretch forward and down
+		//to take the landing, the hind legs follow a bit higher
+		glm::vec3 tucked = rig.front ? glm::vec3(0.0f, 0.3f, 0.12f) : glm::vec3(0.0f, 0.28f, 0.08f);
+		glm::vec3 reaching = rig.front ? glm::vec3(0.0f, -0.02f, 0.2f) : glm::vec3(0.0f, 0.06f, -0.04f);
+		glm::vec3 offset = glm::mix(tucked, reaching, reach) + glm::vec3(0.1f * rig.side, 0.1f, 0.0f) * spread;
+		glm::vec3 target = input.rootPosition + yaw * (rig.neutral + offset);
+		float toes = glm::mix(0.6f, -0.1f, reach);
+		if (rig.front)
+		{
+			//Pushing off: the front legs lift and reach forward
+			target += yaw * glm::vec3(0.0f, 0.05f, 0.18f) * launch;
+		}
+		else
+		{
+			//Pushing off: the hind paws stay where they left the ground until the legs are stretched
+			target = glm::mix(target, foot.swingFrom, launch);
+			toes = glm::mix(toes, 0.9f, launch);
+		}
+		//Smoothed relative to the body, which moves fast (in the world the paws would trail behind)
+		airOffsets[leg] = glm::mix(airOffsets[leg], target - input.rootPosition, weight * smoothingFactor(0.035f, timeDelta));
+		foot.position = input.rootPosition + airOffsets[leg];
+		foot.normal = glm::normalize(glm::mix(foot.normal, UP, smoothingFactor(0.05f, timeDelta)));
+		c.toePitch[leg] = toes * weight;
+	}
+
+	//Nose up when rising, down when falling, a bit less when the front legs reach for the ground
+	float pitch = input.velocity.y > 0.0f ? std::min(input.velocity.y * 0.025f, 0.3f) : std::max(input.velocity.y * 0.018f, -0.3f) * (1.0f - 0.4f * reach);
+	bodyPitch += (pitch - bodyPitch) * smoothingFactor(0.08f, timeDelta);
+	bodyHeight += (0.0f - bodyHeight) * smoothingFactor(0.1f, timeDelta);
+}
+
 void BearRig::reset(const LocomotionInput& input, const GroundProbe& probe)
 {
 	if (!isValid())
@@ -462,7 +573,11 @@ void BearRig::reset(const LocomotionInput& input, const GroundProbe& probe)
 	gallop = 0.0f;
 	bodyHeight = bodyPitch = lean = bend = 0.0f;
 	airborneTime = 0.0f;
+	launchTime = -1.0f;
+	airPose = reach = 0.0f;
+	landingBlend = 1.0f;
 	squash = animation::SpringValue();
+	pitchKick = animation::SpringValue();
 	lookYaw = lookPitch = lookTargetYaw = lookTargetPitch = 0.0f;
 	gazeYaw = gazePitch = gazeTargetYaw = gazeTargetPitch = 0.0f;
 	blinkProgress = -1.0f;
@@ -607,15 +722,26 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		const float swingDuration = (1.0f - duty) / frequency;
 		const float stanceDuration = duty / frequency;
 
-		if (input.grounded)
+		if (input.jumped)
 		{
-			if (airborneTime > TUCK_DELAY)
+			launchTime = 0.0f;
+			pitchKick.velocity += 1.2f;
+		}
+		if (input.grounded && !input.jumped)
+		{
+			if (airborneTime > TUCK_DELAY || launchTime >= 0.0f)
 			{
-				//Landing: the body dips and the feet are on the ground again
-				squash.velocity -= std::min(std::abs(lastVerticalSpeed) * 0.1f, 1.6f);
-				plantFeet(probe, c);
+				//Landing: the paws are on the ground again, the legs give way (the harder the landing, the more),
+				//the front legs take the impact first
+				float impact = std::max(-lastVerticalSpeed, 0.0f);
+				squash.velocity -= std::min(impact * 0.1f, 2.0f);
+				pitchKick.velocity -= std::min(impact * 0.07f, 1.4f);
+				landFeet(probe, c);
+				landingBlend = 0.0f;
 			}
 			airborneTime = 0.0f;
+			launchTime = -1.0f;
+			reach = 0.0f;
 
 			bool anySwinging = false, anyAway = false;
 			for (int leg = 0; leg < LEG_COUNT; ++leg)
@@ -632,9 +758,13 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 				gaitPhase += frequency * timeDelta;
 			}
 
+			//Right after landing the paws go smoothly from where they landed into the steps (which may be under way)
+			float landingFollow = glm::mix(smoothingFactor(0.04f, timeDelta), 1.0f, smooth(landingBlend));
+			landingBlend = std::min(1.0f, landingBlend + timeDelta / 0.2f);
 			for (int leg = 0; leg < LEG_COUNT; ++leg)
 			{
 				Foot& foot = feet[leg];
+				glm::vec3 previous = foot.position;
 				float phase = fract(gaitPhase - glm::mix(WALK_OFFSETS[leg], BOUND_OFFSETS[leg], gallop));
 				if (stepping && phase >= duty)
 				{
@@ -677,6 +807,7 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 					foot.swingProgress = 0.0f;
 					foot.position = foot.planted;
 				}
+				foot.position = glm::mix(previous, foot.position, landingFollow);
 			}
 
 			//The body follows the ground under the feet: height over the hind legs, slope from the hind to the front legs
@@ -688,26 +819,7 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		}
 		else
 		{
-			//In the air: the front paws reach forward to land, the hind legs stretch backwards
-			airborneTime += timeDelta;
-			lastVerticalSpeed = input.velocity.y;
-			float tuck = smooth((airborneTime - TUCK_DELAY) / 0.2f);
-			for (int leg = 0; leg < LEG_COUNT; ++leg)
-			{
-				glm::vec3 tucked = legs[leg].neutral + (legs[leg].front ? glm::vec3(0.0f, 0.28f, 0.25f) : glm::vec3(0.0f, 0.3f, -0.22f));
-				glm::vec3 target = input.rootPosition + yaw * tucked;
-				Foot& foot = feet[leg];
-				if (foot.swinging)
-				{
-					//A step that started on the ground ends where it was going
-					foot.swinging = false;
-					foot.position = foot.planted;
-				}
-				foot.position = glm::mix(foot.position, target, tuck * smoothingFactor(0.05f, timeDelta));
-				c.toePitch[leg] = 0.5f * tuck;
-			}
-			bodyHeight += (0.0f - bodyHeight) * smoothingFactor(0.1f, timeDelta);
-			bodyPitch += (std::clamp(input.velocity.y * 0.03f, -0.3f, 0.3f) - bodyPitch) * smoothingFactor(0.1f, timeDelta);
+			updateAirborne(timeDelta, input, probe, c);
 		}
 		for (int leg = 0; leg < LEG_COUNT; ++leg)
 		{
@@ -715,13 +827,18 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 			c.footNormals[leg] = feet[leg].normal;
 		}
 		squash.update(0.0f, 170.0f, 13.0f, timeDelta);
+		pitchKick.update(0.0f, 110.0f, 12.0f, timeDelta);
+		if (input.grounded && !input.jumped)
+		{
+			airPose -= std::min(airPose, timeDelta / 0.25f);
+		}
 
 		//Bobbing with the steps: twice per cycle when walking, rocking back and forth when bounding
 		float cycle = 2.0f * PI * gaitPhase;
 		float walking = moving * (1.0f - gallop), bounding = moving * gallop;
 		float breathing = 0.02f * std::sin(2.0f * PI * 0.33f * time) * (1.0f - moving);
 		c.pelvisOffset.y = STAND_HEIGHT + bodyHeight + squash.value - 0.022f * std::cos(2.0f * cycle) * walking + 0.07f * std::sin(cycle - 0.9f) * bounding;
-		c.pelvisPitch = bodyPitch + 0.08f * std::sin(cycle) * bounding;
+		c.pelvisPitch = bodyPitch + pitchKick.value + 0.08f * std::sin(cycle) * bounding;
 		//Leaning into turns, the spine bends into them
 		lean += (std::clamp(-input.yawRate * forwardSpeed * 0.03f, -0.28f, 0.28f) - lean) * smoothingFactor(0.12f, timeDelta);
 		bend += (std::clamp(input.yawRate * 0.22f, -0.35f, 0.35f) - bend) * smoothingFactor(0.12f, timeDelta);
@@ -733,13 +850,14 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		updateSecondary(timeDelta, moving > 0.1f);
 		//The head stays level and looks around, running flattens the ears a bit
 		c.neckPitch = -0.4f * c.pelvisPitch;
-		c.headPitch = lookPitch - 0.3f * c.pelvisPitch - 0.5f * c.spinePitch;
+		//In the air the head and the eyes look down to where the bear lands, the ears fold back and the mouth opens a bit
+		c.headPitch = lookPitch - 0.3f * c.pelvisPitch - 0.5f * c.spinePitch - 0.25f * reach * airPose;
 		c.headYaw = lookYaw + 0.4f * bend;
 		c.face.gazeYaw = gazeYaw + 0.3f * bend;
-		c.face.gazePitch = gazePitch;
-		c.face.lids = blinkAmount();
-		c.face.earsBack = 0.35f * bounding;
-		c.face.jawOpen = 0.12f * bounding; //panting a little
+		c.face.gazePitch = gazePitch - 0.15f * reach * airPose;
+		c.face.lids = blinkAmount() * (1.0f - airPose);
+		c.face.earsBack = std::max(0.35f * bounding, 0.5f * airPose);
+		c.face.jawOpen = std::max(0.12f * bounding, 0.2f * airPose); //panting a little
 	}
 
 	evaluate(bind, c, timeDelta);
@@ -1364,6 +1482,9 @@ bool BearRig::updateGetUp(float timeDelta, const GroundProbe& probe, glm::vec3 r
 		gaitPhase = 0.0f;
 		bodyHeight = bodyPitch = lean = bend = 0.0f;
 		airborneTime = 0.0f;
+		launchTime = -1.0f;
+		airPose = reach = 0.0f;
+		landingBlend = 1.0f;
 		return true;
 	}
 	return false;

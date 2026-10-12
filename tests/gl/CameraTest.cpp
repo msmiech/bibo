@@ -96,18 +96,20 @@ TEST_CASE("The camera follows a target from behind and above", "[gl][camera]")
 
 	SECTION("Scene object (the bear)")
 	{
-		Target bear(glm::translate(mat4(1.0f), target), targetDirection, gl.window());
-		//The direction is computed from the previous position of the camera, so it settles after the second frame
-		camera.setTarget(&bear);
-		camera.setTarget(&bear);
+		Camera::FollowTarget bear;
+		bear.position = target;
+		bear.direction = targetDirection;
+		camera.snapBehind(bear);
+		camera.follow(bear, 1.0f / 60.0f);
 
 		vec3 offset = camera.getPosition() - target;
 		CHECK(offset.y > 0.0f); //above
 		CHECK(offset.z > 0.0f); //behind (the target looks along -z)
-		vec3 pointAheadOfTarget = toView(camera, target + 3.0f * targetDirection);
-		CHECK_THAT(pointAheadOfTarget.x, WithinAbs(0.0f, 1e-4f));
-		CHECK_THAT(pointAheadOfTarget.y, WithinAbs(0.0f, 1e-4f));
-		CHECK(pointAheadOfTarget.z < 0.0f);
+		CHECK_THAT(glm::length(camera.getPosition() - camera.getPivot()), WithinAbs(Camera::DEFAULT_DISTANCE, 1e-3f));
+		vec3 pivotInView = toView(camera, camera.getPivot()); //the camera orbits around the point above the target
+		CHECK_THAT(pivotInView.x, WithinAbs(0.0f, 1e-4f));
+		CHECK_THAT(pivotInView.y, WithinAbs(0.0f, 1e-4f));
+		CHECK(pivotInView.z < 0.0f);
 	}
 }
 
@@ -177,4 +179,136 @@ TEST_CASE("The view frustum of the camera matches its view and projection matrix
 	}
 	CHECK(inside > 100);
 	CHECK(outside > 100);
+}
+
+namespace
+{
+	Camera::FollowTarget bearAt(vec3 position, vec3 direction, vec3 velocity = vec3(0.0f))
+	{
+		Camera::FollowTarget target;
+		target.position = position;
+		target.direction = direction;
+		target.velocity = velocity;
+		return target;
+	}
+
+	void followFor(Camera& camera, const Camera::FollowTarget& target, float seconds)
+	{
+		for (int i = 0; i < static_cast<int>(seconds * 60.0f); ++i)
+		{
+			camera.follow(target, 1.0f / 60.0f);
+		}
+	}
+}
+
+TEST_CASE("The camera orbits around the bear", "[gl][camera]")
+{
+	GlContext gl;
+	Camera camera(vec3(0.0f), vec3(0.0f, 0.0f, -1.0f), UP, gl.window());
+	const Camera::FollowTarget bear = bearAt(vec3(3.0f, 1.0f, 2.0f), vec3(0.0f, 0.0f, 1.0f));
+	camera.snapBehind(bear);
+	const vec3 right = camera.getRight();
+	CHECK_THAT(camera.getForward(), IsNear(vec3(0.0f, 0.0f, 1.0f), 1e-5f)); //behind the bear
+	CHECK_THAT(right, IsNear(vec3(-1.0f, 0.0f, 0.0f), 1e-5f));
+
+	SECTION("Turning right")
+	{
+		camera.rotate(glm::radians(90.0f), 0.0f);
+		CHECK_THAT(camera.getForward(), IsNear(right, 1e-5f));
+		CHECK_THAT(camera.getPosition().x, WithinAbs(camera.getPivot().x + Camera::DEFAULT_DISTANCE * std::cos(camera.getPitch()), 1e-3f));
+	}
+	SECTION("Looking down and up stays within limits, the distance stays the same")
+	{
+		camera.rotate(0.0f, 10.0f);
+		CHECK_THAT(camera.getPitch(), WithinAbs(glm::radians(70.0f), 1e-5f));
+		CHECK(camera.getPosition().y > camera.getPivot().y + 6.0f);
+		camera.rotate(0.0f, -10.0f);
+		CHECK_THAT(camera.getPitch(), WithinAbs(glm::radians(-20.0f), 1e-5f));
+		CHECK(camera.getPosition().y < camera.getPivot().y);
+		CHECK_THAT(glm::distance(camera.getPosition(), camera.getPivot()), WithinAbs(Camera::DEFAULT_DISTANCE, 1e-3f));
+	}
+	SECTION("The bear stays in the middle of the image")
+	{
+		camera.rotate(1.3f, -0.2f);
+		vec3 pivot = toView(camera, camera.getPivot());
+		CHECK_THAT(pivot.x, WithinAbs(0.0f, 1e-4f));
+		CHECK_THAT(pivot.y, WithinAbs(0.0f, 1e-4f));
+	}
+	SECTION("Zooming")
+	{
+		camera.zoom(100.0f);
+		followFor(camera, bear, 2.0f);
+		CHECK_THAT(glm::distance(camera.getPosition(), camera.getPivot()), WithinAbs(Camera::MIN_DISTANCE, 0.01f));
+	}
+}
+
+TEST_CASE("The camera follows the bear and goes back behind it when it runs", "[gl][camera]")
+{
+	GlContext gl;
+	Camera camera(vec3(0.0f), vec3(0.0f, 0.0f, -1.0f), UP, gl.window());
+	const vec3 direction(0.0f, 0.0f, 1.0f);
+	camera.snapBehind(bearAt(vec3(0.0f), direction));
+	camera.rotate(1.0f, 0.0f);
+	const float turned = camera.getYaw();
+
+	SECTION("Standing: the camera stays where the player turned it")
+	{
+		followFor(camera, bearAt(vec3(0.0f), direction), 5.0f);
+		CHECK_THAT(camera.getYaw(), WithinAbs(turned, 1e-5f));
+	}
+	SECTION("Running: after a moment the camera turns back behind the bear")
+	{
+		vec3 position(0.0f);
+		for (int i = 0; i < 60; ++i)
+		{
+			position += direction * (10.0f / 60.0f);
+			camera.follow(bearAt(position, direction, direction * 10.0f), 1.0f / 60.0f);
+		}
+		CHECK_THAT(camera.getYaw(), WithinAbs(turned, 1e-5f)); //not right away
+		for (int i = 0; i < 5 * 60; ++i)
+		{
+			position += direction * (10.0f / 60.0f);
+			camera.follow(bearAt(position, direction, direction * 10.0f), 1.0f / 60.0f);
+		}
+		CHECK_THAT(camera.getYaw(), WithinAbs(0.0f, 0.05f));
+		CHECK(glm::distance(vec3(camera.getPivot().x, 0.0f, camera.getPivot().z), position) < 0.5f); //keeps up (a bit behind at full speed)
+	}
+	SECTION("Recentered")
+	{
+		camera.recenter();
+		followFor(camera, bearAt(vec3(0.0f), direction), 0.5f);
+		CHECK_THAT(camera.getYaw(), WithinAbs(0.0f, 0.02f));
+	}
+}
+
+TEST_CASE("The camera does not go into the environment", "[gl][camera]")
+{
+	GlContext gl;
+	Camera camera(vec3(0.0f), vec3(0.0f, 0.0f, -1.0f), UP, gl.window());
+	float free = 1.0f;
+	float probedRadius = 0.0f;
+	camera.setCollisionProbe([&](vec3, vec3, float radius) {
+		probedRadius = radius;
+		return free;
+	});
+	const Camera::FollowTarget bear = bearAt(vec3(0.0f), vec3(0.0f, 0.0f, 1.0f));
+	camera.snapBehind(bear);
+	REQUIRE_THAT(glm::distance(camera.getPosition(), camera.getPivot()), WithinAbs(Camera::DEFAULT_DISTANCE, 1e-3f));
+	CHECK(probedRadius > 0.13f); //larger than the near plane (the camera does not see into a wall)
+
+	//Something gets between the bear and the camera: it moves in front of it at once
+	free = 0.4f;
+	camera.follow(bear, 1.0f / 60.0f);
+	CHECK_THAT(glm::distance(camera.getPosition(), camera.getPivot()), WithinAbs(0.4f * Camera::DEFAULT_DISTANCE, 1e-3f));
+	camera.rotate(0.2f, 0.0f);
+	CHECK_THAT(glm::distance(camera.getPosition(), camera.getPivot()), WithinAbs(0.4f * Camera::DEFAULT_DISTANCE, 1e-3f));
+
+	//And moves back smoothly when it is gone
+	free = 1.0f;
+	camera.follow(bear, 1.0f / 60.0f);
+	float distance = glm::distance(camera.getPosition(), camera.getPivot());
+	CHECK(distance > 0.4f * Camera::DEFAULT_DISTANCE);
+	CHECK(distance < Camera::DEFAULT_DISTANCE - 1.0f);
+	followFor(camera, bear, 2.0f);
+	CHECK_THAT(glm::distance(camera.getPosition(), camera.getPivot()), WithinAbs(Camera::DEFAULT_DISTANCE, 1e-2f));
 }

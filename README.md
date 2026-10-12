@@ -12,20 +12,30 @@ Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complet
   * Detailed face: eyes with iris and pupil that look around and blink with their eyelids, a jaw, tongue and teeth, ears and tail that swing
   * Running into a rock knocks the bear over: it tumbles as a ragdoll until it lies still, then gets up, shakes its fur and runs on
   * Idle animations when it stands still for a while: it sits down and stretches (and sticks its tongue out), or sits down and yawns
-* Freely movable camera
-  * Locked mode = following the player's character (default)
-  * Unlocked mode = 3d flying camera (hold left mouse button)
+  * Jumps in a natural arc: holding the button jumps higher, it can still jump right after running over an edge and a jump pressed shortly before landing happens on landing; in the air the bear keeps its momentum
+  * Jump animation: the hind legs push off, the legs tuck in, before landing they reach for the ground and the landing is absorbed (the harder, the deeper)
+* Third person camera
+  * Orbits around the bear with the mouse or the right stick, the mouse wheel zooms, it goes back behind the running bear on its own
+  * Does not go into the terrain or through rocks (sphere cast into the physics world)
+  * Unlocked mode (L) = 3d flying camera (WASD and the mouse)
 * Movable objects with physics (based on Jolt Physics, originally Nvidia PhysX)
 * Texture Mapping (including normal maps)
 * Lighting and Materials
 * A lap around the track: the finish line only counts after all checkpoints along the track were passed in order
-* Keyboard controls
-  * Arrow keys for navigation
-  * Space bar for jumping
+* Keyboard and mouse controls
+  * WASD or arrow keys to run (relative to the camera)
+  * Mouse to look around, mouse wheel to zoom, middle mouse button to put the camera behind the bear
+  * Space bar to jump (hold to jump higher)
   * R to restart
   * ESC for the pause menu
   * F-Keys for settings and debug features (F1 for help)
-* Main menu, pause menu, game over menu (restart the run or back to the main menu) and settings menu (based on RmlUi, usable with mouse or keyboard)
+* Gamepad controls (e.g. Sony DualSense, Xbox Series controller)
+  * Left stick to run, right stick to look around (press it to put the camera behind the bear)
+  * Cross / A to jump (hold to jump higher)
+  * Options / Start for the pause menu, D-pad, Cross / A and Circle / B in the menus
+  * Other controllers work if GLFW knows them; newer mappings can be added in a `gamecontrollerdb.txt` ([SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB)) in the game folder
+* Settings for the camera sensitivity and inverting the camera up/down
+* Main menu, pause menu, game over menu (restart the run or back to the main menu) and settings menu (based on RmlUi, usable with mouse, keyboard or gamepad)
   * Graphics settings (VSync, HDR, bloom, shadows, normal mapping, transparency, texture filtering, mipmapping, wireframe)
   * Resolution and window mode (windowed, fullscreen or borderless)
 * Supports complex models (Collada scenes and skinned glTF models)
@@ -152,9 +162,9 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests are in the `tests` folder:
-* `unit`: game rules (falling off the track, checkpoints in their order, the finish line), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions, ray casts, ragdolls falling and coming to rest with connected joints), animation (transforms, forward kinematics, two bone IK, springs), the fur (guide hairs lag behind, hang down, lie on the ground and on obstacles, hits ruffle them; strand placement), the view frustum (compared with the camera matrices for random cameras), math helpers and the generated textures
-* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart and the collision mesh of the terrain matches the rendered terrain; the bear model (its skeleton matches its skinning, it stands on the ground and fits its capsule, fur and bare skin, eyes, mouth, tongue, teeth and claws) and the bear in action (paws planted while it runs, knocked down by a rock it tumbles, gets up and runs again, rolling over from its back, idle animations and how moving interrupts them, blinking and looking around)
-* `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the camera and the whole scene (e.g. culling never removes a visible pixel). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
+* `unit`: game rules (falling off the track, checkpoints in their order, the finish line), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions, ray casts, sphere casts, ragdolls falling and coming to rest with connected joints), animation (transforms, forward kinematics, two bone IK, springs), the fur (guide hairs lag behind, hang down, lie on the ground and on obstacles, hits ruffle them; strand placement), the view frustum (compared with the camera matrices for random cameras), math helpers, the generated textures and the input (stick dead zones, moving relative to the camera)
+* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart and the collision mesh of the terrain matches the rendered terrain; the bear model (its skeleton matches its skinning, it stands on the ground and fits its capsule, fur and bare skin, eyes, mouth, tongue, teeth and claws) and the bear in action (paws planted while it runs, knocked down by a rock it tumbles, gets up and runs again, rolling over from its back, idle animations and how moving interrupts them, blinking and looking around, steering, jumping higher the longer the button is held, jumping after running over an edge and just before landing, the legs reaching for the ground and landing without jumping paws)
+* `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the camera (orbiting, following, going back behind the bear, keeping out of obstacles) and the whole scene (e.g. culling never removes a visible pixel, the camera never goes into the terrain of the track). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
   On Linux servers without a graphics card they run on a virtual X server with Mesa's software renderer: `xvfb-run -a ctest --test-dir build --output-on-failure`
 
 Every test case is a separate CTest test and its Catch2 tags become CTest labels, e.g. only the physics tests: `ctest --test-dir build -L physics`.
@@ -192,6 +202,8 @@ The script also saves `Model/BearCub/BearCub.blend` to look at the result, and `
 When walking and bounding, the paws are planted where they land (found with ray casts) and the legs reach them with two bone inverse kinematics;
 the body bobs with the steps, follows the ground and leans into turns. Ears and tail are springs, the eyes make saccades and blink with their lids.
 The idle animations (stretching, yawning) and getting up are key poses of the body, the paws and the face, also solved with IK.
+In a jump the hind paws push off from where they left the ground, the legs tuck in, and when a ray cast finds that the ground is close (by the falling speed)
+the legs reach for it; on landing the paws are put down where they are, springs dip the body and the nose and the steps blend in.
 
 **Fur** (`BIBO/Scene/Fur.cpp`, `Shader/bear_fur.*`): every vertex of the skin has a guide hair, a damped spring that lags behind when the body
 accelerates, hangs down, moves in the wind, lies on the ground and on rocks and is ruffled by hits (simulated on the CPU).

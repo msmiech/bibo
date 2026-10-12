@@ -16,9 +16,14 @@ namespace bibo
 		*/
 		struct BearInput
 		{
-			float forward = 0.0f; //1: forward, -1: backward
+			/**
+			* Where the bear should go in world space (y is ignored), length 0 to 1 (how fast): the bear turns towards it and runs.
+			* Used instead of forward and turn if it is not zero (e.g. the stick of a gamepad relative to the camera).
+			*/
+			glm::vec3 move = glm::vec3(0.0f);
+			float forward = 0.0f; //relative to the bear: 1 forward, -1 backward
 			float turn = 0.0f; //1: left, -1: right
-			bool jump = false;
+			bool jump = false; //held: the longer, the higher the jump (a new jump needs a new press)
 		};
 
 		/**
@@ -52,6 +57,12 @@ namespace bibo
 			*/
 			static physics::CharacterControllerDesc characterControllerDesc(glm::vec3 position);
 
+			//Running speed (m/s)
+			static constexpr float FORWARD_SPEED = 10.0f;
+			//Jump: how high the bear gets when the button is held until the highest point, and how long it rises (a shorter press jumps lower)
+			static constexpr float JUMP_HEIGHT = 3.0f;
+			static constexpr float JUMP_RISE_TIME = 0.4f;
+
 			/**
 			* Call after the physics world was updated
 			*/
@@ -76,6 +87,14 @@ namespace bibo
 			*/
 			glm::vec3 getPosition() const;
 			glm::vec3 getDirection() const { return direction; }
+			/**
+			* How fast the bear moves (m/s), zero while it tumbles or gets up
+			*/
+			glm::vec3 getVelocity() const { return state == State::CONTROL ? velocity : glm::vec3(0.0f); }
+			/**
+			* @return true while the bear is in the air (jumping or falling)
+			*/
+			bool isAirborne() const { return state == State::CONTROL && !standingOnGround; }
 			/**
 			* @return true for a moment after getting up, when hits do not knock the bear down
 			*/
@@ -106,12 +125,17 @@ namespace bibo
 			glm::vec3 rawPosition() const;
 			void setState(State newState);
 			void updateControl(float timeDelta, const BearInput& input);
+			/**
+			* Turns the bear and changes its speed (on the ground)
+			* @return The speed the bear should run at (m/s)
+			*/
+			float steer(float timeDelta, const BearInput& input, bool& hasInput);
 			void updateRagdoll(float timeDelta);
 			void updateGettingUp(float timeDelta);
 			void startRagdoll();
 			void startGettingUp();
 			void updateSkin(float timeDelta);
-			LocomotionInput locomotionInput() const;
+			LocomotionInput locomotionInput(bool jumped = false) const;
 
 			physics::PhysicsWorld& world;
 			const resources::SkinnedModel& model;
@@ -128,7 +152,14 @@ namespace bibo
 			float speed = 0.0f; //along the direction
 			float yawRate = 0.0f;
 			glm::vec3 velocity = glm::vec3(0.0f);
-			float jumpTimeLeft = 0.0f, fallingTime = 0.0f;
+			//Jumping and falling
+			glm::vec3 airVelocity = glm::vec3(0.0f); //horizontal velocity in the air (the bear keeps its momentum)
+			float verticalSpeed = 0.0f;
+			float airTime = 0.0f; //since the bear left the ground
+			float jumpBuffer = 0.0f; //jump was pressed this long ago (it still jumps if it lands soon)
+			bool jumping = false; //rising from a jump (not falling off an edge)
+			bool jumpWasHeld = false;
+			float fallingTime = 0.0f; //getting up
 			bool standingOnGround = false;
 			bool knockDownPending = false;
 			physics::CharacterController::Hit pendingHit;

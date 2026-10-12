@@ -162,6 +162,8 @@ void Menu::Impl::bindDataModel()
 	constructor.Bind("wireframe", &settings.wireframe);
 	constructor.Bind("show_frame_time", &settings.showFrameTime);
 	constructor.Bind("show_help", &settings.showHelp);
+	constructor.Bind("camera_sensitivity", &settings.cameraSensitivity);
+	constructor.Bind("invert_camera_y", &settings.invertCameraY);
 
 	constructor.Bind("window_mode", &windowMode);
 	constructor.Bind("resolution", &resolution);

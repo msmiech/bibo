@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -6,6 +7,8 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <vector>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
@@ -13,7 +16,9 @@
 #include "Physics/Physics.hpp"
 #include "UI/Menu.hpp"
 #include "Util/Console.hpp"
+#include "Util/DemoScript.hpp"
 #include "Util/Display.hpp"
+#include "Util/FrameRecorder.hpp"
 #include "Util/Input.hpp"
 #include "Util/Settings.hpp"
 
@@ -45,6 +50,7 @@ void cleanup();
 void draw();
 void update(float time_delta);
 void gameLoop();
+void playDemoFrame(int frame);
 void renderQuad();
 void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale, vec3 color);
 void resizeScreenBuffers();
@@ -70,6 +76,14 @@ GLFWwindow* window;
 float time_delta; //Last frame time
 //Longer frames (e.g. while the window is dragged) slow the game down instead of simulating a few huge steps
 const float MAX_TIME_STEP = 0.1f;
+
+//Demo (--demo) and recording (--record): the game runs with a fixed time step and the default settings,
+//so that a script always plays the same way (e.g. tools/readme_demo.txt for the GIF of the README)
+float fixedTimeStep = 0; //0: the time step is the duration of the last frame
+bool useSavedSettings = true;
+unique_ptr<DemoScript> demoScript;
+unique_ptr<FrameRecorder> recorder;
+bool recordingFailed = false;
 
 enum GameState
 {
@@ -127,28 +141,83 @@ float messageTimeLeft = 0;
 
 int main(int argc, char** argv)
 {
-	//Saved by the settings menu, the command line arguments take precedence
-	settings.load(SETTINGS_FILE);
+	//Options anywhere on the command line: --demo <script> plays the input of the script, --record <file> writes every
+	//frame to the file (raw video, see FrameRecorder), --fps <frames per second> of both (default 15)
+	vector<string> arguments; //width height [fullscreen]
+	string demoPath;
+	string recordPath;
+	int fps = 15;
+	for (int i = 1; i < argc; ++i)
+	{
+		string argument = argv[i];
+		bool hasValue = i + 1 < argc;
+		if (argument == "--demo" && hasValue)
+		{
+			demoPath = argv[++i];
+		}
+		else if (argument == "--record" && hasValue)
+		{
+			recordPath = argv[++i];
+		}
+		else if (argument == "--fps" && hasValue)
+		{
+			if ((stringstream(argv[++i]) >> fps).fail() || fps <= 0 || fps > 1000)
+			{
+				util::fatalError("--fps needs the number of frames per second");
+			}
+		}
+		else if (argument.rfind("--", 0) == 0)
+		{
+			util::fatalError("Unknown option " + argument + " (BIBO [--demo <script>] [--record <file>] [--fps <frames per second>] [width height [fullscreen]])");
+		}
+		else
+		{
+			arguments.push_back(argument);
+		}
+	}
 
-	if (argc >= 3) {
+	if (!demoPath.empty() || !recordPath.empty())
+	{
+		fixedTimeStep = 1.0f / fps;
+		useSavedSettings = false;
+		//It would show the fixed time step instead of the time it takes to draw a frame
+		settings.showFrameTime = false;
+	}
+	if (!demoPath.empty())
+	{
+		demoScript = make_unique<DemoScript>();
+		string error;
+		if (!demoScript->load(demoPath, fps, error))
+		{
+			util::fatalError("Demo script " + demoPath + ": " + error);
+		}
+	}
+
+	//Saved by the settings menu, the command line arguments take precedence
+	if (useSavedSettings)
+	{
+		settings.load(SETTINGS_FILE);
+	}
+
+	if (arguments.size() >= 2) {
 		cout << "You are running" << endl;
 
-		if ((stringstream(argv[1]) >> settings.width).fail() || settings.width <= 0)
+		if ((stringstream(arguments[0]) >> settings.width).fail() || settings.width <= 0)
 		{
 			cerr << "ERROR: Could not parse first element, try again!" << endl;
 			util::pause();
 			exit(EXIT_FAILURE);
 		}
 
-		if ((stringstream(argv[2]) >> settings.height).fail() || settings.height <= 0) {
+		if ((stringstream(arguments[1]) >> settings.height).fail() || settings.height <= 0) {
 			cerr << "ERROR: Could not parse second element, try again!" << endl;
 			util::pause();
 			exit(EXIT_FAILURE);
 		}
 
-		if (argc >= 4) {
+		if (arguments.size() >= 3) {
 			bool fullscreen;
-			if ((stringstream(argv[3]) >> fullscreen).fail()) {
+			if ((stringstream(arguments[2]) >> fullscreen).fail()) {
 
 				cerr << "ERROR: Could not parse third command-line-arg, try again!" << endl;
 				util::pause();
@@ -162,7 +231,23 @@ int main(int argc, char** argv)
 
 	initialize();
 
+	if (!recordPath.empty())
+	{
+		recorder = make_unique<FrameRecorder>(recordPath, windowWidth, windowHeight);
+		if (!recorder->isOpen())
+		{
+			util::fatalError("Could not create " + recordPath);
+		}
+		cout << "Recording " << windowWidth << "x" << windowHeight << " pixels at " << fps << " fps to " << recordPath << endl;
+	}
+
 	gameLoop();
+
+	if (recorder)
+	{
+		cout << "Recorded " << recorder->getFrameCount() << " frames" << endl;
+		recorder.reset(nullptr);
+	}
 
 	cleanup();
 
@@ -170,7 +255,7 @@ int main(int argc, char** argv)
 
 	glfwTerminate();
 
-	return EXIT_SUCCESS;
+	return recordingFailed ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
 void initialize()
@@ -606,7 +691,7 @@ void onMenuAction(ui::MenuAction action)
 		applyGraphicsSettings(); //the swap interval (VSync) may be reset by a new video mode
 		[[fallthrough]];
 	case ui::MenuAction::SettingsClosed:
-		if (!settings.save(SETTINGS_FILE))
+		if (useSavedSettings && !settings.save(SETTINGS_FILE))
 		{
 			cerr << "WARNING: Could not save the settings to " << SETTINGS_FILE << endl;
 		}
@@ -731,8 +816,8 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 
 void windowFocusCallback(GLFWwindow* window, int focused)
 {
-	//e.g. when switching to another window with Alt+Tab (without menus the game keeps running)
-	if (!focused && gameState == PLAYING)
+	//e.g. when switching to another window with Alt+Tab (without menus the game keeps running, a demo does not need the keyboard)
+	if (!focused && gameState == PLAYING && !demoScript)
 	{
 		pauseGame();
 	}
@@ -786,9 +871,23 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 void gameLoop()
 {
 	auto time = glfwGetTime();
+	int frame = 0;
 	while (!glfwWindowShouldClose(window)) {
 		auto time_new = glfwGetTime();
-		time_delta = static_cast<float>(time_new - time);
+		if (fixedTimeStep > 0)
+		{
+			//Every frame advances the game by the same time: a recording as fast as the frames can be drawn, a demo in real time
+			if (!recorder)
+			{
+				this_thread::sleep_for(chrono::duration<double>(time + fixedTimeStep - time_new));
+				time_new = glfwGetTime();
+			}
+			time_delta = fixedTimeStep;
+		}
+		else
+		{
+			time_delta = static_cast<float>(time_new - time);
+		}
 		time = time_new;
 
 		glfwPollEvents();
@@ -799,6 +898,12 @@ void gameLoop()
 			glfwWaitEvents();
 			continue;
 		}
+
+		if (demoScript)
+		{
+			playDemoFrame(frame);
+		}
+		++frame;
 
 		controls->update();
 		handleGamepad();
@@ -829,9 +934,38 @@ void gameLoop()
 			glPolygonMode(GL_FRONT_AND_BACK, settings.wireframe ? GL_LINE : GL_FILL);
 		}
 
+		if (recorder && !recordingFailed && !recorder->recordFrame(windowWidth, windowHeight))
+		{
+			cerr << "ERROR: Could not record the frame (the disk is full or the window size changed)" << endl;
+			recordingFailed = true;
+			glfwSetWindowShouldClose(window, true);
+		}
+
 		glfwSwapBuffers(window);
 
 
+	}
+}
+
+//The keys of the demo script are pressed as on the keyboard, for the menus and the game
+void playDemoFrame(int frame)
+{
+	for (const DemoScript::Event& event : demoScript->eventsAt(frame))
+	{
+		switch (event.type)
+		{
+		case DemoScript::Event::KeyDown:
+		case DemoScript::Event::KeyUp:
+		{
+			bool down = event.type == DemoScript::Event::KeyDown;
+			input::setScriptedKey(event.key, down);
+			keyCallback(window, event.key, glfwGetKeyScancode(event.key), down ? GLFW_PRESS : GLFW_RELEASE, 0);
+			break;
+		}
+		case DemoScript::Event::Quit:
+			glfwSetWindowShouldClose(window, true);
+			break;
+		}
 	}
 }
 

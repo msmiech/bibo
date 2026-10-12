@@ -1,0 +1,68 @@
+name: README GIF
+
+# Records the gameplay GIF of the README (menus, graphics settings, gameplay) when a pull request is opened
+# and commits it to the branch of the pull request (see tools/record_gameplay.sh and tools/readme_demo.txt).
+on:
+  pull_request:
+    types: [opened, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    name: Record the gameplay GIF
+    # The token of pull requests from forks cannot push to their branch
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev libxkbcommon-dev wayland-protocols \
+            xvfb xauth libgl1-mesa-dri ffmpeg
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBIBO_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build --parallel --target BIBO
+
+      # Mesa's software renderer is slow, but the game runs with a fixed time step while recording
+      - name: Record
+        run: xvfb-run -a -s "-screen 0 1280x720x24" bash tools/record_gameplay.sh build Screenshots/bibo_gameplay.gif
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bibo_gameplay
+          path: Screenshots/bibo_gameplay.gif
+          retention-days: 7
+
+      - name: Show the GIF in the README and commit it
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          sed -i 's|Screenshots/bibo_screenshot\.PNG|Screenshots/bibo_gameplay.gif|' README.md
+          git add Screenshots/bibo_gameplay.gif README.md
+          if git diff --cached --quiet; then
+            echo "The GIF did not change"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update the gameplay GIF of the README"
+          # Commits pushed to the branch while the GIF was recorded come first
+          git pull --rebase origin "$BRANCH"
+          git push origin "HEAD:$BRANCH"

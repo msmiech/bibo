@@ -3,6 +3,7 @@
 #include <cmath>
 #include <glm/gtc/constants.hpp>
 #include "../Animation/Skeleton.hpp"
+#include "../Util/Input.hpp"
 
 using namespace bibo;
 using namespace scene;
@@ -65,7 +66,7 @@ void Camera::setDirection(vec3 newDirection)
 void Camera::update(float time_delta)
 {
 	//Toggled once per key press, not in every frame while the key is held
-	bool lockKeyPressed = glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS;
+	bool lockKeyPressed = input::isKeyDown(window, GLFW_KEY_L);
 	if (lockKeyPressed && !lockKeyWasPressed) {
 		locked = !locked;
 		if (!locked)
@@ -78,19 +79,19 @@ void Camera::update(float time_delta)
 	{
 		auto velocity = speed * time_delta;
 		vec3 right = normalize(cross(direction, up));
-		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		if (input::isKeyDown(window, GLFW_KEY_W))
 		{
 			position += direction * velocity;
 		}
-		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		if (input::isKeyDown(window, GLFW_KEY_S))
 		{
 			position -= direction * velocity;
 		}
-		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		if (input::isKeyDown(window, GLFW_KEY_A))
 		{
 			position -= right * velocity;
 		}
-		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		if (input::isKeyDown(window, GLFW_KEY_D))
 		{
 			position += right * velocity;
 		}

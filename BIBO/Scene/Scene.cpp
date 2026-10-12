@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include "../Util/Console.hpp"
+#include "../Util/Input.hpp"
 
 using namespace bibo;
 using namespace scene;
@@ -123,7 +124,7 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 
 void Scene::update(float time_delta, const input::PlayerInput& player) {
 	physicsWorld->update(time_delta);
-	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+	if (input::isKeyDown(window, GLFW_KEY_R))
 	{
 		restart();
 	}

@@ -3,7 +3,11 @@
 
 Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complete a lap as fast as possible and avoiding obstacles
 
-![alt text](Screenshots/bibo_screenshot.PNG)
+![Main menu, graphics settings and gameplay](Screenshots/bibo_gameplay.gif)
+
+The GIF is recorded by the [README GIF workflow](.github/workflows/readme-gif.yml) when a pull request is opened:
+the game plays the input of [tools/readme_demo.txt](tools/readme_demo.txt) (`BIBO --demo <script> --record <file>`)
+and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames with FFmpeg.
 
 ## Features
 * The player character is a young brown bear (see [The bear](#the-bear) below)
@@ -127,6 +131,14 @@ The build copies the game assets (`Font`, `Shader`, `Texture`, `UI`, the scene `
 The game starts in the main menu, ESC opens the pause menu during the game.
 The settings menu saves the settings to `settings.cfg` in the current folder (a text file, delete it to reset the settings).
 The command line arguments `BIBO [width height [fullscreen]]` override the saved resolution and window mode: width and height of the window in pixels and `1` for fullscreen (default: `800 600 0`).
+
+To play a scripted run (e.g. [tools/readme_demo.txt](tools/readme_demo.txt), see `BIBO/Util/DemoScript.hpp` for the commands), add `--demo <script>`; `--record <file>` writes every frame to a file as raw RGB video.
+With either option the game runs with a fixed time step (`--fps <frames per second>`, default 15) and the default settings, so a script always plays the same way.
+[tools/record_gameplay.sh](tools/record_gameplay.sh) records the GIF at the top of this page (FFmpeg required; on a server without a display run it with `xvfb-run`):
+
+```bash
+tools/record_gameplay.sh build
+```
 
 To create a folder with the executable and all assets that can be copied to another computer:
 

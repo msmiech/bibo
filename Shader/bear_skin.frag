@@ -5,26 +5,16 @@
 * white of the eye are drawn from it, the cornea is glossy and always has a small catchlight (as if there was a light next to the camera).
 * Nose, inside of the mouth, tongue, teeth and claws are wet or glossy.
 */
+#include "include/lighting.glsl"
+
 in vec3 worldPosition;
 in vec3 worldNormal;
 in vec4 vertexColor;
 flat in int surfaceType;
-in vec4 fragPosLightSpace;
 
-uniform struct Light {
-	uint type;
-	vec3 position;
-	vec3 direction;
-	vec3 ambientColor;
-	vec3 diffuseColor;
-	vec3 specularColor;
-} light;
-uniform sampler2D shadowMap;
-uniform bool shadowMappingEnabled;
 uniform vec3 worldEye;
 
 layout (location = 0) out vec4 fragColor;
-layout (location = 1) out vec4 brightColor;
 
 const int FUR = 0;
 const int EYE = 1;
@@ -33,26 +23,6 @@ const int MOUTH = 3;
 const int TONGUE = 4;
 const int TEETH = 5;
 const int CLAW = 6;
-
-float shadowCalculation(vec4 positionLightSpace, float bias)
-{
-	vec3 projected = positionLightSpace.xyz / positionLightSpace.w * 0.5 + 0.5;
-	if (projected.z > 1.0)
-	{
-		return 0.0;
-	}
-	float shadow = 0.0;
-	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-	for (int x = -1; x <= 1; ++x)
-	{
-		for (int y = -1; y <= 1; ++y)
-		{
-			float depth = texture(shadowMap, projected.xy + vec2(x, y) * texelSize).r;
-			shadow += projected.z - bias > depth ? 1.0 : 0.0;
-		}
-	}
-	return shadow / 9.0;
-}
 
 /**
 * Color of the eye where it is seen from the center in the direction d (eye space)
@@ -81,7 +51,7 @@ vec3 eyeColor(vec3 d)
 void main()
 {
 	vec3 N = normalize(worldNormal);
-	vec3 L = normalize(-light.direction);
+	vec3 L = sunDirection();
 	vec3 V = normalize(worldEye - worldPosition);
 	vec3 H = normalize(L + V);
 	float NdotL = dot(N, L);
@@ -136,10 +106,11 @@ void main()
 
 	float diffuse = clamp((NdotL + wrap) / (1.0 + wrap), 0.0, 1.0);
 	float specular = glossiness * pow(max(dot(N, H), 0.0), shininess) * step(0.0, NdotL);
-	float shadow = shadowMappingEnabled ? shadowCalculation(fragPosLightSpace, max(0.01 * (1.0 - NdotL), 0.002)) : 0.0;
+	float lit = sunShadow(worldPosition, N);
+	vec3 sun = frame.sunColorNormalMapping.rgb / PI;
+	vec3 sky = skyLight(N, 0.85);
 
-	vec3 color = occlusion * (light.ambientColor * 0.25 * albedo
-		+ (1.0 - shadow) * (light.diffuseColor * albedo * diffuse + light.specularColor * specular));
+	vec3 color = occlusion * (sky * albedo + lit * sun * (albedo * diffuse + specular));
 
 	//Catchlight: reflection of a light above the camera, so the eyes sparkle from every side
 	if (surfaceType == EYE || surfaceType == NOSE || surfaceType == TONGUE)
@@ -149,10 +120,8 @@ void main()
 		float sparkle = pow(max(dot(N, normalize(cameraLight + V)), 0.0), sharpness);
 		color += vec3(surfaceType == EYE ? 2.5 : 0.5) * sparkle * occlusion;
 		//Fresnel: glossy surfaces reflect the bright sky at grazing angles
-		color += glossiness * 0.15 * pow(1.0 - max(dot(N, V), 0.0), 4.0) * light.ambientColor;
+		color += glossiness * 0.15 * pow(1.0 - max(dot(N, V), 0.0), 4.0) * skyLight(reflect(-V, N), 0.2);
 	}
 
-	fragColor = vec4(color, 1.0);
-	float brightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
-	brightColor = brightness > 1.0 ? vec4(color, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+	fragColor = vec4(applyFog(color, worldPosition), 1.0);
 }

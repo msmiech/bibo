@@ -2,14 +2,15 @@
 #include <vector>
 #include "SceneObject.hpp"
 #include "Geometry.hpp"
-#include "Light.hpp"
 #include <memory>
 #include "Bear.hpp"
 #include "Cube.hpp"
 #include "GameRules.hpp"
+#include "../Render/Renderer.hpp"
 #include "../Util/Input.hpp"
 #include "../Util/Util.hpp"
 #include "../Physics/Physics.hpp"
+#include "../World/World.hpp"
 #include <glm/gtc/quaternion.hpp>
 
 
@@ -20,25 +21,14 @@ namespace bibo
 	namespace scene
 	{
 		/**
-		* Scale, rotation and position of a static triangle mesh in the physics world
+		* The race: the bear, the objects of the track (finish line, rocks, signs, ...) and the world around it (World:
+		* the island with its forest, caves, sky, water and snow)
 		*/
-		struct MeshTransform
-		{
-			float scale;
-			quat rotation;
-			vec3 position;
-		};
-
-		/**
-		* The collision mesh of the terrain must be placed like the rendered terrain.
-		* @param modelMatrix Model matrix of the rendered terrain: uniform scale, rotation (Z-up of Blender/Collada to Y-up) and translation
-		*/
-		MeshTransform terrainTransform(const mat4& modelMatrix);
-
-		class Scene
+		class Scene : public render::RenderableScene
 		{
 			void initPhysicsBodies();
 			void initAnimatedTextures();
+			void initWorld(const aiScene& track);
 			/**
 			* @param board The finish line (geometry), the trigger goes along it across the track
 			*/
@@ -48,41 +38,44 @@ namespace bibo
 			//What the camera follows: the bear
 			Camera::FollowTarget cameraTarget();
 			/**
+			* The objects of the track (not the world)
 			* @param frustum Geometries outside of it are not drawn (nullptr: draw all)
-			* @param shadedBear The bear is drawn with its own shaders and its fur (main pass), otherwise with the given shader
+			* @param withBear The bear is drawn with the given shader too (its surface), otherwise left out
 			* @return Number of drawn geometries
 			*/
-			int draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* frustum, bool shadedBear);
+			int drawGeometries(Shader* shader, const mat4& view, const mat4& projection, const ViewFrustum* frustum, bool withBear);
 			/**
 			* @return false if the geometry is outside of the frustum and was not drawn
 			*/
-			bool drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappingEnabledLocation, const ViewFrustum* frustum);
+			bool drawGeometry(Shader* shader, Geometry* geometry, GLint normalMappingEnabledLocation, const ViewFrustum* frustum);
+			Geometry* addGeometry(const aiScene* track, const char* nodeName, Texture* texture, Texture* normalMap = nullptr);
 
 			GLFWwindow* window;
 			Shader* mainShader;
+			unique_ptr<Shader> depthShader;
+			unique_ptr<Shader> lightShader;
 			vector<unique_ptr<Geometry>> geometries;
-			vector<unique_ptr<Light>> lights;
 			unique_ptr<Camera> camera;
 			vector<unique_ptr<Texture>> textures;
 			vector<unique_ptr<Texture>> monitorVideo;
-			vector<unique_ptr<Texture>> waterVideo;
 			vector<unique_ptr<Geometry>> arrows;
+			unique_ptr<world::World> world;
 
 			//special pointers
 			Bear* bear;
-			Geometry* world;
+			Geometry* finishLine;
 			Geometry* monitor1;
-			Geometry* water; //transparent, drawn after the other geometries
+			Geometry* crate;
+			vector<Geometry*> rocks;
 			unique_ptr<Cube> debugCube;
 			unique_ptr<Geometry> rotatingRock;
+			Texture* crateNormalMap;
 
 			//Physics
 			physics::PhysicsWorld* physicsWorld;
 
-			bool shadowMappingEnabled = true;
-			bool normalMappingEnabled = true;
-			bool transparencyEnabled = true;
 			bool viewFrustumCullingEnabled = true;
+			bool normalMappingEnabled = true;
 			int drawnGeometryCount = 0;
 
 			bool gameOver = false;
@@ -90,7 +83,7 @@ namespace bibo
 
 			//Index of the checkpoint the bear has to pass next, see rules::passCheckpoint
 			size_t nextCheckpoint = 0;
-			rules::FinishLine finishLine;
+			rules::FinishLine finishLineTrigger;
 
 			vector<physics::BodyHandle> bodiesRock;
 			//Dynamic bodies and their start positions, which they are moved back to by restart()
@@ -98,10 +91,10 @@ namespace bibo
 
 			float accumulatedVideoTime = 0;
 			int monitorFrame = 0;
-			int waterFrame = 0;
 
 		public:
 			Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld);
+			~Scene() override;
 
 			/**
 			* @param player What the player does: moves the bear (relative to the camera), jumps and turns the camera
@@ -113,31 +106,34 @@ namespace bibo
 			bool isCameraLocked() { return camera->isLocked(); }
 			Camera& getCamera() { return *camera; }
 			Bear& getBear() { return *bear; }
+			world::World& getWorld() { return *world; }
 			/**
 			* Starts the run again: the bear, the movable objects and the lap go back to the start (R key, game over menu)
 			*/
 			void restart();
 
+			//render::RenderableScene (the frame is rendered by render::Renderer)
+			render::CameraView cameraView() override;
+			void fillFrameUniforms(render::FrameUniforms& uniforms) override;
+			void prepareFrame() override;
+			void drawShadowCasters(const render::ShadowCascade& cascade) override;
+			void drawMain(const render::RenderSettings& settings) override;
+
+			/**
+			* Only the objects of the track with the given shader (e.g. their silhouettes), the camera's view and projection
+			*/
 			void renderFromCamera(Shader* shader);
-			void renderFromLightSource(Shader* shader);
-			void renderLightSourcesOnly(Shader* shader);
 			/**
 			* Size of the rendered image in pixels (e.g. after the window was resized)
 			*/
 			void setViewportSize(int width, int height);
-			void setTransparencyEnabled(bool transparency);
-			void setNormalMappingEnabled(bool normalMappingEnabled);
-			void setShadowMappingEnabled(bool shadowMappingEnabled);
 			/**
 			* Only the geometries that are (partially) inside of the view frustum of the camera are drawn
 			*/
 			void setViewFrustumCullingEnabled(bool viewFrustumCullingEnabled);
-			bool isTransparencyEnabled();
-			bool isNormalMappingEnabled();
-			bool isShadowMappingEnabled();
 			bool isViewFrustumCullingEnabled();
 			/**
-			* @return Number of geometries drawn by the last renderFromCamera
+			* @return Number of geometries drawn by the last renderFromCamera or drawMain
 			*/
 			int getDrawnGeometryCount();
 			/**

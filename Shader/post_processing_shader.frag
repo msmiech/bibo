@@ -1,66 +1,48 @@
 #version 430 core
-/*Based on http://learnopengl.com/#!Advanced-Lighting/Bloom
-and based on OpenGL SuperBible 5th Edition and https://github.com/openglsuperbible/sb6code/blob/master/bin/media/shaders/hdrtonemap/tonemap_adaptive.fs.glsl
-Used for tone mapping and adding bloom to the scene
+/*
+* Final image: the HDR image with its bloom, exposed (auto exposure), tone mapped (ACES filmic curve) and gamma corrected,
+* with a slight vignette and dithering (no banding in the gradients of the sky).
+* Without HDR only the gamma correction (bright parts are clipped).
 */
-in vec2 fragUV;
+in vec2 uv;
 
-layout(binding = 0) uniform sampler2D sceneTex; //Our rendered scene from main shader as texture (in this sampler)
+layout(binding = 0) uniform sampler2D sceneTex;
 layout(binding = 1) uniform sampler2D bloomTex;
+layout(binding = 2) uniform sampler2D exposureTexture;
 uniform bool hdrEnabled;
 uniform bool bloomEnabled;
+uniform float bloomStrength;
 
 out vec4 fragColor;
 
+//Fit of the ACES filmic tone mapping curve (Krzysztof Narkowicz)
+vec3 aces(vec3 x)
+{
+	const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+	return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
 void main()
 {
-	const float gamma = 2.15;
-	vec3 sceneColor = texture(sceneTex, fragUV).rgb;
-	if(hdrEnabled) 
+	const float GAMMA = 2.2;
+	vec3 color = texture(sceneTex, uv).rgb;
+	if (hdrEnabled)
 	{
-		vec2 uvOffsetFactor = vec2(1.0) / textureSize(sceneTex, 0);
-
-		float luminance[25];
-		for (int i = 0; i < 25; ++i)
+		float exposure = texelFetch(exposureTexture, ivec2(0), 0).r;
+		color *= exposure;
+		if (bloomEnabled)
 		{
-			vec2 uv = (gl_FragCoord.xy + 3.5 * vec2(i % 5 - 2, i / 5 - 2));
-			vec3 color = texture(sceneTex, uv * uvOffsetFactor).rgb;
-			luminance[i] = dot(color, vec3(0.3, 0.59, 0.11));
+			//The bloom is already exposed (bright pass)
+			color += texture(bloomTex, uv).rgb * bloomStrength;
 		}
-
-		
-		// Calculate weighted color of region
-		vec3 vColor = texelFetch(sceneTex, 2 * ivec2(gl_FragCoord.xy), 0).rgb;
-
-		float kernelLuminance = (
-			(1.0 * (luminance[0] + luminance[4] + luminance[20] + luminance[24])) +
-			(4.0 * (luminance[1] + luminance[3] + luminance[5] + luminance[9] + luminance[15] + luminance[19] + luminance[21] + luminance[23])) +
-			(7.0 * (luminance[2] + luminance[10] + luminance[14] + luminance[22])) +
-			(16.0 * (luminance[6] + luminance[8] + luminance[16] + luminance[18])) +
-			(26.0 * (luminance[7] + luminance[11] + luminance[13] + luminance[17])) +
-			(41.0 * luminance[12])
-		) / 273.0;
-
-		if(bloomEnabled) 
-		{	//Additive blending
-			vec3 bloomColor = texture(bloomTex, fragUV).rgb;
-			sceneColor += bloomColor;
-		}
-		// Reinhard tone mapping
-		float exposure = sqrt(8.0 / (kernelLuminance + 0.25));
-		exposure = clamp(exposure, 0.02f, 20.0f);
-
-		vec4 hdrResult = vec4(1.0);
-		hdrResult.rgb = 1.0 - exp2(-sceneColor * exposure);
-		hdrResult.a = 1.0;
-		// Gamma correction  
-		hdrResult = pow(hdrResult, vec4(1.0 / gamma));
-		fragColor = hdrResult;
+		color = aces(color);
+		//Vignette
+		vec2 centered = uv - 0.5;
+		color *= 1.0 - 0.28 * dot(centered, centered) * 2.0;
 	}
-	else
-    {
-		//Only gamma correction
-        vec3 result = pow(sceneColor, vec3(1.0 / gamma));
-        fragColor = vec4(result, 1.0);
-    }
+	color = pow(clamp(color, 0.0, 1.0), vec3(1.0 / GAMMA));
+	//Dithering against banding (less than one step of 8 bit)
+	float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+	color += (noise - 0.5) / 255.0;
+	fragColor = vec4(color, 1.0);
 }

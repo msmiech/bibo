@@ -8,6 +8,7 @@
 #include <catch2/generators/catch_generators_range.hpp>
 #include <catch2/matchers/catch_matchers_container_properties.hpp>
 
+#include "Render/FrameUniforms.hpp"
 #include "Resources/Shader.hpp"
 #include "TestSupport.hpp"
 
@@ -29,9 +30,10 @@ namespace
 	*/
 	GLuint compile(const std::string& file, GLenum type)
 	{
-		std::ifstream stream(assetPath(file));
-		REQUIRE(stream.good());
-		std::string code((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+		//With the files it includes, like Shader::loadShader
+		std::string error;
+		std::string code = bibo::Shader::preprocess(assetPath(file).string(), error);
+		REQUIRE(error.empty());
 		const char* codePtr = code.c_str();
 
 		GLuint shader = glCreateShader(type);
@@ -79,12 +81,27 @@ TEST_CASE("The main shader has the inputs the game sets", "[gl][shader]")
 	GlContext gl;
 	bibo::Shader shader(assetPath("Shader/main_shader.vert").string(), assetPath("Shader/main_shader.frag").string());
 
-	SECTION("Matrices (Scene::draw, Geometry::draw)")
+	SECTION("Matrices (Scene::drawGeometries, Geometry::draw)")
 	{
 		CHECK(shader.getUniformLocation("model") != -1);
 		CHECK(shader.getUniformLocation("view") != -1);
 		CHECK(shader.getUniformLocation("projection") != -1);
-		CHECK(shader.getUniformLocation("lightSpaceMatrix") != -1);
+	}
+
+	SECTION("Material (Mesh::draw, Geometry::draw)")
+	{
+		CHECK(shader.getUniformLocation("material.diffuse") != -1);
+		CHECK(shader.getUniformLocation("material.shininess") != -1);
+		CHECK(shader.getUniformLocation("materialLayer") != -1);
+	}
+
+	SECTION("Sun, sky and shadows come from the uniform buffer of the frame (render::FrameUniforms)")
+	{
+		GLuint block = glGetUniformBlockIndex(shader.programHandle, "Frame");
+		REQUIRE(block != GL_INVALID_INDEX);
+		GLint size = 0;
+		glGetActiveUniformBlockiv(shader.programHandle, block, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
+		CHECK(size == static_cast<GLint>(sizeof(bibo::render::FrameUniforms)));
 	}
 
 	SECTION("Vertex attributes (Mesh)")

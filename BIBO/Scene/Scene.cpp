@@ -1,8 +1,11 @@
-﻿#include "Scene.hpp"
+#include "Scene.hpp"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
+#include <limits>
 #include "../Util/Console.hpp"
 #include "../Util/Input.hpp"
+#include "../World/MaterialTextures.hpp"
 
 using namespace bibo;
 using namespace scene;
@@ -10,24 +13,19 @@ using namespace scene;
 namespace
 {
 	const char* const TRACK_FILE = "Model/SnowTerrain/track1.dae";
+	//How long the loading may wait for the world around the start (it goes on streaming afterwards)
+	const float WORLD_LOADING_TIMEOUT = 30.0f;
 }
 
-MeshTransform scene::terrainTransform(const mat4& modelMatrix)
+Geometry* Scene::addGeometry(const aiScene* track, const char* nodeName, Texture* texture, Texture* normalMap)
 {
-	//Jolt only scales triangle meshes uniformly, so the scale of the x axis is used for all axes
-	float scale = length(vec3(modelMatrix[0]));
-	return { scale, quat_cast(mat3(modelMatrix) / scale), vec3(modelMatrix[3]) };
+	geometries.push_back(make_unique<Geometry>(mat4(1.0f), mainShader, *window, track, nodeName, texture, normalMap));
+	return geometries.back().get();
 }
 
 Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld) : window(window), mainShader(shader), physicsWorld(physicsWorld)
 {
 	shader->enable();
-
-	geometries.clear();
-	arrows.clear();
-
-	// Clear the screen
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//All geometries are nodes of the same scene file, which is only loaded once (it is ~20 MB of XML)
 	util::ScenePtr track = util::loadSceneFromFile(TRACK_FILE);
@@ -37,58 +35,43 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	}
 	const aiScene* trackScene = track.get();
 
-	lights = util::retrieveLightFromScene(*window, shader, trackScene);
-	if (lights.empty())
-	{
-		util::fatalError(string("There is no light source in ") + TRACK_FILE);
-	}
 	camera = make_unique<Camera>(vec3(0.0f, 1.0f, 2.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), *window);
+	depthShader = make_unique<Shader>("Shader/depth_shader.vert", "Shader/depth_shader.frag");
+	lightShader = make_unique<Shader>("Shader/light_source_shader.vert", "Shader/light_source_shader.frag");
 
-	textures.push_back(Texture::createCheckerboard(256, 8, 0)); //0, chequered flag (generated, no image file)
-	Texture* checkerboardTexPtr = textures[0].get();
-
-	textures.push_back(make_unique<Texture>("Texture/cfur01.jpg", 0)); //1
-	textures.push_back(make_unique<Texture>("Texture/sky1Tex.jpg", 0)); //2
-	textures.push_back(make_unique<Texture>("Texture/snow.jpg", 0)); //3
-	textures.push_back(make_unique<Texture>("Texture/snow-normal.jpg", 2)); //4
-	textures.push_back(make_unique<Texture>("Texture/ground07.jpg", 0)); //5
-	textures.push_back(make_unique<Texture>("Texture/wood16.jpg", 0)); //6
-	textures.push_back(make_unique<Texture>("Texture/wood16n.jpg", 2)); //7
-	textures.push_back(make_unique<Texture>("Texture/Water.png", 0));//8
-	textures.push_back(make_unique<Texture>("Texture/ground07n.jpg", 2)); //9
+	textures.push_back(Texture::createCheckerboard(256, 8, 0)); //chequered flag (generated, no image file)
+	Texture* checkerboard = textures.back().get();
+	textures.push_back(make_unique<Texture>("Texture/wood16.jpg", 0));
+	Texture* wood = textures.back().get();
+	textures.push_back(make_unique<Texture>("Texture/wood16n.jpg", 2));
+	crateNormalMap = textures.back().get();
 	initAnimatedTextures();
 
-	geometries.push_back(make_unique<Bear>(*window, trackScene, physicsWorld, [this](const physics::CharacterController::Hit& hit) { onBearHit(hit); })); //0
+	geometries.push_back(make_unique<Bear>(*window, trackScene, physicsWorld, [this](const physics::CharacterController::Hit& hit) { onBearHit(hit); }));
 	bear = static_cast<Bear*>(geometries[0].get());
 	shader->enable(); //the bear compiled its own shaders
 
-	debugCube = make_unique<Cube>(mat4(1.0f), shader, *window, textures[6].get());
+	debugCube = make_unique<Cube>(mat4(1.0f), shader, *window, wood);
 
-
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Boden", textures[3].get()));//1
-	world = geometries[1].get();
-
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "FinishLine", checkerboardTexPtr));//2
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock1", textures[5].get(), textures[9].get())); //3
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock2", textures[5].get(), textures[9].get())); //4
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock3", textures[5].get(), textures[9].get())); //5
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock4", textures[5].get(), textures[9].get())); //6
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock5", textures[5].get(), textures[9].get())); //7
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock6", textures[5].get(), textures[9].get())); //8
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock7", textures[5].get(), textures[9].get())); //9
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock8", textures[5].get(), textures[9].get())); //10
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock9", textures[5].get(), textures[9].get())); //11
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock10", textures[5].get(), textures[9].get())); //12
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock11", textures[5].get(), textures[9].get())); //13
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock12", textures[5].get(), textures[9].get())); //14
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Torus", textures[3].get())); //15
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Water", textures[8].get())); //16
-	water = geometries[16].get();
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Cube", textures[6].get(), textures[7].get())); //17
-
-	geometries.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Monitor1", checkerboardTexPtr)); //18
-
-	monitor1 = geometries[18].get();
+	finishLine = addGeometry(trackScene, "FinishLine", checkerboard);
+	for (int i = 1; i <= 12; ++i)
+	{
+		//The obstacles are made of the rock of the island
+		Geometry* rock = addGeometry(trackScene, ("Rock" + to_string(i)).c_str(), wood);
+		rock->materialLayer = world::MATERIAL_ROCK;
+		rock->materialScale = 1.2f;
+		for (Mesh* mesh : rock->getModel()->meshes)
+		{
+			mesh->smoothNormals(); //the model is flat shaded
+		}
+		rocks.push_back(rock);
+	}
+	//A ring of stone in the forest
+	Geometry* torus = addGeometry(trackScene, "Torus", wood);
+	torus->materialLayer = world::MATERIAL_ROCK;
+	torus->materialScale = 1.5f;
+	crate = addGeometry(trackScene, "Cube", wood, crateNormalMap);
+	monitor1 = addGeometry(trackScene, "Monitor1", checkerboard);
 	Material monitorMaterial;
 	monitorMaterial.ambient = vec3(0.8f, 0.8f, 0.8f);
 	monitorMaterial.diffuse = vec3(0.8f, 0.8f, 0.8f);
@@ -96,30 +79,91 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	monitorMaterial.shininess = 1.0f;
 	monitor1->getModel()->meshes[0]->setMaterial(monitorMaterial);
 
-
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil0", checkerboardTexPtr)); //18
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil1", checkerboardTexPtr)); //19
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil2", checkerboardTexPtr)); //20
-	arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Pfeil3", checkerboardTexPtr)); //21
+	for (int i = 0; i < 4; ++i)
+	{
+		arrows.push_back(make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, ("Pfeil" + to_string(i)).c_str(), checkerboard));
+	}
 	initPhysicsBodies();
-	initFinishLine(geometries[2].get());
+	initFinishLine(finishLine);
 
 	//The fur lies on the rocks when the bear runs into one
-	vector<fur::SphereCollider> rocks;
-	for (int i = 3; i <= 14; i++)
+	vector<fur::SphereCollider> obstacles;
+	for (Geometry* rock : rocks)
 	{
-		rocks.push_back({ geometries[i]->getPosition(), 0.8f });
+		obstacles.push_back({ rock->getPosition(), 0.8f });
 	}
-	bear->setObstacles(rocks);
+	bear->setObstacles(obstacles);
 
-	//The camera stays out of the terrain and the rocks
+	//The camera stays out of the terrain, the trees and the rocks
 	camera->setCollisionProbe([this](vec3 from, vec3 to, float radius) {
 		physics::RayHit hit;
 		return this->physicsWorld->castSphere(from, to - from, radius, hit, true) ? hit.fraction : 1.0f;
 	});
 
-	rotatingRock = make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock1", textures[5].get(), textures[9].get());
+	rotatingRock = make_unique<Geometry>(mat4(1.0f), shader, *window, trackScene, "Rock1", wood);
 	rotatingRock->modelMatrix = translate(rotatingRock->modelMatrix, vec3(10, 25, 1));
+	rotatingRock->materialLayer = world::MATERIAL_ROCK;
+	rotatingRock->materialScale = 1.2f;
+	for (Mesh* mesh : rotatingRock->getModel()->meshes)
+	{
+		mesh->smoothNormals();
+	}
+
+	initWorld(*trackScene);
+	camera->snapBehind(cameraTarget());
+	world->finishLoading(camera->getPosition(), bear->getPosition(), WORLD_LOADING_TIMEOUT);
+}
+
+Scene::~Scene() = default;
+
+void Scene::initWorld(const aiScene& track)
+{
+	cout << "Generating the island..." << endl;
+	//The world must not cover the objects of the track
+	vector<world::KeepClear> keepClear;
+	auto keep = [&](Geometry* geometry) {
+		//Sphere around the vertices in world space (the model matrices of some objects scale the axes differently)
+		vector<vec3> points;
+		for (const Mesh* mesh : geometry->getModel()->meshes)
+		{
+			for (unsigned int i = 0; mesh->vertices && i < mesh->numVertices; ++i)
+			{
+				points.push_back(vec3(geometry->modelMatrix * vec4(mesh->vertices[i * 3], mesh->vertices[i * 3 + 1], mesh->vertices[i * 3 + 2], 1.0f)));
+			}
+		}
+		vec3 low(numeric_limits<float>::max()), high(numeric_limits<float>::lowest());
+		for (const vec3& point : points)
+		{
+			low = glm::min(low, point);
+			high = glm::max(high, point);
+		}
+		world::KeepClear object{ 0.5f * (low + high), 0.0f };
+		for (const vec3& point : points)
+		{
+			object.radius = std::max(object.radius, distance(object.center, point));
+		}
+		if (!points.empty())
+		{
+			keepClear.push_back(object);
+		}
+	};
+	keep(finishLine);
+	keep(crate);
+	keep(monitor1);
+	for (const unique_ptr<Geometry>& geometry : geometries)
+	{
+		if (geometry->getModel() && geometry.get() != finishLine && geometry.get() != crate && geometry.get() != monitor1)
+		{
+			keep(geometry.get()); //rocks and the stone ring
+		}
+	}
+	for (const unique_ptr<Geometry>& arrow : arrows)
+	{
+		keep(arrow.get());
+	}
+	vector<glm::vec2> checkpoints(std::begin(rules::CHECKPOINTS), std::end(rules::CHECKPOINTS));
+	vec3 start = bear->getPosition();
+	world = make_unique<world::World>(track, glm::vec2(start.x, start.z), glm::vec2(0.0f, -1.0f), checkpoints, keepClear, physicsWorld);
 }
 
 void Scene::update(float time_delta, const input::PlayerInput& player) {
@@ -150,7 +194,6 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 	{
 		accumulatedVideoTime = 0.f;
 		monitor1->getModel()->meshes[0]->setTexture(monitorVideo[++monitorFrame % monitorVideo.size()].get());
-		water->getModel()->meshes[0]->setTexture(waterVideo[++waterFrame % waterVideo.size()].get());
 	}
 
 	debugCube->update(time_delta);
@@ -170,12 +213,14 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 	else
 	{
 		nextCheckpoint = rules::passCheckpoint(playerPosition, nextCheckpoint);
-		if (rules::hasCompletedLap(nextCheckpoint, playerPosition, finishLine))
+		if (rules::hasCompletedLap(nextCheckpoint, playerPosition, finishLineTrigger))
 		{
 			gameWon = true;
 		}
 	}
 	}
+	//The world streams around the camera, the physics around the bear
+	world->update(time_delta, camera->getPosition(), bear->getPosition());
 }
 
 Camera::FollowTarget Scene::cameraTarget()
@@ -192,6 +237,8 @@ void Scene::restart()
 {
 	bear->reset();
 	bear->setInput(BearInput());
+	//The ground at the start may have been streamed out of the physics world
+	world->ensureCollision(bear->getPosition());
 	camera->snapBehind(cameraTarget());
 	for (const auto& dynamicBody : dynamicBodies)
 	{
@@ -202,164 +249,165 @@ void Scene::restart()
 	gameWon = false;
 }
 
-void Scene::renderFromCamera(Shader* shader)
+render::CameraView Scene::cameraView()
 {
+	render::CameraView view;
+	view.view = camera->getViewMatrix();
+	view.projection = camera->getProjectionMatrix();
+	view.position = camera->getPosition();
+	view.fieldOfView = camera->getFieldOfView();
+	view.aspectRatio = camera->getAspectRatio();
+	view.nearPlane = camera->getNearPlane();
+	return view;
+}
+
+void Scene::fillFrameUniforms(render::FrameUniforms& uniforms)
+{
+	world->fillFrameUniforms(uniforms);
+}
+
+void Scene::prepareFrame()
+{
+	world->prepareFrame();
+}
+
+void Scene::drawShadowCasters(const render::ShadowCascade& cascade)
+{
+	world->drawShadows(cascade, camera->getPosition());
+	depthShader->enable();
+	glUniformMatrix4fv(depthShader->getUniformLocation("lightSpaceMatrix"), 1, GL_FALSE, value_ptr(cascade.lightSpace));
+	for (const unique_ptr<Geometry>& geometry : geometries)
+	{
+		if (geometry.get() == bear)
+		{
+			bear->draw(depthShader.get());
+			continue;
+		}
+		Model* model = geometry->getModel();
+		float scale = std::max({ length(vec3(geometry->modelMatrix[0])), length(vec3(geometry->modelMatrix[1])), length(vec3(geometry->modelMatrix[2])) });
+		if (cascade.contains(vec3(geometry->modelMatrix * vec4(model->getBoundingSphereCenter(), 1.0f)), model->getBoundingSphereRadius() * scale))
+		{
+			geometry->draw(depthShader.get());
+		}
+	}
+	rotatingRock->draw(depthShader.get());
+	glUniformMatrix4fv(depthShader->getUniformLocation("model"), 1, GL_FALSE, value_ptr(debugCube->modelMatrix));
+	debugCube->draw(depthShader.get());
+}
+
+void Scene::drawMain(const render::RenderSettings& settings)
+{
+	normalMappingEnabled = settings.normalMapping;
 	mat4 view = camera->getViewMatrix();
 	mat4 projection = camera->getProjectionMatrix();
 	ViewFrustum frustum = camera->getViewFrustum();
-	drawnGeometryCount = draw(shader, view, projection, viewFrustumCullingEnabled ? &frustum : nullptr, shader == mainShader);
+	vec3 eye = camera->getPosition();
+
+	//1. Opaque: the terrain and the vegetation, the objects of the track and the signs (they glow)
+	world->drawOpaque(frustum, eye, viewFrustumCullingEnabled);
+	mainShader->enable();
+	drawnGeometryCount = drawGeometries(mainShader, view, projection, viewFrustumCullingEnabled ? &frustum : nullptr, false);
+	lightShader->enable();
+	glUniformMatrix4fv(lightShader->getUniformLocation("view"), 1, GL_FALSE, value_ptr(view));
+	glUniformMatrix4fv(lightShader->getUniformLocation("projection"), 1, GL_FALSE, value_ptr(projection));
+	for (const unique_ptr<Geometry>& arrow : arrows)
+	{
+		arrow->draw(lightShader.get());
+	}
+
+	//2. The sky behind everything (not in wireframe mode)
+	if (!settings.wireframe)
+	{
+		world->drawSky();
+	}
+
+	//3. The bear: its fur is blended with what is behind it
+	if (!viewFrustumCullingEnabled || bear->isVisible(frustum))
+	{
+		BearRenderContext context;
+		context.view = view;
+		context.projection = projection;
+		context.eye = eye;
+		bear->drawShaded(context);
+		++drawnGeometryCount;
+	}
+
+	//4. Transparent: the water, the falling snow
+	world->drawTransparent(settings.transparency);
+	glActiveTexture(GL_TEXTURE0);
 }
 
-void Scene::renderFromLightSource(Shader* shader)
+void Scene::renderFromCamera(Shader* shader)
 {
-	GLfloat near_plane = 1.0f, far_plane = 75.0f;
-	mat4 lightProjectionMatrix = ortho(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
-	vec3 lightViewEye = bear->getPosition() + vec3(0.0f, 40.0f, 0.0f);
-	mat4 lightViewMatrix = lookAt(lightViewEye, lightViewEye + lights[0]->getDirection(), vec3(0, 1, 0));
-	//Everything casts shadows, also what the camera does not see
-	draw(shader, lightViewMatrix, lightProjectionMatrix, nullptr, false);
+	ViewFrustum frustum = camera->getViewFrustum();
+	shader->enable();
+	drawnGeometryCount = drawGeometries(shader, camera->getViewMatrix(), camera->getProjectionMatrix(), viewFrustumCullingEnabled ? &frustum : nullptr, true);
 }
 
-void Scene::renderLightSourcesOnly(Shader* shader)
+int Scene::drawGeometries(Shader* shader, const mat4& view, const mat4& projection, const ViewFrustum* frustum, bool withBear)
 {
-	GLuint viewLoc = shader->getUniformLocation("view");
-	GLuint projLoc = shader->getUniformLocation("projection");
-	// Set matrices
-	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, value_ptr(camera->getViewMatrix()));
-	glUniformMatrix4fv(projLoc, 1, GL_FALSE, value_ptr(camera->getProjectionMatrix()));
-
-	lights[0]->draw(shader);
-
-
-	for (unsigned int i = 0; i < arrows.size(); ++i)
-	{
-		arrows[i]->draw(shader);
-	}
-}
-
-int Scene::draw(Shader* shader, mat4 view, mat4 projection, const ViewFrustum* frustum, bool shadedBear)
-{
-	GLuint modelLocation = shader->getUniformLocation("model");
-	GLuint viewLocation = shader->getUniformLocation("view");
-	GLuint projectionLocation = shader->getUniformLocation("projection");
-	GLuint shadowMappingEnabledLocation = shader->getUniformLocation("shadowMappingEnabled");
-	GLuint normalMappingEnabledLocation = shader->getUniformLocation("normalMappingEnabled");
-	GLuint lightSpaceMatrixLocation = shader->getUniformLocation("lightSpaceMatrix");
-	GLuint lightPositionLocation = shader->getUniformLocation("lightPosition");
-	GLuint worldEyeLocation = shader->getUniformLocation("worldEye");
-
-	GLfloat near_plane = 1.0f, far_plane = 75.0f;
-	mat4 lightProjectionMatrix = ortho(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
-	vec3 lightViewEye = bear->getPosition() + vec3(0.0f, 40.0f, 0.0f);
-	mat4 lightViewMatrix = lookAt(lightViewEye, lightViewEye + lights[0]->getDirection(), vec3(0, 1, 0));
-	mat4 lightSpaceMatrix = lightProjectionMatrix * lightViewMatrix;
-
-
-	if (shadowMappingEnabledLocation != 0xFFFFFFFF) {
-
-		glUniform1i(shadowMappingEnabledLocation, shadowMappingEnabled);
-	}
-
-	if (lightSpaceMatrixLocation != 0xFFFFFFFF)
-	{
-		glUniformMatrix4fv(lightSpaceMatrixLocation, 1, GL_FALSE, value_ptr(lightSpaceMatrix));
-	}
-
-	if (lightPositionLocation != 0xFFFFFFFF)
-	{
-		auto lightPos = lights[0]->getPosition();
-		glUniform3f(lightPositionLocation, lightPos.x, lightPos.y, lightPos.z);
-	}
-
-	if (worldEyeLocation != 0xFFFFFFFF)
-	{
-		glUniform3fv(worldEyeLocation, 1, &camera->getPosition()[0]);
-	}
-
-
-
-	if (viewLocation != 0xFFFFFFFF &&
-		projectionLocation != 0xFFFFFFFF)
+	GLint viewLocation = shader->getUniformLocation("view");
+	GLint projectionLocation = shader->getUniformLocation("projection");
+	GLint normalMappingEnabledLocation = shader->getUniformLocation("normalMappingEnabled");
+	GLint textureTransparentLocation = shader->getUniformLocation("textureTransparent");
+	if (viewLocation >= 0 && projectionLocation >= 0)
 	{
 		glUniformMatrix4fv(viewLocation, 1, GL_FALSE, value_ptr(view));
 		glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, value_ptr(projection));
 	}
-	GLuint textureTransparentLocation = shader->getUniformLocation("textureTransparent");
-
-	lights[0]->loadUniforms(shader);
+	if (textureTransparentLocation >= 0)
+	{
+		glUniform1i(textureTransparentLocation, false);
+	}
 
 	int drawnGeometries = 0;
-	for (unsigned int i = 0; i < geometries.size(); ++i)
+	for (const unique_ptr<Geometry>& geometry : geometries)
 	{
-		if (geometries[i].get() == bear && shadedBear)
+		if (geometry.get() == bear)
 		{
-			if (!frustum || bear->isVisible(*frustum))
+			if (withBear && (!frustum || bear->isVisible(*frustum)))
 			{
-				BearRenderContext context;
-				context.view = view;
-				context.projection = projection;
-				context.lightSpaceMatrix = lightSpaceMatrix;
-				context.eye = camera->getPosition();
-				context.light = lights[0].get();
-				context.shadowMappingEnabled = shadowMappingEnabled;
-				bear->drawShaded(context);
-				shader->enable(); //the uniforms of the main shader are kept
+				bear->draw(shader);
 				++drawnGeometries;
 			}
 		}
-		else if (geometries[i].get() != water && drawGeometry(shader, geometries[i].get(), normalMappingEnabledLocation, frustum))
+		else if (drawGeometry(shader, geometry.get(), normalMappingEnabledLocation, frustum))
 		{
 			++drawnGeometries;
 		}
 	}
 	drawGeometry(shader, rotatingRock.get(), normalMappingEnabledLocation, frustum);
 
-
-	if (normalMappingEnabledLocation != 0xFFFFFFFF) {
-
-		glUniform1i(normalMappingEnabledLocation, false);
-	}
-	auto& debugModel = debugCube->modelMatrix;
-	if (modelLocation != 0xFFFFFFFF)
+	if (normalMappingEnabledLocation >= 0)
 	{
-		glUniformMatrix4fv(modelLocation, 1, GL_FALSE, value_ptr(debugModel));
+		glUniform1i(normalMappingEnabledLocation, normalMappingEnabled);
 	}
-	textures[7].get()->bind();
+	GLint modelLocation = shader->getUniformLocation("model");
+	if (modelLocation >= 0)
+	{
+		glUniformMatrix4fv(modelLocation, 1, GL_FALSE, value_ptr(debugCube->modelMatrix));
+	}
+	GLint layerLocation = shader->getUniformLocation("materialLayer");
+	if (layerLocation >= 0)
+	{
+		glUniform1i(layerLocation, -1);
+	}
+	crateNormalMap->bind();
 	debugCube->draw(shader);
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-
-	//The transparent water is drawn last, so that the geometry behind it is already in the depth buffer and blended with it
-	if (transparencyEnabled)
-	{
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		if (textureTransparentLocation != 0xFFFFFFFF)
-		{
-			glUniform1i(textureTransparentLocation, true);
-		}
-	}
-	if (drawGeometry(shader, water, normalMappingEnabledLocation, frustum))
-	{
-		++drawnGeometries;
-	}
-	glDisable(GL_BLEND);
-	if (textureTransparentLocation != 0xFFFFFFFF)
-	{
-		glUniform1i(textureTransparentLocation, false);
-	}
 	return drawnGeometries;
 }
 
-bool Scene::drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappingEnabledLocation, const ViewFrustum* frustum)
+bool Scene::drawGeometry(Shader* shader, Geometry* geometry, GLint normalMappingEnabledLocation, const ViewFrustum* frustum)
 {
 	if (frustum && !geometry->isVisible(*frustum))
 	{
 		return false;
 	}
-	if (normalMappingEnabledLocation != 0xFFFFFFFF)
+	if (normalMappingEnabledLocation >= 0)
 	{
 		glUniform1i(normalMappingEnabledLocation, normalMappingEnabled && geometry->getHasNormalMap());
 	}
@@ -374,39 +422,6 @@ bool Scene::drawGeometry(Shader* shader, Geometry* geometry, GLuint normalMappin
 void Scene::setViewportSize(int width, int height)
 {
 	camera->setViewportSize(width, height);
-}
-
-void Scene::setTransparencyEnabled(bool transparency)
-{
-	this->transparencyEnabled = transparency;
-}
-
-void Scene::setNormalMappingEnabled(bool normalMappingEnabled)
-{
-	this->normalMappingEnabled = normalMappingEnabled;
-}
-
-void Scene::setShadowMappingEnabled(bool shadowMappingEnabled)
-{
-	this->shadowMappingEnabled = shadowMappingEnabled;
-}
-
-
-bool Scene::isTransparencyEnabled()
-{
-	return transparencyEnabled;
-}
-
-
-bool Scene::isShadowMappingEnabled()
-{
-	return shadowMappingEnabled;
-}
-
-
-bool Scene::isNormalMappingEnabled()
-{
-	return normalMappingEnabled;
 }
 
 void Scene::setViewFrustumCullingEnabled(bool viewFrustumCullingEnabled)
@@ -429,7 +444,6 @@ bool Scene::isGameWon()
 	return gameWon;
 }
 
-
 int Scene::getDrawnGeometryCount()
 {
 	return drawnGeometryCount;
@@ -450,15 +464,11 @@ int Scene::getCheckpointCount()
 	return static_cast<int>(rules::CHECKPOINT_COUNT);
 }
 
-
 void Scene::initPhysicsBodies()
 {
-	//Create bodies
-	//1) Create ground plane (a large box whose top face is at y = -5)
+	//Ground under the sea (a large box whose top face is at y = -5): the bear lands on it when it falls into the sea
 	physicsWorld->createStaticBox(vec3(0.0f, -6.0f, 0.0f), vec3(1000.0f, 1.0f, 1000.0f));
 
-
-	//2) Create cube
 	vec3 boxPosition = bear->getPosition() - vec3(0.0f, -10.0f, 5.0f);
 	physics::BodyHandle box = physicsWorld->createDynamicBox(boxPosition, vec3(0.4f), 1.0f);
 	debugCube->setPhysicsBody(physicsWorld, box);
@@ -466,28 +476,17 @@ void Scene::initPhysicsBodies()
 
 	//There is no wall at the start: the finish line is a trigger (see initFinishLine) and the checkpoints keep the bear from going backwards
 
-	Geometry* geomBox2 = geometries[17].get();
-	physics::BodyHandle box2 = physicsWorld->createDynamicBox(geomBox2->getPosition(), vec3(0.8f), 1.0f);
-	geomBox2->setPhysicsBody(physicsWorld, box2);
-	dynamicBodies.emplace_back(box2, geomBox2->getPosition());
+	physics::BodyHandle box2 = physicsWorld->createDynamicBox(crate->getPosition(), vec3(0.8f), 1.0f);
+	crate->setPhysicsBody(physicsWorld, box2);
+	dynamicBodies.emplace_back(box2, crate->getPosition());
 
-	for (int i = 3; i <= 14; i++)
+	for (Geometry* rock : rocks)
 	{
-		Geometry* geomRock = geometries[i].get();
-		physics::BodyHandle rock = physicsWorld->createStaticSphere(geomRock->getPosition(), 0.7f);
-		geomRock->setPhysicsBody(physicsWorld, rock);
-		bodiesRock.push_back(rock);
+		physics::BodyHandle body = physicsWorld->createStaticSphere(rock->getPosition(), 0.7f);
+		rock->setPhysicsBody(physicsWorld, body);
+		bodiesRock.push_back(body);
 	}
-
-
-
-	//The terrain is a static triangle mesh, placed like the rendered terrain
-	Mesh* worldMesh = world->getModel()->meshes[0];
-	MeshTransform worldTransform = terrainTransform(world->modelMatrix);
-	physicsWorld->createStaticMesh(worldMesh->vertices, worldMesh->numVertices, worldMesh->indices, worldMesh->numFaces,
-		worldTransform.scale, worldTransform.position, worldTransform.rotation);
-
-	physicsWorld->optimizeBroadPhase();
+	//The terrain and the trees are added by the world (streamed around the bear)
 }
 
 void Scene::initFinishLine(Geometry* board)
@@ -498,7 +497,7 @@ void Scene::initFinishLine(Geometry* board)
 	{
 		halfLength = std::max(halfLength, std::abs(boardMesh->vertices[i * 3]));
 	}
-	finishLine = rules::finishLine(board->modelMatrix, halfLength);
+	finishLineTrigger = rules::finishLine(board->modelMatrix, halfLength);
 }
 
 void Scene::initAnimatedTextures()
@@ -508,23 +507,6 @@ void Scene::initAnimatedTextures()
 	{
 		monitorVideo.push_back(Texture::createNoise(128, i + 1, 0));
 	}
-
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water01.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water02.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water03.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water04.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water05.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water06.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water07.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water08.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water09.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water10.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water11.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water12.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water13.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water14.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water15.png", 0, true));
-	waterVideo.push_back(make_unique<Texture>("Texture/video/water/Water16.png", 0, true));
 }
 
 /**

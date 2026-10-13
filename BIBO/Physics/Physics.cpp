@@ -20,6 +20,7 @@
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
 #include <Jolt/Physics/Constraints/HingeConstraint.h>
 #include <Jolt/Physics/Constraints/SwingTwistConstraint.h>
 #include <Jolt/Physics/Ragdoll/Ragdoll.h>
@@ -218,8 +219,8 @@ PhysicsWorld::PhysicsWorld()
 
 	impl = std::make_unique<Impl>();
 
-	//The scene only contains a few dozen bodies
-	const JPH::uint maxBodies = 1024;
+	//The scene has a few dozen bodies, the streamed parts of the world (terrain, trees) a few hundred more
+	const JPH::uint maxBodies = 16384;
 	const JPH::uint numBodyMutexes = 0; //0 = default
 	const JPH::uint maxBodyPairs = 1024;
 	const JPH::uint maxContactConstraints = 1024;
@@ -293,6 +294,118 @@ BodyHandle PhysicsWorld::createStaticMesh(const float* vertices, unsigned int nu
 	JPH::MeshShapeSettings mesh(std::move(vertexList), std::move(triangles));
 	mesh.SetEmbedded();
 	return impl->addBody(mesh, position, rotation, JPH::EMotionType::Static);
+}
+
+struct CollisionShape::Impl
+{
+	JPH::ShapeRefC shape;
+};
+
+CollisionShape::CollisionShape() : impl(std::make_unique<Impl>())
+{
+}
+
+CollisionShape::~CollisionShape() = default;
+
+bool CollisionShape::isValid() const
+{
+	return impl->shape != nullptr;
+}
+
+std::shared_ptr<CollisionShape> PhysicsWorld::buildMeshShape(const std::vector<glm::vec3>& vertices, const std::vector<std::uint32_t>& indices)
+{
+	if (indices.size() < 3)
+	{
+		return nullptr;
+	}
+	JPH::VertexList vertexList;
+	vertexList.reserve(vertices.size());
+	for (const glm::vec3& vertex : vertices)
+	{
+		vertexList.push_back(JPH::Float3(vertex.x, vertex.y, vertex.z));
+	}
+	JPH::IndexedTriangleList triangles;
+	triangles.reserve(indices.size() / 3);
+	for (std::size_t i = 0; i + 2 < indices.size(); i += 3)
+	{
+		triangles.push_back(JPH::IndexedTriangle(indices[i], indices[i + 1], indices[i + 2], 0));
+	}
+	JPH::MeshShapeSettings settings(std::move(vertexList), std::move(triangles));
+	settings.SetEmbedded();
+	JPH::ShapeSettings::ShapeResult result = settings.Create();
+	if (result.HasError())
+	{
+		return nullptr; //e.g. only degenerate triangles
+	}
+	auto shape = std::make_shared<CollisionShape>();
+	shape->impl->shape = result.Get();
+	return shape;
+}
+
+std::shared_ptr<CollisionShape> PhysicsWorld::buildCompoundShape(const std::vector<ShapePart>& parts)
+{
+	if (parts.empty())
+	{
+		return nullptr;
+	}
+	JPH::StaticCompoundShapeSettings compound;
+	compound.SetEmbedded();
+	for (const ShapePart& part : parts)
+	{
+		JPH::Ref<JPH::ShapeSettings> settings;
+		if (part.type == ShapePart::CAPSULE && part.halfHeight > 0.0f)
+		{
+			settings = new JPH::CapsuleShapeSettings(part.halfHeight, part.radius);
+		}
+		else
+		{
+			settings = new JPH::SphereShapeSettings(part.radius);
+		}
+		compound.AddShape(toJolt(part.position), toJolt(part.rotation), settings);
+	}
+	JPH::ShapeSettings::ShapeResult result = compound.Create();
+	if (result.HasError())
+	{
+		return nullptr;
+	}
+	auto shape = std::make_shared<CollisionShape>();
+	shape->impl->shape = result.Get();
+	return shape;
+}
+
+BodyHandle PhysicsWorld::addStaticBody(const CollisionShape& shape)
+{
+	if (!shape.isValid())
+	{
+		return INVALID_BODY;
+	}
+	JPH::BodyCreationSettings bodySettings(shape.impl->shape, JPH::RVec3::sZero(), JPH::Quat::sIdentity(), JPH::EMotionType::Static, Layers::NON_MOVING);
+	bodySettings.mFriction = 0.5f;
+	bodySettings.mRestitution = 0.5f;
+	JPH::BodyID body = impl->system.GetBodyInterface().CreateAndAddBody(bodySettings, JPH::EActivation::DontActivate);
+	if (body.IsInvalid())
+	{
+		std::cerr << "ERROR: Could not create physics body (too many bodies?)" << std::endl;
+		return INVALID_BODY;
+	}
+	return body.GetIndexAndSequenceNumber();
+}
+
+void PhysicsWorld::removeBody(BodyHandle body)
+{
+	if (body == INVALID_BODY)
+	{
+		return;
+	}
+	JPH::BodyInterface& bodyInterface = impl->system.GetBodyInterface();
+	JPH::BodyID bodyID(body);
+	bodyInterface.RemoveBody(bodyID);
+	bodyInterface.DestroyBody(bodyID);
+}
+
+std::size_t PhysicsWorld::getBodyCount() const
+{
+	return impl->system.GetNumBodies();
 }
 
 void PhysicsWorld::optimizeBroadPhase()

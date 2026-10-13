@@ -226,6 +226,12 @@ void Camera::setTarget(vec3 target)
 	setDirection(target - position);
 }
 
+void Camera::setView(vec3 eye, vec3 targetPosition)
+{
+	position = eye;
+	setDirection(targetPosition - eye);
+}
+
 void Camera::setTarget(vec3 targetPosition, vec3 targetDirection)
 {
 	vec3 targetDistance = normalize(targetDirection) * (-3.0f) - vec3(0.0f, -2.5f, 0.0f);
@@ -255,7 +261,7 @@ ViewFrustum Camera::getViewFrustum()
 	return frustum;
 }
 
-float Camera::getAspectRatio()
+float Camera::getAspectRatio() const
 {
 	return static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
 }

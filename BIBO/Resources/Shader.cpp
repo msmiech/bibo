@@ -60,32 +60,72 @@ GLint Shader::getAttribLocation(const char* strAttrib)
 	return loc;
 }
 
+namespace
+{
+	string readIncluding(const string& path, int depth, string& error)
+	{
+		ifstream file(path);
+		if (!file)
+		{
+			error = "Shader file could not be found or does not exist: " + path;
+			return "";
+		}
+		if (depth > 8)
+		{
+			error = "Shader files include each other: " + path;
+			return "";
+		}
+		string folder;
+		size_t slash = path.find_last_of("/\\");
+		if (slash != string::npos)
+		{
+			folder = path.substr(0, slash + 1);
+		}
+		string code, line;
+		while (getline(file, line))
+		{
+			size_t start = line.find_first_not_of(" \t");
+			if (start != string::npos && line.compare(start, 8, "#include") == 0)
+			{
+				size_t open = line.find('"', start), close = line.find('"', open + 1);
+				if (open == string::npos || close == string::npos)
+				{
+					error = "Invalid #include in " + path + ": " + line;
+					return "";
+				}
+				string included = readIncluding(folder + line.substr(open + 1, close - open - 1), depth + 1, error);
+				if (!error.empty())
+				{
+					return "";
+				}
+				code += included + "\n";
+			}
+			else
+			{
+				code += line + "\n";
+			}
+		}
+		return code;
+	}
+}
+
+string Shader::preprocess(const string& path, string& error)
+{
+	error.clear();
+	return readIncluding(path, 0, error);
+}
+
 void Shader::loadShader(const string& shader,
 	GLenum shaderType,
 	GLuint& handle)
 {
-	ifstream shaderFile(shader); //inputFileStream
-	if (!shaderFile) {
-		cerr << "Shader file could not be found or does not exist: " << shader << endl;
+	string error;
+	string code = preprocess(shader, error);
+	if (!error.empty()) {
+		cerr << error << endl;
 		util::pause();
 		exit(EXIT_FAILURE);
 	}
-
-	if (!shaderFile.is_open()) {
-		cerr << "Could not open file (maybe unauthorized): " << shader << endl;
-		util::pause();
-		exit(EXIT_FAILURE);
-	}
-	if (!shaderFile.good()) {
-		cerr << "Failed to parse shader file (bad/damaged): " << shader << endl;
-		util::pause();
-		exit(EXIT_FAILURE);
-	}
-
-	auto code = string(istreambuf_iterator<char>(shaderFile),
-		istreambuf_iterator<char>());
-
-	shaderFile.close();
 
 	handle = glCreateShader(shaderType);
 	if (handle == 0)
@@ -108,7 +148,7 @@ void Shader::loadShader(const string& shader,
 		auto msg = make_unique<char[]>(logSize);
 		glGetShaderInfoLog(handle, logSize, nullptr, msg.get());
 
-		cerr << "Failed to compile shader" << endl << msg.get() << endl;
+		cerr << "Failed to compile shader " << shader << endl << msg.get() << endl;
 
 		util::pause();
 

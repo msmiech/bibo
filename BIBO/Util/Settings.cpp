@@ -94,6 +94,7 @@ bool Settings::load(const string& path)
 	read(values, "bilinear_filtering", bilinearFiltering);
 	read(values, "mipmapping", mipmapping, 0, 2);
 	read(values, "wireframe", wireframe);
+	read(values, "world_detail", worldDetail, 0, 2);
 
 	read(values, "camera_sensitivity", cameraSensitivity, 1, 10);
 	read(values, "invert_camera_y", invertCameraY);
@@ -112,7 +113,7 @@ bool Settings::save(const string& path) const
 	}
 
 	file << "# BIBO settings, written by the game when the settings menu is closed" << endl
-		<< "# window_mode: windowed, fullscreen or borderless; mipmapping: 0 = off, 1 = nearest neighbor, 2 = linear" << endl
+		<< "# window_mode: windowed, fullscreen or borderless; mipmapping: 0 = off, 1 = nearest neighbor, 2 = linear; world_detail: 0 = low, 1 = medium, 2 = high" << endl
 		<< "window_mode = " << windowModeNames[windowMode >= WINDOWED && windowMode <= BORDERLESS ? windowMode : WINDOWED] << endl
 		<< "width = " << width << endl
 		<< "height = " << height << endl
@@ -125,6 +126,7 @@ bool Settings::save(const string& path) const
 		<< "bilinear_filtering = " << toString(bilinearFiltering) << endl
 		<< "mipmapping = " << mipmapping << endl
 		<< "wireframe = " << toString(wireframe) << endl
+		<< "world_detail = " << worldDetail << endl
 		<< "camera_sensitivity = " << cameraSensitivity << endl
 		<< "invert_camera_y = " << toString(invertCameraY) << endl
 		<< "show_frame_time = " << toString(showFrameTime) << endl

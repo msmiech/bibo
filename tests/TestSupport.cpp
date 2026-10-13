@@ -17,6 +17,8 @@
 #include "Resources/Model.hpp"
 #include "Resources/SkinnedModel.hpp"
 #include "Util/Util.hpp"
+#include "World/TrackTerrain.hpp"
+#include "World/WorldGenerator.hpp"
 
 namespace bibo::test
 {
@@ -42,10 +44,24 @@ namespace bibo::test
 			{ "Shader/main_shader.vert", "Shader/main_shader.frag" },
 			{ "Shader/text_shader.vert", "Shader/text_shader.frag" },
 			{ "Shader/light_source_shader.vert", "Shader/light_source_shader.frag" },
-			{ "Shader/gaussian_blur_shader.vert", "Shader/gaussian_blur_shader.frag" },
-			{ "Shader/post_processing_shader.vert", "Shader/post_processing_shader.frag" },
 			{ "Shader/bear_skin.vert", "Shader/bear_skin.frag" },
-			{ "Shader/bear_fur.vert", "Shader/bear_fur.frag" } };
+			{ "Shader/bear_fur.vert", "Shader/bear_fur.frag" },
+			//The world (BIBO/World)
+			{ "Shader/fullscreen.vert", "Shader/material_generator.frag" },
+			{ "Shader/fullscreen.vert", "Shader/material_normals.frag" },
+			{ "Shader/fullscreen.vert", "Shader/sky_environment.frag" },
+			{ "Shader/sky.vert", "Shader/sky.frag" },
+			{ "Shader/terrain.vert", "Shader/terrain.frag" },
+			{ "Shader/vegetation.vert", "Shader/vegetation.frag" },
+			{ "Shader/vegetation_depth.vert", "Shader/depth_shader.frag" },
+			{ "Shader/water.vert", "Shader/water.frag" },
+			{ "Shader/snow.vert", "Shader/snow.frag" },
+			//Post processing (BIBO/Render/Renderer.cpp)
+			{ "Shader/fullscreen.vert", "Shader/bright_pass.frag" },
+			{ "Shader/fullscreen.vert", "Shader/gaussian_blur_shader.frag" },
+			{ "Shader/fullscreen.vert", "Shader/luminance.frag" },
+			{ "Shader/fullscreen.vert", "Shader/exposure.frag" },
+			{ "Shader/fullscreen.vert", "Shader/post_processing_shader.frag" } };
 		return programs;
 	}
 
@@ -87,6 +103,38 @@ namespace bibo::test
 			FAIL("Could not load " << BEAR_FILE << ": " << error);
 		}
 		return *model;
+	}
+
+	const world::WorldGenerator& worldGenerator()
+	{
+		static std::unique_ptr<world::WorldGenerator> generator = [] {
+			std::vector<glm::vec3> vertices;
+			std::vector<unsigned int> indices;
+			REQUIRE(world::TrackTerrain::loadNodeMesh(trackScene(), "Boden", vertices, indices));
+			world::WorldGenerator::Description description;
+			description.track = std::make_unique<world::TrackTerrain>(vertices, indices);
+			glm::vec3 start = glm::vec3(nodeModelMatrix(trackNode("BearBody"))[3]);
+			description.start = glm::vec2(start.x, start.z);
+			description.startDirection = glm::vec2(0.0f, -1.0f);
+			description.checkpoints.assign(std::begin(scene::rules::CHECKPOINTS), std::end(scene::rules::CHECKPOINTS));
+			glm::vec3 water;
+			float waterRadius;
+			REQUIRE(world::TrackTerrain::nodeSphere(trackScene(), "Water", water, waterRadius));
+			description.seaLevel = water.y;
+			std::vector<std::string> keep = { "FinishLine", "Cube", "Monitor1", "Torus", "Pfeil0", "Pfeil1", "Pfeil2", "Pfeil3" };
+			for (int i = 1; i <= 12; ++i)
+			{
+				keep.push_back("Rock" + std::to_string(i));
+			}
+			for (const std::string& name : keep)
+			{
+				world::KeepClear object;
+				REQUIRE(world::TrackTerrain::nodeSphere(trackScene(), name.c_str(), object.center, object.radius));
+				description.keepClear.push_back(object);
+			}
+			return std::make_unique<world::WorldGenerator>(std::move(description));
+		}();
+		return *generator;
 	}
 
 	aiNode& trackNode(const std::string& name)

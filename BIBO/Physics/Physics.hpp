@@ -29,12 +29,55 @@ namespace bibo
 		};
 
 		/**
+		* Collision shape of a static body, built before the body is added to the world (e.g. by a worker thread while the
+		* world is streamed in). The vertices of the shapes are in world space, the body is placed at the origin.
+		*/
+		class CollisionShape
+		{
+		public:
+			CollisionShape();
+			~CollisionShape();
+			CollisionShape(const CollisionShape&) = delete;
+			CollisionShape& operator=(const CollisionShape&) = delete;
+			bool isValid() const;
+		private:
+			friend class PhysicsWorld;
+			struct Impl;
+			std::unique_ptr<Impl> impl;
+		};
+
+		/**
+		* A capsule or sphere of a compound collision shape (e.g. the trunks of the trees in a part of the world)
+		*/
+		struct ShapePart
+		{
+			enum Type { CAPSULE, SPHERE };
+			Type type = SPHERE;
+			glm::vec3 position = glm::vec3(0.0f); //center
+			glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); //the capsule goes along the y axis
+			float halfHeight = 0.0f; //capsule: half the length of its cylinder
+			float radius = 0.5f;
+		};
+
+		/**
 		* Physics simulation based on Jolt Physics (https://github.com/jrouwe/JoltPhysics).
 		* Replaces PxFoundation, PxPhysics, PxCooking and PxScene of the former Nvidia PhysX 3.3 implementation.
 		*/
 		class PhysicsWorld
 		{
 		public:
+			/**
+			* Triangle mesh for a static body (thread safe, but a PhysicsWorld must exist)
+			* @param indices 3 per triangle
+			* @return nullptr if the mesh has no triangles
+			*/
+			static std::shared_ptr<CollisionShape> buildMeshShape(const std::vector<glm::vec3>& vertices, const std::vector<std::uint32_t>& indices);
+			/**
+			* Capsules and spheres as one shape for a static body (thread safe, but a PhysicsWorld must exist)
+			* @return nullptr if there are no parts
+			*/
+			static std::shared_ptr<CollisionShape> buildCompoundShape(const std::vector<ShapePart>& parts);
+
 			PhysicsWorld();
 			~PhysicsWorld();
 			PhysicsWorld(const PhysicsWorld&) = delete;
@@ -52,6 +95,18 @@ namespace bibo
 			*/
 			BodyHandle createStaticMesh(const float* vertices, unsigned int numVertices, const unsigned int* indices, unsigned int numTriangles,
 				float scale, glm::vec3 position, glm::quat rotation);
+			/**
+			* Adds a static body with a shape built before (at the origin, the shape is in world space)
+			*/
+			BodyHandle addStaticBody(const CollisionShape& shape);
+			/**
+			* Removes the body from the world and deletes it
+			*/
+			void removeBody(BodyHandle body);
+			/**
+			* @return Number of bodies in the world
+			*/
+			std::size_t getBodyCount() const;
 			/**
 			* Should be called once after all static bodies were added (speeds up collision detection)
 			*/

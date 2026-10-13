@@ -83,34 +83,60 @@ TEST_CASE("The bear waits at the start of the race without losing", "[gl][scene]
 
 	SECTION("A frame is rendered without OpenGL errors")
 	{
-		Shader depthShader("Shader/depth_shader.vert", "Shader/depth_shader.frag");
-		Shader lightShader("Shader/light_source_shader.vert", "Shader/light_source_shader.frag");
-
-		//The passes of Main.cpp draw
-		depthShader.enable();
-		scene.renderFromLightSource(&depthShader);
-		mainShader.enable();
-		scene.renderFromCamera(&mainShader);
-		lightShader.enable();
-		scene.renderLightSourcesOnly(&lightShader);
-
+		//Like Main.cpp draw: shadow maps, the scene in HDR, bloom, exposure and tone mapping into the framebuffer
+		bibo::render::Renderer renderer(800, 600);
+		Framebuffer framebuffer(800, 600);
+		framebuffer.clear();
+		renderer.render(scene, bibo::render::RenderSettings(), 1.0f / 60.0f);
 		CHECK_THAT(gl.errors(), Catch::Matchers::IsEmpty());
+
+		//A bright day: the image is neither black nor white
+		std::vector<unsigned char> pixels = framebuffer.pixels();
+		double sum = 0.0;
+		for (std::size_t i = 0; i < pixels.size(); i += 4)
+		{
+			sum += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3.0;
+		}
+		double average = sum / static_cast<double>(pixels.size() / 4);
+		CAPTURE(average);
+		CHECK(average > 40.0);
+		CHECK(average < 230.0);
 	}
 
 	SECTION("Graphics options can be switched off")
 	{
-		scene.setShadowMappingEnabled(false);
-		scene.setNormalMappingEnabled(false);
-		scene.setTransparencyEnabled(false);
+		bibo::render::RenderSettings settings;
+		settings.hdr = false;
+		settings.bloom = false;
+		settings.shadows = false;
+		settings.normalMapping = false;
+		settings.transparency = false;
 		scene.setViewFrustumCullingEnabled(false);
-		CHECK_FALSE(scene.isShadowMappingEnabled());
-		CHECK_FALSE(scene.isNormalMappingEnabled());
-		CHECK_FALSE(scene.isTransparencyEnabled());
 		CHECK_FALSE(scene.isViewFrustumCullingEnabled());
-
-		mainShader.enable();
-		scene.renderFromCamera(&mainShader);
+		bibo::render::Renderer renderer(800, 600);
+		Framebuffer framebuffer(800, 600);
+		renderer.render(scene, settings, 1.0f / 60.0f);
+		settings.wireframe = true;
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		renderer.render(scene, settings, 1.0f / 60.0f);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		CHECK_THAT(gl.errors(), Catch::Matchers::IsEmpty());
+		//Without culling the whole world is drawn
+		bibo::world::World::Statistics statistics = scene.getWorld().getStatistics();
+		CHECK(statistics.drawnChunks == statistics.meshes);
+	}
+
+	SECTION("The world is only drawn where the camera looks")
+	{
+		bibo::render::Renderer renderer(800, 600);
+		Framebuffer framebuffer(800, 600);
+		renderer.render(scene, bibo::render::RenderSettings(), 1.0f / 60.0f);
+		bibo::world::World::Statistics statistics = scene.getWorld().getStatistics();
+		CAPTURE(statistics.drawnChunks, statistics.meshes, statistics.drawnInstances, statistics.instances);
+		CHECK(statistics.drawnChunks > 0);
+		CHECK(statistics.drawnChunks < statistics.meshes);
+		CHECK(statistics.drawnInstances > 0);
+		CHECK(statistics.drawnInstances < static_cast<int>(statistics.instances));
 	}
 
 	SECTION("View frustum culling only skips geometries that would not cover any pixel")

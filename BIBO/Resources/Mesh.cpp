@@ -1,4 +1,7 @@
 ﻿#include "Mesh.hpp"
+#include <cmath>
+#include <map>
+#include <tuple>
 
 using namespace bibo;
 using namespace resources;
@@ -271,14 +274,21 @@ void Mesh::draw(Shader* shader) {
 	GLuint materialSpecularLocation = shader->getUniformLocation("material.specular");
 	GLuint materialShininessLocation = shader->getUniformLocation("material.shininess");
 
-	if (materialAmbientLocation != 0xFFFFFFFF &&
-		materialDiffuseLocation != 0xFFFFFFFF &&
-		materialSpecularLocation != 0xFFFFFFFF &&
-		materialShininessLocation != 0xFFFFFFFF)
+	//Each one only if the shader uses it (unused uniforms are removed by the compiler)
+	if (materialAmbientLocation != 0xFFFFFFFF)
 	{
 		glUniform3f(materialAmbientLocation, 0.01f, 0.01f, 0.01f);
+	}
+	if (materialDiffuseLocation != 0xFFFFFFFF)
+	{
 		glUniform3f(materialDiffuseLocation, material.diffuse.r, material.diffuse.g, material.diffuse.b);
+	}
+	if (materialSpecularLocation != 0xFFFFFFFF)
+	{
 		glUniform3f(materialSpecularLocation, material.specular.r, material.specular.g, material.specular.b);
+	}
+	if (materialShininessLocation != 0xFFFFFFFF)
+	{
 		glUniform1f(materialShininessLocation, material.shininess);
 	}
 
@@ -307,4 +317,35 @@ void Mesh::setTexture(Texture* texture)
 void Mesh::setMaterial(Material material)
 {
 	this->material = material;
+}
+
+void Mesh::smoothNormals()
+{
+	if (!vertices || !normals || !vbo[NORMAL_BUFFER])
+	{
+		return;
+	}
+	//Vertices at the same position (to a thousandth) get the same normal: the average of their normals
+	auto key = [this](unsigned int i) {
+		return std::make_tuple(std::lround(vertices[i * 3] * 1000.0f), std::lround(vertices[i * 3 + 1] * 1000.0f), std::lround(vertices[i * 3 + 2] * 1000.0f));
+	};
+	std::map<std::tuple<long, long, long>, glm::vec3> sums;
+	for (unsigned int i = 0; i < numVertices; ++i)
+	{
+		sums[key(i)] += glm::vec3(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
+	}
+	for (unsigned int i = 0; i < numVertices; ++i)
+	{
+		glm::vec3 sum = sums[key(i)];
+		if (glm::length(sum) > 1e-6f)
+		{
+			glm::vec3 normal = glm::normalize(sum);
+			normals[i * 3] = normal.x;
+			normals[i * 3 + 1] = normal.y;
+			normals[i * 3 + 2] = normal.z;
+		}
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[NORMAL_BUFFER]);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, 3 * numVertices * sizeof(GLfloat), normals);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }

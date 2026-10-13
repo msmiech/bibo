@@ -1,173 +1,71 @@
 #version 430 core
-/** This shader is based on 
-* http://learnopengl.com/#!Lighting/Materials
-* http://www.3dgep.com/texturing-and-lighting-with-opengl-and-glsl
-* http://www.ogldev.org/www/tutorial18/tutorial18.html
-* http://www.learnopengl.com/#!Advanced-Lighting/Shadows/Shadow-Mapping
-* http://learnopengl.com/#!Advanced-Lighting/Bloom
-*/ 
-in vec4 worldPosition;
-in vec4 worldNormal;
+/*
+* Physically based shading of the objects of the track (Geometry). The color comes from their texture (or, with
+* materialLayer >= 0, from a generated material projected in model space, e.g. the rock of the obstacles), the roughness
+* from the shininess of their material. Lit by the sun, the sky and the shadows like the rest of the world.
+*/
+#include "include/lighting.glsl"
+
+in vec3 worldPosition;
+in vec3 worldNormal;
+in vec3 modelPosition;
 in vec2 fragUV;
-in vec4 fragPosLightSpace;
 in vec3 tangent;
 in vec3 bitangent;
-uniform struct Material {
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-    float shininess;
-}
 
- material;
-uniform struct Light {
-    uint type;
-    //2 = point light, 1 = directional light (sun, etc.)
-    vec3 position;
-    //for point light (but not actually used by shadow mapping since we have a sun)
-	vec3 direction;
-    //for directional light
-    vec3 ambientColor;
-    vec3 diffuseColor;
-    vec3 specularColor;
-}
- light;
+uniform struct Material {
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+	float shininess;
+} material;
 uniform sampler2D colorTextureSampler;
-//shadow mapping
-uniform sampler2D shadowMap;
-//normal mapping
 uniform sampler2D normalMap;
-uniform vec3 worldEye;
-uniform bool shadowMappingEnabled;
 uniform bool normalMappingEnabled;
 uniform bool textureTransparent;
+//Layer of the generated materials (MaterialTextures.hpp), -1: the texture of the object
+uniform int materialLayer = -1;
+uniform float materialScale = 1.0;
+
+layout(binding = 3) uniform sampler2DArray materialAlbedo;
+layout(binding = 4) uniform sampler2DArray materialNormal;
 
 layout (location = 0) out vec4 fragColor;
-layout (location = 1) out vec4 brightColor;
-
-
-
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 N, vec3 L)
-{
-    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    //transform coordinates to range [0,1]
-	projCoords = projCoords * 0.5 + 0.5;
-    float closestDepth = texture(shadowMap, projCoords.xy).r;
-    float currentDepth = projCoords.z;
-    float bias = max(0.02 * (1.0 - dot(N, L)), 0.002);
-    float shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-	for(int x = -1; x <= 1; ++x)
-	{
-		for(int y = -1; y <= 1; ++y)
-		{
-			float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-			shadow += currentDepth - bias > pcfDepth  ? 1.0 : 0.0;
-		}
-	}
-    shadow /= 9.0;
-    // Keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
-    if(projCoords.z > 1.0){
-        shadow = 0.0;
-    }
-
-
-    return shadow;
-}
-
 
 void main()
 {
-	vec4 textureColor = texture(colorTextureSampler, fragUV);
-	if(textureTransparent) 
+	vec3 N = normalize(worldNormal);
+	vec3 albedo;
+	float roughness = clamp(sqrt(2.0 / (material.shininess + 2.0)), 0.25, 1.0);
+	float alpha = 1.0;
+	if (materialLayer >= 0)
 	{
-		textureColor.a = 0.5;
+		vec3 p = modelPosition * materialScale;
+		vec3 blend = pow(abs(normalize(worldNormal)), vec3(4.0));
+		blend /= blend.x + blend.y + blend.z;
+		float layer = float(materialLayer);
+		vec4 color = texture(materialAlbedo, vec3(p.zy, layer)) * blend.x + texture(materialAlbedo, vec3(p.xz, layer)) * blend.y
+			+ texture(materialAlbedo, vec3(p.xy, layer)) * blend.z;
+		albedo = color.rgb;
+		roughness = color.a;
 	}
-
-	bool blinn = true; //default true for better performance
-    //ambient term
-    vec3 ambient = light.ambientColor * material.ambient;
-    //diffuse term
-	vec3 L;
-    if(light.type == 2) 
-	{
-        //Point light
-		L = normalize(light.position - vec3(worldPosition));
-        //i.e. direction from vertex position in world space towards the light source position in world space
-	} 
-	else if(light.type == 1) 
-	{
-        //Directional light
-		L = normalize(-light.direction);
-    }
-
-
-	L = normalize(-light.direction);
-    vec3 N;
-    vec3 V;
-    N = vec3(normalize(worldNormal));
-    //normal mapping
-	if(normalMappingEnabled) 
-	{
-        // Obtain normal from normal map in range [0,1]
-		mat3 TBN = mat3(tangent, bitangent, N);
-        N = texture(normalMap, fragUV).rgb;
-        // Transform normal vector to range [-1,1]
-		N = normalize(N * 2.0 - 1.0);
-        N = normalize(TBN * N);
-	} 
-
-	V = normalize(worldEye - vec3(worldPosition));
-    float NdotL = dot(N, L);
-    vec3 diffuse;
-    if(NdotL <= 0) 
-	{
-        diffuse = vec3(0.0f);
-    }
-	else 
-	{
-        diffuse = light.diffuseColor * (NdotL * material.diffuse);
-    }
-
-
-
-	//specular term
-	vec3 R;
-    if(blinn) 
-	{
-        R = normalize(L + V);
-        //Halfway angle vector (approximation for better performance)
-	} else {
-        R = reflect(-L, N);
-    }
-
-
-	float VdotR = dot(V,R);
-    float spec = 0.0f;
-    if(VdotR > 0.0f) {
-        spec = pow(VdotR, material.shininess);
-    }
-
-
-    vec3 specular = light.specularColor * (spec * material.specular);
-
-	float shadow = 0.0;
-	if(shadowMappingEnabled)
-	{
-		shadow = ShadowCalculation(fragPosLightSpace, N, L);
-	}
-	vec4 lightResult = vec4((ambient + (1.0 - shadow) * (diffuse + specular)), 1.0) * textureColor;
-	fragColor = lightResult;
-
-    // Only bright fragments contribute to bloom (brightColor must always be written, otherwise its content is undefined)
-    float brightness = dot(lightResult.rgb, vec3(0.2126, 0.7152, 0.0722));
-    if(brightness > 1.0)
-	{
-        brightColor = fragColor;
-    }
 	else
 	{
-		brightColor = vec4(0.0, 0.0, 0.0, 1.0);
-    }
+		vec4 textureColor = texture(colorTextureSampler, fragUV);
+		//The image files are sRGB
+		albedo = pow(textureColor.rgb, vec3(2.2)) * clamp(material.diffuse * 1.25, 0.0, 1.0);
+		if (normalMappingEnabled)
+		{
+			vec3 mapped = normalize(texture(normalMap, fragUV).rgb * 2.0 - 1.0);
+			N = normalize(mat3(normalize(tangent), normalize(bitangent), N) * mapped);
+		}
+		if (textureTransparent)
+		{
+			alpha = 0.5;
+		}
+	}
+	Surface surface = defaultSurface(albedo, N);
+	surface.roughness = roughness;
+	vec3 color = shade(surface, worldPosition, sunShadow(worldPosition, normalize(worldNormal)));
+	fragColor = vec4(applyFog(color, worldPosition), alpha);
 }
-

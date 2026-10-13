@@ -52,6 +52,10 @@ namespace bibo
 			void setPhysicsBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle body);
 			Texture* normalMap;
 			bool hasNormalMap;
+			//Layer of the generated materials (world::MaterialTextures) instead of the texture, -1: the texture
+			int materialLayer = -1;
+			//How often the generated material repeats per unit of the model
+			float materialScale = 1.0f;
 			bool getHasNormalMap();
 		protected:
 			/**

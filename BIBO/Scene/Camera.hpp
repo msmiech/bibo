@@ -55,6 +55,10 @@ namespace bibo
 			vec3 getDirection() override { return direction; };
 
 			/**
+			* Puts the camera somewhere and looks at the target (e.g. for screenshots of the world)
+			*/
+			void setView(vec3 eye, vec3 targetPosition);
+			/**
 			* Looks at the target from where the camera is
 			*/
 			void setTarget(vec3 targetPosition);
@@ -112,6 +116,13 @@ namespace bibo
 			*/
 			ViewFrustum getViewFrustum();
 			/**
+			* Vertical field of view in degrees (it widens a bit at high speed)
+			*/
+			float getFieldOfView() const { return aperture; }
+			float getNearPlane() const { return zNear; }
+			float getFarPlane() const { return zFar; }
+			float getAspectRatio() const;
+			/**
 			* Size of the image in pixels, determines the aspect ratio of the projection
 			*/
 			void setViewportSize(int width, int height);
@@ -119,7 +130,6 @@ namespace bibo
 			bool isLocked();
 
 		private:
-			float getAspectRatio();
 			/**
 			* Points the camera along yaw and pitch
 			*/
@@ -141,8 +151,8 @@ namespace bibo
 			float pitch = 0.0f;
 			float speed = 3.0f; //unlocked
 			float aperture = 60.0f; //vertical field of view in degrees
-			float zNear = 0.1f;
-			float zFar = 200.0f;
+			float zNear = 0.15f;
+			float zFar = 1600.0f; //the island and the sea to the horizon
 
 			//Locked (third person)
 			vec3 pivot = vec3(0.0f);

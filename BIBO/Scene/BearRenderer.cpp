@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
-#include "Light.hpp"
 
 using namespace bibo;
 using namespace scene;
@@ -109,14 +108,7 @@ void BearRenderer::drawShaded(const BearRenderContext& context, glm::vec3 center
 		shader->enable();
 		setMatrix(shader, "view", context.view);
 		setMatrix(shader, "projection", context.projection);
-		setMatrix(shader, "lightSpaceMatrix", context.lightSpaceMatrix);
 		glUniform3fv(shader->getUniformLocation("worldEye"), 1, glm::value_ptr(context.eye));
-		glUniform1i(shader->getUniformLocation("shadowMap"), 1); //bound by the game (Main.cpp draw)
-		glUniform1i(shader->getUniformLocation("shadowMappingEnabled"), context.shadowMappingEnabled);
-		if (context.light)
-		{
-			context.light->loadUniforms(shader);
-		}
 	};
 
 	setCommonUniforms(skinShader.get());

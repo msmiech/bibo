@@ -59,6 +59,12 @@ void Geometry::draw(Shader* shader)
 	{
 		glUniformMatrix4fv(modelLocation, 1, GL_FALSE, value_ptr(modelMatrix));
 	}
+	GLint layerLocation = shader->getUniformLocation("materialLayer");
+	if (layerLocation >= 0)
+	{
+		glUniform1i(layerLocation, materialLayer);
+		glUniform1f(shader->getUniformLocation("materialScale"), materialScale);
+	}
 	if (hasNormalMap)
 	{
 		normalMap->bind();

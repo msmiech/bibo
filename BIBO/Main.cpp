@@ -51,9 +51,9 @@ void draw();
 void update(float time_delta);
 void gameLoop();
 void playDemoFrame(int frame);
-void renderQuad();
 void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale, vec3 color);
 void resizeScreenBuffers();
+render::RenderSettings renderSettings();
 void applyGraphicsSettings();
 bool pauseGame();
 void resumeGame();
@@ -98,22 +98,11 @@ unique_ptr<ui::Menu> menu;
 unique_ptr<input::Input> controls;
 
 unique_ptr<Shader> mainShader;
-unique_ptr<Shader> depthShader;
 unique_ptr<Shader> textShader;
-unique_ptr<Shader> lightShader;
-unique_ptr<Shader> blurShader;
-unique_ptr<Shader> postProcessingShader;
 
 unique_ptr<Scene> gameScene;
-
-GLuint shadowFBO; //Frame Buffer Object (FBO) for depth (from Light POV!)
-GLuint shadowDepthTexture;
-GLuint hdrFBO;
-GLuint colorBuffers[2];
-GLuint depthBloomRBO; //Render Buffer Object (RBO) for depth (from Camera POV!)
-GLuint blurFBO[2];
-GLuint blurColorbuffers[2];
-const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
+//Shadow maps, HDR image, bloom, auto exposure and tone mapping
+unique_ptr<render::Renderer> renderer;
 
 #ifdef _WIN32
 //Ask laptops with switchable graphics to run the game on the dedicated Nvidia/AMD GPU
@@ -133,9 +122,6 @@ struct Character {
 map<GLchar, Character> Characters;
 GLuint textVAO;
 GLuint textVBO;
-//Quad VAO/VBO for screen (space) drawing
-GLuint quadVAO = 0;
-GLuint quadVBO;
 string lastMessage = "";
 float messageTimeLeft = 0;
 
@@ -389,6 +375,10 @@ static void GLAPIENTRY DebugCallbackAMD(GLuint id, GLenum category, GLenum sever
 }
 
 static void GLAPIENTRY DebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const GLvoid* userParam) {
+	if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+	{
+		return; //e.g. where the driver keeps a buffer, for every chunk of the streamed world
+	}
 	string error = FormatDebugOutput(source, type, id, severity, message);
 	cout << error << endl;
 }
@@ -503,118 +493,19 @@ static string FormatDebugOutput(GLenum source, GLenum type, GLuint id, GLenum se
 void initShaders()
 {
 	cout << "Initializing shaders..." << endl;
-	//Depth/Shadow Shader (Pass 1)
-	cout << "Depth shader..." << endl;
-	depthShader = make_unique<Shader>("Shader/depth_shader.vert", "Shader/depth_shader.frag");
-	//Main Shader (Pass 2)
+	//Objects of the track (the world, the bear and the post processing have their own shaders)
 	cout << "Main shader..." << endl;
 	mainShader = make_unique<Shader>("Shader/main_shader.vert", "Shader/main_shader.frag");
-	//Text Shader
 	cout << "Text shader..." << endl;
 	textShader = make_unique<Shader>("Shader/text_shader.vert", "Shader/text_shader.frag");
-	//Light (source) Shader
-	cout << "Light source shader..." << endl;
-	lightShader = make_unique<Shader>("Shader/light_source_shader.vert", "Shader/light_source_shader.frag");
-	//Blur Shader
-	cout << "Blur shader..." << endl;
-	blurShader = make_unique<Shader>("Shader/gaussian_blur_shader.vert", "Shader/gaussian_blur_shader.frag");
-	//HDR/Bloom (post processing) Shader
-	cout << "Post processing shader..." << endl;
-	postProcessingShader = make_unique<Shader>("Shader/post_processing_shader.vert", "Shader/post_processing_shader.frag");
 
-
-	//Preparing shaders
-	//Final Shader - based on http://learnopengl.com/#!Advanced-Lighting/Bloom
-	postProcessingShader->enable();
-	glUniform1i(postProcessingShader->getUniformLocation("sceneTex"), 0);
-	glUniform1i(postProcessingShader->getUniformLocation("bloomTex"), 1);
-
-	glGenFramebuffers(1, &hdrFBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-
-	glGenTextures(2, colorBuffers);
-	for (GLuint i = 0; i < 2; i++)
-	{
-		glBindTexture(GL_TEXTURE_2D, colorBuffers[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, windowWidth, windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, colorBuffers[i], 0);
-	}
-
-	// - Create and attach depth buffer (renderbuffer)
-	glGenRenderbuffers(1, &depthBloomRBO);
-	glBindRenderbuffer(GL_RENDERBUFFER, depthBloomRBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, windowWidth, windowHeight);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBloomRBO);
-
-	// Attach draw buffers for rendering so OpenGL nows which to draw to
-	GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-	glDrawBuffers(2, attachments);
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		cout << "Framebuffer not complete!" << endl;
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	// Ping pong framebuffer for blurring
-	glGenFramebuffers(2, blurFBO);
-	glGenTextures(2, blurColorbuffers);
-	for (GLuint i = 0; i < 2; ++i)
-	{
-		glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[i]);
-		glBindTexture(GL_TEXTURE_2D, blurColorbuffers[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, windowWidth, windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // We clamp to the edge as the blur filter would otherwise sample repeated texture values!
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blurColorbuffers[i], 0);
-		// Also check if framebuffers are complete (no need for depth buffer)
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-			cout << "Framebuffer not complete!" << endl;
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-
-	//Main Shader
 	mainShader->enable();
-	glUniform1i(mainShader->getUniformLocation("colorTextureSampler"), 0);
-	glUniform1i(mainShader->getUniformLocation("shadowMap"), 1);
-	glUniform1i(mainShader->getUniformLocation("normalMap"), 2);
+	glUniform1i(mainShader->getUniformLocation("colorTextureSampler"), render::TextureUnit::COLOR);
+	glUniform1i(mainShader->getUniformLocation("normalMap"), render::TextureUnit::NORMAL_MAP);
 
-
-	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-
-	//Generating depth map fbo
-	glGenFramebuffers(1, &shadowFBO);
-
-	//Generating depth map
-	glGenTextures(1, &shadowDepthTexture);
-	glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-	//Attaching to shadowFBO (only depth)
-	glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowDepthTexture, 0);
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
-
-	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-
-	if (status != GL_FRAMEBUFFER_COMPLETE) {
-		printf("Framebuffer error, status: 0x%x\n", status);
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	cout << "Renderer (shadow maps, HDR, bloom)..." << endl;
+	renderer = make_unique<render::Renderer>(windowWidth, windowHeight);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 void init(GLFWwindow* window) {
@@ -657,9 +548,7 @@ void applyGraphicsSettings()
 	glPolygonMode(GL_FRONT_AND_BACK, settings.wireframe ? GL_LINE : GL_FILL);
 	texSettings::bilinear = settings.bilinearFiltering;
 	texSettings::mipMappingQuality = settings.mipmapping;
-	gameScene->setNormalMappingEnabled(settings.normalMapping);
-	gameScene->setShadowMappingEnabled(settings.shadows);
-	gameScene->setTransparencyEnabled(settings.transparency);
+	gameScene->getWorld().setDetail(settings.worldDetail);
 }
 
 void onMenuAction(ui::MenuAction action)
@@ -773,20 +662,10 @@ void updateTextProjection()
 	glUniformMatrix4fv(textShader->getUniformLocation("projection"), 1, GL_FALSE, value_ptr(textProjectionMatrix));
 }
 
-//The render targets of the HDR and bloom passes have the size of the window, so they are reallocated when it changes
+//The render targets of the renderer have the size of the window, so they are reallocated when it changes
 void resizeScreenBuffers()
 {
-	for (GLuint i = 0; i < 2; i++)
-	{
-		glBindTexture(GL_TEXTURE_2D, colorBuffers[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, windowWidth, windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
-		glBindTexture(GL_TEXTURE_2D, blurColorbuffers[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, windowWidth, windowHeight, 0, GL_RGB, GL_FLOAT, nullptr);
-	}
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindRenderbuffer(GL_RENDERBUFFER, depthBloomRBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, windowWidth, windowHeight);
-	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	renderer->resize(windowWidth, windowHeight);
 	updateTextProjection();
 }
 
@@ -1025,115 +904,27 @@ void joystickCallback(int joystick, int event)
 	}
 }
 
-void draw() {
-	////Shadow Mapping Pass 1 (Preparation)///
-	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-	depthShader->enable();
-	//Drawing entire scene in depthShader
-	glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-
-	glClear(GL_DEPTH_BUFFER_BIT);
-	gameScene->renderFromLightSource(depthShader.get());
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	//The bloom of bright fragments is only added to the scene by the HDR tone mapping (and not in wireframe mode)
-	bool bloom = settings.hdr && settings.bloom && !settings.wireframe;
-
-	////Pass 2 - Main Scene///
-	if (!settings.wireframe)
-	{
-		// 1. Render scene into floating point framebuffer
-		glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-	}
-	glViewport(0, 0, windowWidth, windowHeight);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	//Rendering light sources (opaque, before the scene with its transparent water)
-	lightShader->enable();
-	gameScene->renderLightSourcesOnly(lightShader.get());
-
-	//drawing entire scene in main shader
-	mainShader->enable();
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
-	gameScene->renderFromCamera(mainShader.get());
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTexture(GL_TEXTURE0);
-	if (!bloom)
-	{
-		textRendering();
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	if (!settings.wireframe)
-	{
-		bool bloomBlurHorizontal = true;
-		if (bloom)
-		{
-			// Horizontal/Vertical gaussian blur
-			bool firstPass = true;
-			int gaussPasses = 10; //2 passes: horizontal and vertical (5 horizontal iterations, 5 vertical)
-			blurShader->enable();
-			for (int i = 0; i < gaussPasses; ++i)
-			{
-				glBindFramebuffer(GL_FRAMEBUFFER, blurFBO[bloomBlurHorizontal]);
-				glUniform1i(blurShader->getUniformLocation("horizontal"), bloomBlurHorizontal);
-				glBindTexture(GL_TEXTURE_2D, firstPass ? colorBuffers[1] : blurColorbuffers[!bloomBlurHorizontal]);  // Bind result of previous framebuffer as texture
-				renderQuad();
-				bloomBlurHorizontal = !bloomBlurHorizontal;
-				if (firstPass)
-				{
-					firstPass = false;
-				}
-			}
-			//The text is added to the scene with the bloom (and therefore not blurred)
-			textRendering();
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		}
-
-		// Rendering colorBuffer to simple quad to get drawing across entire screen and mapping HDR tones
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		postProcessingShader->enable();
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, blurColorbuffers[!bloomBlurHorizontal]);
-		glUniform1i(postProcessingShader->getUniformLocation("hdrEnabled"), settings.hdr);
-		glUniform1i(postProcessingShader->getUniformLocation("bloomEnabled"), bloom);
-		renderQuad();
-	}
-
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
+render::RenderSettings renderSettings()
+{
+	render::RenderSettings result;
+	result.hdr = settings.hdr;
+	result.bloom = settings.bloom;
+	result.shadows = settings.shadows;
+	result.normalMapping = settings.normalMapping;
+	result.transparency = settings.transparency;
+	result.wireframe = settings.wireframe;
+	return result;
 }
 
-// Based on: http://learnopengl.com/#!Advanced-Lighting/Shadows/Shadow-Mapping
-void renderQuad()
-{
-	if (quadVAO == 0)
-	{
-		GLfloat quadVertices[] = {
-			// Positions        // Texture Coords
-			-1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-			-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-			1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-			1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-		};
-		// Setup plane VAO
-		glGenVertexArrays(1, &quadVAO);
-		glGenBuffers(1, &quadVBO);
-		glBindVertexArray(quadVAO);
-		glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-	}
-	glBindVertexArray(quadVAO);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	glBindVertexArray(0);
+void draw() {
+	//Shadow maps, the scene in HDR, bloom, exposure and tone mapping (render::Renderer)
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	renderer->render(*gameScene, renderSettings(), time_delta);
+	//The HUD on top of the final image
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	textRendering();
+	glPolygonMode(GL_FRONT_AND_BACK, settings.wireframe ? GL_LINE : GL_FILL);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void cleanup() {
@@ -1141,6 +932,7 @@ void cleanup() {
 	//Releases the OpenGL resources of the menus, so it must happen before the window (and its context) is destroyed
 	menu.reset(nullptr);
 	gameScene.reset(nullptr);
+	renderer.reset(nullptr);
 	//The scene (and the character controller of the bear) must be released before the physics world
 	physicsWorld.reset(nullptr);
 }
@@ -1300,6 +1092,15 @@ void textRendering()
 		//Fewer objects are drawn with view frustum culling (F8)
 		string drawnObjects = to_string(gameScene->getDrawnGeometryCount()) + "/" + to_string(gameScene->getGeometryCount());
 		renderText(textShader.get(), "Objects: " + drawnObjects, windowWidth * 0.62f, windowHeight - 1.f * windowHeight / 10.f, 0.6f, vec3(0.9, 0.5f, 0.5f));
+		//The streamed world: chunks drawn and loaded (per level of detail), drawn plants and stones, jobs of the worker threads
+		world::World::Statistics world = gameScene->getWorld().getStatistics();
+		string lods;
+		for (int count : world.streaming.chunksAtLod)
+		{
+			lods += (lods.empty() ? "" : "/") + to_string(count);
+		}
+		renderText(textShader.get(), "Chunks: " + to_string(world.drawnChunks) + " drawn (LOD " + lods + ")  Plants: " + to_string(world.drawnInstances)
+			+ "  Jobs: " + to_string(world.streaming.pendingJobs), windowWidth / 10.f, windowHeight - 1.45f * windowHeight / 10.f, 0.4f, vec3(0.9, 0.5f, 0.5f));
 	}
 
 	//Lap progress (the finish line only counts after all checkpoints)

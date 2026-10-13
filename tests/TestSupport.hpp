@@ -23,6 +23,11 @@ namespace bibo::resources
 	class SkinnedModel;
 }
 
+namespace bibo::world
+{
+	class WorldGenerator;
+}
+
 namespace bibo::test
 {
 	/**
@@ -78,6 +83,12 @@ namespace bibo::test
 	* The model of the bear loaded like the game does (SkinnedModel), only loaded once per test run
 	*/
 	const resources::SkinnedModel& bearModel();
+
+	/**
+	* The generator of the world around the track like the game creates it (Scene::initWorld: the start, the checkpoints,
+	* the objects it must not cover), only created once per test run
+	*/
+	const world::WorldGenerator& worldGenerator();
 
 	/**
 	* @return The node with this name in the track, fails the test if there is none

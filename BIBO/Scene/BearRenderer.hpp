@@ -12,19 +12,14 @@ namespace bibo
 {
 	namespace scene
 	{
-		class Light;
-
 		/**
-		* What the bear needs to be drawn like the rest of the scene (Scene::draw)
+		* What the bear needs to be drawn like the rest of the scene (the sun, sky and shadows come from the frame uniforms)
 		*/
 		struct BearRenderContext
 		{
 			glm::mat4 view = glm::mat4(1.0f);
 			glm::mat4 projection = glm::mat4(1.0f);
-			glm::mat4 lightSpaceMatrix = glm::mat4(1.0f);
 			glm::vec3 eye = glm::vec3(0.0f);
-			Light* light = nullptr;
-			bool shadowMappingEnabled = true;
 		};
 
 		/**

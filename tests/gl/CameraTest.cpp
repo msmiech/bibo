@@ -50,8 +50,10 @@ TEST_CASE("The projection of the camera fits the window", "[gl][camera]")
 
 	CHECK_THAT(projection[1][1] / projection[0][0], WithinRel(1024.0f / 576.0f, 1e-5f)); //aspect ratio
 	CHECK_THAT(projection[1][1], WithinRel(1.0f / std::tan(glm::radians(30.0f)), 1e-5f)); //60 degrees vertical field of view
-	CHECK_THAT(depth(projection, -0.1f), WithinAbs(-1.0f, 1e-4f)); //near plane
-	CHECK_THAT(depth(projection, -200.0f), WithinAbs(1.0f, 1e-4f)); //far plane
+	CHECK_THAT(depth(projection, -camera.getNearPlane()), WithinAbs(-1.0f, 1e-4f)); //near plane
+	CHECK_THAT(depth(projection, -camera.getFarPlane()), WithinAbs(1.0f, 1e-4f)); //far plane
+	CHECK(camera.getNearPlane() < Camera::COLLISION_RADIUS); //the environment never comes closer than the near plane
+	CHECK(camera.getFarPlane() > 1000.0f); //the island and the sea up to the horizon
 }
 
 TEST_CASE("The camera looks from its position along its direction", "[gl][camera]")

@@ -7,13 +7,11 @@ layout (location = 3) in float surface; //SkinnedModel::Surface: 0 fur, 1 eye, 2
 
 uniform mat4 view;
 uniform mat4 projection;
-uniform mat4 lightSpaceMatrix;
 
 out vec3 worldPosition;
 out vec3 worldNormal;
 out vec4 vertexColor;
 flat out int surfaceType;
-out vec4 fragPosLightSpace;
 
 void main()
 {
@@ -21,6 +19,5 @@ void main()
 	worldNormal = normal;
 	vertexColor = color;
 	surfaceType = int(surface + 0.5);
-	fragPosLightSpace = lightSpaceMatrix * vec4(position, 1.0);
 	gl_Position = projection * view * vec4(position, 1.0);
 }

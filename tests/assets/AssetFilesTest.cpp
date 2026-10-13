@@ -78,10 +78,8 @@ TEST_CASE("Every texture file can be decoded", "[assets]")
 
 TEST_CASE("All textures of the scene exist", "[assets]")
 {
-	//Scene::Scene, a missing file would be replaced by a magenta placeholder
-	const std::string file = GENERATE(values<std::string>({
-		"Texture/cfur01.jpg", "Texture/sky1Tex.jpg", "Texture/snow.jpg", "Texture/snow-normal.jpg", "Texture/ground07.jpg",
-		"Texture/wood16.jpg", "Texture/wood16n.jpg", "Texture/Water.png", "Texture/ground07n.jpg" }));
+	//Scene::Scene, a missing file would be replaced by a magenta placeholder (the materials of the world are generated)
+	const std::string file = GENERATE(values<std::string>({ "Texture/wood16.jpg", "Texture/wood16n.jpg" }));
 	CAPTURE(file);
 
 	CHECK(Image(assetPath(file)).rgba != nullptr);
@@ -100,21 +98,6 @@ TEST_CASE("Normal maps contain tangent space normals", "[assets]")
 	CHECK(blue > 200.0);
 	CHECK(blue > red);
 	CHECK(blue > green);
-}
-
-TEST_CASE("The frames of the water animation are complete and equally sized", "[assets]")
-{
-	//Scene::initAnimatedTextures loads Water01.png to Water16.png
-	Image first(assetPath("Texture/video/water/Water01.png"));
-	REQUIRE(first.rgba != nullptr);
-
-	const int frame = GENERATE(range(2, 17));
-	std::string file = "Texture/video/water/Water" + std::string(frame < 10 ? "0" : "") + std::to_string(frame) + ".png";
-	CAPTURE(file);
-	Image image(assetPath(file));
-	REQUIRE(image.rgba != nullptr);
-	CHECK(image.width == first.width);
-	CHECK(image.height == first.height);
 }
 
 TEST_CASE("The shader sources of the game exist and declare a GLSL version", "[assets]")

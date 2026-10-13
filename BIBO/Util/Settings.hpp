@@ -31,6 +31,7 @@ namespace bibo
 		bool bilinearFiltering = true; //false = nearest neighbor
 		int mipmapping = 2; //0 = off, 1 = nearest neighbor, 2 = linear
 		bool wireframe = false;
+		int worldDetail = 2; //0 = low, 1 = medium, 2 = high: how far the details and the vegetation of the world reach
 
 		//Controls
 		int cameraSensitivity = 5; //1 (slow) to 10 (fast), mouse and gamepad

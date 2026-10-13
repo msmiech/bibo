@@ -22,18 +22,21 @@ add_executable(bibo_tests
 	unit/RagdollTest.cpp
 	unit/TextureGeneratorTest.cpp
 	unit/ViewFrustumTest.cpp
+	unit/WorldUnitTest.cpp
 	# Content of the asset files, no graphics card needed
 	assets/AssetFilesTest.cpp
 	assets/BearCharacterTest.cpp
 	assets/BearModelTest.cpp
 	assets/TrackAssetTest.cpp
 	assets/TrackPhysicsTest.cpp
+	assets/WorldTest.cpp
 	# Need an OpenGL 4.3 context, skipped if there is none (e.g. no display)
 	gl/CameraTest.cpp
 	gl/ModelTest.cpp
 	gl/SceneTest.cpp
 	gl/ShaderTest.cpp
-	gl/TextureTest.cpp)
+	gl/TextureTest.cpp
+	gl/WorldRenderTest.cpp)
 
 target_include_directories(bibo_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(bibo_tests PRIVATE bibo_core Catch2::Catch2WithMain)

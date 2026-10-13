@@ -19,7 +19,7 @@ namespace
 
 	//Settings that are applied to the game as soon as they are changed in the settings menu
 	const char* const GRAPHICS_VARIABLES[] = { "vsync", "hdr", "bloom", "shadows", "normal_mapping", "transparency",
-		"bilinear_filtering", "mipmapping", "wireframe", "show_frame_time", "show_help" };
+		"bilinear_filtering", "mipmapping", "wireframe", "world_detail", "show_frame_time", "show_help" };
 
 	/**
 	* GLFW system interface of RmlUi that prints its messages (e.g. errors in the RML and RCSS files) to the console
@@ -160,6 +160,7 @@ void Menu::Impl::bindDataModel()
 	constructor.Bind("bilinear_filtering", &settings.bilinearFiltering);
 	constructor.Bind("mipmapping", &settings.mipmapping);
 	constructor.Bind("wireframe", &settings.wireframe);
+	constructor.Bind("world_detail", &settings.worldDetail);
 	constructor.Bind("show_frame_time", &settings.showFrameTime);
 	constructor.Bind("show_help", &settings.showHelp);
 	constructor.Bind("camera_sensitivity", &settings.cameraSensitivity);

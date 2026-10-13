@@ -74,6 +74,14 @@
 				<span class="label">Wireframe</span>
 				<input type="checkbox" data-checked="wireframe"/>
 			</label>
+			<div class="row">
+				<span class="label">World detail</span>
+				<select data-value="world_detail">
+					<option value="0">Low</option>
+					<option value="1">Medium</option>
+					<option value="2">High</option>
+				</select>
+			</div>
 
 			<h2>Controls</h2>
 			<div class="row">

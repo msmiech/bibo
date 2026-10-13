@@ -27,7 +27,6 @@ layout(std430, binding = 2) readonly buffer Strands { Strand strands[]; };
 
 uniform mat4 view;
 uniform mat4 projection;
-uniform mat4 lightSpaceMatrix;
 uniform vec3 worldEye;
 uniform int segments; //of every strand
 uniform float maxFurLength; //world units for fur length 1
@@ -40,7 +39,6 @@ out vec3 skinNormal;
 out vec3 furColor;
 out float strandParameter; //0 at the root, 1 at the tip
 out float coverage; //how much of the pixel the strand covers
-out vec4 fragPosLightSpace;
 
 uint hash(uint x)
 {
@@ -116,6 +114,5 @@ void main()
 	skinNormal = normal;
 	furColor = color.rgb * (0.85 + 0.3 * strand.parameters.w);
 	strandParameter = t;
-	fragPosLightSpace = lightSpaceMatrix * vec4(position, 1.0);
 	gl_Position = projection * view * vec4(position, 1.0);
 }

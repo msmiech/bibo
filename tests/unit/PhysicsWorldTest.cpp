@@ -1,5 +1,7 @@
 #include <cmath>
+#include <memory>
 #include <set>
+#include <thread>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -8,12 +10,9 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include "Physics/Physics.hpp"
-#include "Scene/Scene.hpp"
 #include "TestSupport.hpp"
 
 using namespace bibo::physics;
-using bibo::scene::MeshTransform;
-using bibo::scene::terrainTransform;
 using bibo::test::IsNear;
 using Catch::Matchers::WithinAbs;
 using glm::mat3;
@@ -138,26 +137,19 @@ TEST_CASE("Every body gets its own valid handle", "[physics]")
 	CHECK(handles.count(INVALID_BODY) == 0);
 }
 
-TEST_CASE("A triangle mesh is placed like its model matrix", "[physics]")
+TEST_CASE("A triangle mesh is scaled, rotated and placed", "[physics]")
 {
-	//Like the terrain (Scene::initPhysicsBodies): modelled with Z-up in Blender, rotated to Y-up and scaled
+	//Modelled with Z-up (like in Blender), rotated to Y-up and scaled
 	PhysicsWorld world;
 	const vec3 position(0.0f, 2.0f, 0.0f);
-	const mat4 modelMatrix = glm::scale(glm::rotate(glm::translate(mat4(1.0f), position), glm::radians(-90.0f), vec3(1.0f, 0.0f, 0.0f)), vec3(10.0f));
-	const MeshTransform transform = terrainTransform(modelMatrix);
-	BodyHandle mesh = world.createStaticMesh(SQUARE_VERTICES, 4, SQUARE_INDICES, 2, transform.scale, transform.position, transform.rotation);
+	const glm::quat rotation = glm::angleAxis(glm::radians(-90.0f), vec3(1.0f, 0.0f, 0.0f));
+	BodyHandle mesh = world.createStaticMesh(SQUARE_VERTICES, 4, SQUARE_INDICES, 2, 10.0f, position, rotation);
 	REQUIRE(mesh != INVALID_BODY);
 
-	SECTION("Scale, rotation and position are taken from the model matrix")
+	SECTION("The transformation of the body is the rotation and the position")
 	{
-		CHECK_THAT(transform.scale, WithinAbs(10.0f, 1e-5f));
-		CHECK_THAT(transform.position, IsNear(position, 1e-6f));
-		CHECK_THAT(transform.rotation * vec3(0.0f, 0.0f, 1.0f), IsNear(vec3(0.0f, 1.0f, 0.0f), 1e-6f)); //up axis
-	}
-
-	SECTION("The transformation of the body is the model matrix without the scale")
-	{
-		CHECK_THAT(world.getTransform(mesh), IsNear(glm::scale(modelMatrix, vec3(0.1f)), 1e-5f));
+		mat4 expected = glm::translate(mat4(1.0f), position) * glm::mat4_cast(rotation);
+		CHECK_THAT(world.getTransform(mesh), IsNear(expected, 1e-5f));
 	}
 
 	SECTION("A box falling onto the scaled square lands on it")
@@ -174,6 +166,58 @@ TEST_CASE("A triangle mesh is placed like its model matrix", "[physics]")
 		simulate(world, 2.0f);
 		CHECK(positionOf(world, box).y < position.y - 5.0f);
 	}
+}
+
+TEST_CASE("Shapes built in other threads become static bodies that can be removed again", "[physics]")
+{
+	//Like the streamed world: the worker threads build the shapes, the game adds and removes the bodies
+	PhysicsWorld world;
+	std::shared_ptr<CollisionShape> ground, trunks;
+	std::thread builder([&] {
+		std::vector<vec3> vertices = { { -10.0f, 0.0f, -10.0f }, { 10.0f, 0.0f, -10.0f }, { 10.0f, 0.0f, 10.0f }, { -10.0f, 0.0f, 10.0f } };
+		ground = PhysicsWorld::buildMeshShape(vertices, { 0, 2, 1, 0, 3, 2 });
+		ShapePart trunk;
+		trunk.type = ShapePart::CAPSULE;
+		trunk.position = vec3(3.0f, 2.0f, 0.0f);
+		trunk.halfHeight = 1.5f;
+		trunk.radius = 0.3f;
+		ShapePart stone;
+		stone.position = vec3(-3.0f, 0.5f, 0.0f);
+		stone.radius = 0.8f;
+		trunks = PhysicsWorld::buildCompoundShape({ trunk, stone });
+	});
+	builder.join();
+	REQUIRE(ground);
+	REQUIRE(trunks);
+	CHECK(ground->isValid());
+	CHECK_FALSE(PhysicsWorld::buildMeshShape({}, {}));
+	CHECK_FALSE(PhysicsWorld::buildCompoundShape({}));
+
+	std::size_t before = world.getBodyCount();
+	BodyHandle groundBody = world.addStaticBody(*ground);
+	BodyHandle trunksBody = world.addStaticBody(*trunks);
+	REQUIRE(groundBody != INVALID_BODY);
+	REQUIRE(trunksBody != INVALID_BODY);
+	CHECK(world.getBodyCount() == before + 2);
+
+	//The shapes are in world space (the bodies are at the origin)
+	RayHit hit;
+	REQUIRE(world.castRay(vec3(1.0f, 5.0f, 1.0f), vec3(0.0f, -10.0f, 0.0f), hit, true));
+	CHECK(hit.body == groundBody);
+	CHECK_THAT(hit.position.y, WithinAbs(0.0f, 1e-3f));
+	REQUIRE(world.castRay(vec3(3.0f, 2.0f, -5.0f), vec3(0.0f, 0.0f, 10.0f), hit, true));
+	CHECK(hit.body == trunksBody);
+	CHECK_THAT(hit.position.z, WithinAbs(-0.3f, 1e-3f));
+	REQUIRE(world.castRay(vec3(-3.0f, 5.0f, 0.0f), vec3(0.0f, -10.0f, 0.0f), hit, true));
+	CHECK_THAT(hit.position.y, WithinAbs(1.3f, 1e-3f));
+
+	world.removeBody(trunksBody);
+	world.removeBody(INVALID_BODY); //nothing happens
+	CHECK(world.getBodyCount() == before + 1);
+	REQUIRE(world.castRay(vec3(3.0f, 2.0f, -5.0f), vec3(0.0f, 0.0f, 10.0f), hit, true) == false);
+	world.removeBody(groundBody);
+	CHECK(world.getBodyCount() == before);
+	CHECK_FALSE(world.castRay(vec3(1.0f, 5.0f, 1.0f), vec3(0.0f, -10.0f, 0.0f), hit, true));
 }
 
 TEST_CASE("Physics worlds can be created again and simulate the same way", "[physics]")

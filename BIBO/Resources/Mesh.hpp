@@ -59,6 +59,10 @@ namespace bibo
 			void setTexture(Texture* texture);
 
 			void setMaterial(Material material);
+			/**
+			* Averages the normals of the vertices at the same position (a flat shaded model looks round)
+			*/
+			void smoothNormals();
 		};
 	}
 }

@@ -277,6 +277,7 @@ void initialize()
 		util::pause();
 		exit(EXIT_FAILURE);
 	}
+	display::setWindowIcon(window, "Icon/bibo.png");
 	//The framebuffer can be smaller than requested (e.g. limited to the screen) or larger (scaled on high DPI screens)
 	int framebufferWidth, framebufferHeight;
 	glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);

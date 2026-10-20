@@ -1,0 +1,2 @@
+// The icon of the executable. GLFW uses the icon resource named GLFW_ICON for its windows (title bar, task bar, Alt+Tab).
+GLFW_ICON ICON "../Icon/bibo.ico"

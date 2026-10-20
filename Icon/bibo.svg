@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+	<!-- The icon of BIBO: the bear cub sits in the river and happily eats a salmon (rendered by tools/build_icon.py) -->
+	<defs>
+		<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="#c9efff"/>
+			<stop offset="1" stop-color="#7cc8f2"/>
+		</linearGradient>
+		<linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="#3f9ee0"/>
+			<stop offset="1" stop-color="#2a74c4"/>
+		</linearGradient>
+		<clipPath id="tile">
+			<rect x="16" y="16" width="480" height="480" rx="104"/>
+		</clipPath>
+		<path id="fishBody" d="M -168 0 C -168 -36 -122 -58 -46 -58 C 32 -58 92 -36 126 -12 L 126 12 C 92 36 32 58 -46 58 C -122 58 -168 36 -168 0 Z"/>
+		<clipPath id="fishClip">
+			<use href="#fishBody"/>
+		</clipPath>
+		<!-- The bite out of the back of the salmon -->
+		<mask id="bite" maskUnits="userSpaceOnUse" x="-300" y="-200" width="600" height="400">
+			<rect x="-300" y="-200" width="600" height="400" fill="#fff"/>
+			<circle cx="-24" cy="-58" r="19" fill="#000"/>
+			<circle cx="6" cy="-62" r="21" fill="#000"/>
+			<circle cx="36" cy="-58" r="18" fill="#000"/>
+		</mask>
+	</defs>
+
+	<g clip-path="url(#tile)">
+		<rect x="0" y="0" width="512" height="512" fill="url(#sky)"/>
+
+		<!-- Snowflakes -->
+		<g fill="#fff">
+			<circle cx="70" cy="96" r="7"/>
+			<circle cx="446" cy="82" r="6"/>
+			<circle cx="452" cy="232" r="8"/>
+			<circle cx="58" cy="236" r="6"/>
+			<circle cx="256" cy="46" r="5"/>
+		</g>
+
+		<g stroke="#3a2216" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+			<!-- Body (in the river) -->
+			<ellipse cx="256" cy="500" rx="176" ry="130" fill="#9a5b34"/>
+
+			<!-- Ears -->
+			<circle cx="138" cy="138" r="54" fill="#9a5b34"/>
+			<circle cx="374" cy="138" r="54" fill="#9a5b34"/>
+			<circle cx="142" cy="142" r="28" fill="#e0a08a" stroke="none"/>
+			<circle cx="370" cy="142" r="28" fill="#e0a08a" stroke="none"/>
+
+			<!-- Head -->
+			<ellipse cx="256" cy="262" rx="164" ry="146" fill="#9a5b34"/>
+			<ellipse cx="226" cy="180" rx="78" ry="34" fill="#b0703f" stroke="none" transform="rotate(-12 226 180)"/>
+
+			<!-- Muzzle, nose and mouth -->
+			<ellipse cx="256" cy="320" rx="84" ry="62" fill="#ecc795"/>
+			<path d="M 228 282 C 228 266 284 266 284 282 C 284 296 268 306 256 306 C 244 306 228 296 228 282 Z" fill="#3a2216" stroke-width="6"/>
+			<ellipse cx="246" cy="278" rx="8" ry="5" fill="#fff" stroke="none" opacity="0.7"/>
+			<path d="M 256 306 L 256 318 M 234 318 Q 245 330 256 318 Q 267 330 278 318" fill="none" stroke-width="7"/>
+
+			<!-- Closed happy eyes and rosy cheeks -->
+			<path d="M 176 246 Q 198 220 220 246 M 292 246 Q 314 220 336 246" fill="none" stroke-width="13"/>
+			<ellipse cx="160" cy="296" rx="26" ry="17" fill="#ff8b8b" stroke="none" opacity="0.65"/>
+			<ellipse cx="352" cy="296" rx="26" ry="17" fill="#ff8b8b" stroke="none" opacity="0.65"/>
+		</g>
+
+		<!-- River -->
+		<path d="M 0 452 Q 48 432 96 452 T 192 452 T 288 452 T 384 452 T 480 452 T 576 452 L 576 512 L 0 512 Z" fill="url(#water)"/>
+		<path d="M 0 452 Q 48 432 96 452 T 192 452 T 288 452 T 384 452 T 480 452 T 576 452" fill="none" stroke="#e8f8ff" stroke-width="8" stroke-linecap="round"/>
+
+		<!-- Salmon -->
+		<g transform="translate(250 384) rotate(-7)" stroke="#3a2216" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+			<path d="M 116 -6 C 138 -22 160 -44 192 -56 C 178 -24 178 24 192 56 C 160 44 138 22 116 6 Z" fill="#e8604f"/>
+			<g mask="url(#bite)">
+				<use href="#fishBody" fill="#ff8a6e"/>
+				<g clip-path="url(#fishClip)" stroke="none">
+					<ellipse cx="-30" cy="-58" rx="190" ry="34" fill="#e8604f"/>
+					<ellipse cx="-40" cy="54" rx="180" ry="34" fill="#ffd9c2"/>
+					<circle cx="-70" cy="-30" r="5" fill="#b8402f"/>
+					<circle cx="-36" cy="-24" r="5" fill="#b8402f"/>
+					<circle cx="60" cy="-26" r="5" fill="#b8402f"/>
+					<circle cx="88" cy="-16" r="5" fill="#b8402f"/>
+				</g>
+				<use href="#fishBody" fill="none"/>
+			</g>
+			<!-- Outline of the bite -->
+			<g clip-path="url(#fishClip)" fill="none">
+				<circle cx="-24" cy="-58" r="19"/>
+				<circle cx="6" cy="-62" r="21"/>
+				<circle cx="36" cy="-58" r="18"/>
+			</g>
+			<path d="M -118 -36 Q -98 0 -118 36" fill="none" stroke-width="7"/>
+			<circle cx="-142" cy="-10" r="11" fill="#3a2216" stroke="none"/>
+			<circle cx="-145" cy="-14" r="4" fill="#fff" stroke="none"/>
+		</g>
+
+		<!-- Front paws holding the salmon -->
+		<g stroke="#3a2216" stroke-width="10">
+			<ellipse cx="178" cy="404" rx="44" ry="50" fill="#9a5b34" transform="rotate(14 178 404)"/>
+			<ellipse cx="352" cy="382" rx="44" ry="50" fill="#9a5b34" transform="rotate(-14 352 382)"/>
+		</g>
+		<g fill="#ecc795">
+			<ellipse cx="172" cy="388" rx="9" ry="11"/>
+			<ellipse cx="192" cy="384" rx="9" ry="11"/>
+			<ellipse cx="210" cy="394" rx="9" ry="11"/>
+			<ellipse cx="324" cy="372" rx="9" ry="11"/>
+			<ellipse cx="342" cy="364" rx="9" ry="11"/>
+			<ellipse cx="362" cy="366" rx="9" ry="11"/>
+		</g>
+	</g>
+</svg>

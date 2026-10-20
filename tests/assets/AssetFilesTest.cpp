@@ -85,6 +85,19 @@ TEST_CASE("All textures of the scene exist", "[assets]")
 	CHECK(Image(assetPath(file)).rgba != nullptr);
 }
 
+TEST_CASE("The window icon is a square image with a transparent background", "[assets]")
+{
+	//display::setWindowIcon (rendered from Icon/bibo.svg by tools/build_icon.py)
+	Image icon(assetPath("Icon/bibo.png"));
+	REQUIRE(icon.rgba != nullptr);
+	CHECK(icon.width == icon.height);
+	CHECK(icon.width >= 48);
+
+	//The tile has rounded corners
+	CHECK(icon.rgba.get()[3] == 0);
+	CHECK(icon.rgba.get()[((icon.height / 2) * icon.width + icon.width / 2) * 4 + 3] == 255);
+}
+
 TEST_CASE("Normal maps contain tangent space normals", "[assets]")
 {
 	//Mostly pointing away from the surface (+Z, stored in the blue channel)

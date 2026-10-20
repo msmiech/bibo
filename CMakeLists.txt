@@ -332,6 +332,10 @@ if(MINGW AND NOT BIBO_USE_SYSTEM_LIBS)
 	# Self-contained executables without MinGW runtime DLLs (the game and the tests)
 	target_link_options(bibo_core INTERFACE -static)
 endif()
+if(WIN32)
+	#The icon of the executable (Icon/bibo.ico), GLFW also uses it for the window
+	target_sources(BIBO PRIVATE BIBO/bibo.rc)
+endif()
 if(MSVC)
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT BIBO)
 	set_property(TARGET BIBO PROPERTY VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:BIBO>)
@@ -339,7 +343,7 @@ endif()
 
 # The game loads its assets relative to the working directory, so they are copied next to the executable.
 # Of the Model folder only the scene, the bear and the credits are needed, the other files are the sources of the models (~100 MB).
-set(BIBO_ASSET_DIRS Font Shader Texture UI)
+set(BIBO_ASSET_DIRS Font Icon Shader Texture UI)
 set(BIBO_MODEL_FILES Model/readme.txt Model/SnowTerrain/track1.dae Model/BearCub/BearCub.glb)
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.26)
 	set(BIBO_COPY_DIRECTORY copy_directory_if_different)

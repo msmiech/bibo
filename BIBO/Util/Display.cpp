@@ -1,5 +1,7 @@
 #include "Display.hpp"
 #include <algorithm>
+#include <iostream>
+#include <stb_image.h>
 
 using namespace std;
 using namespace bibo;
@@ -137,4 +139,29 @@ void display::applyWindowMode(GLFWwindow* window, int windowMode, int width, int
 	glfwSetWindowPos(window,
 		areaX + left + max(0, (areaWidth - left - right - width) / 2),
 		areaY + top + max(0, (areaHeight - top - bottom - height) / 2));
+}
+
+void display::setWindowIcon(GLFWwindow* window, const char* path)
+{
+#if defined(_WIN32) || defined(__APPLE__)
+	//Windows: the icon resource of the executable, macOS: windows have no icons (the icon of an application belongs to its bundle)
+	(void)window;
+	(void)path;
+#else
+	if (isWayland())
+	{
+		//The compositor shows the icon of the desktop entry, applications cannot set one
+		return;
+	}
+	GLFWimage icon;
+	int channels = 0;
+	icon.pixels = stbi_load(path, &icon.width, &icon.height, &channels, 4);
+	if (!icon.pixels)
+	{
+		std::cerr << "WARNING: Could not load the window icon " << path << " (" << stbi_failure_reason() << ")" << std::endl;
+		return;
+	}
+	glfwSetWindowIcon(window, 1, &icon);
+	stbi_image_free(icon.pixels);
+#endif
 }

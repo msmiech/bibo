@@ -36,5 +36,10 @@ namespace bibo
 		* @param width Window size (windowed) or video mode (full screen), ignored for borderless windows
 		*/
 		void applyWindowMode(GLFWwindow* window, int windowMode, int width, int height);
+		/**
+		* Sets the icon of the window (title bar, task bar) from an image file, on the platforms that let applications set it.
+		* On Windows the icon is a resource of the executable (BIBO/bibo.rc) that GLFW uses for every window.
+		*/
+		void setWindowIcon(GLFWwindow* window, const char* path);
 	}
 }

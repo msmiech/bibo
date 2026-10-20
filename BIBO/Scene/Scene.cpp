@@ -15,6 +15,31 @@ namespace
 	const char* const TRACK_FILE = "Model/SnowTerrain/track1.dae";
 	//How long the loading may wait for the world around the start (it goes on streaming afterwards)
 	const float WORLD_LOADING_TIMEOUT = 30.0f;
+
+	//The vertices of the meshes of a geometry in model space (the model matrix is not applied)
+	vector<vec3> modelVertices(Geometry* geometry)
+	{
+		vector<vec3> points;
+		for (const Mesh* mesh : geometry->getModel()->meshes)
+		{
+			for (unsigned int i = 0; mesh->vertices && i < mesh->numVertices; ++i)
+			{
+				points.push_back(vec3(mesh->vertices[i * 3], mesh->vertices[i * 3 + 1], mesh->vertices[i * 3 + 2]));
+			}
+		}
+		return points;
+	}
+
+	//The vertices of the meshes of a geometry in world space
+	vector<vec3> worldVertices(Geometry* geometry)
+	{
+		vector<vec3> points = modelVertices(geometry);
+		for (vec3& point : points)
+		{
+			point = vec3(geometry->modelMatrix * vec4(point, 1.0f));
+		}
+		return points;
+	}
 }
 
 Geometry* Scene::addGeometry(const aiScene* track, const char* nodeName, Texture* texture, Texture* normalMap)
@@ -90,7 +115,8 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	vector<fur::SphereCollider> obstacles;
 	for (Geometry* rock : rocks)
 	{
-		obstacles.push_back({ rock->getPosition(), 0.8f });
+		rules::Sphere collider = rules::rockCollider(worldVertices(rock));
+		obstacles.push_back({ collider.center, collider.radius + 0.1f });
 	}
 	bear->setObstacles(obstacles);
 
@@ -123,14 +149,7 @@ void Scene::initWorld(const aiScene& track)
 	vector<world::KeepClear> keepClear;
 	auto keep = [&](Geometry* geometry) {
 		//Sphere around the vertices in world space (the model matrices of some objects scale the axes differently)
-		vector<vec3> points;
-		for (const Mesh* mesh : geometry->getModel()->meshes)
-		{
-			for (unsigned int i = 0; mesh->vertices && i < mesh->numVertices; ++i)
-			{
-				points.push_back(vec3(geometry->modelMatrix * vec4(mesh->vertices[i * 3], mesh->vertices[i * 3 + 1], mesh->vertices[i * 3 + 2], 1.0f)));
-			}
-		}
+		vector<vec3> points = worldVertices(geometry);
 		vec3 low(numeric_limits<float>::max()), high(numeric_limits<float>::lowest());
 		for (const vec3& point : points)
 		{
@@ -168,10 +187,6 @@ void Scene::initWorld(const aiScene& track)
 
 void Scene::update(float time_delta, const input::PlayerInput& player) {
 	physicsWorld->update(time_delta);
-	if (input::isKeyDown(window, GLFW_KEY_R))
-	{
-		restart();
-	}
 	if (gameWon != true && gameOver != true){
 	//The camera turns first, the bear moves relative to where the camera looks then
 	camera->rotate(player.look.x, player.look.y);
@@ -237,12 +252,12 @@ void Scene::restart()
 {
 	bear->reset();
 	bear->setInput(BearInput());
-	//The ground at the start may have been streamed out of the physics world
-	world->ensureCollision(bear->getPosition());
 	camera->snapBehind(cameraTarget());
-	for (const auto& dynamicBody : dynamicBodies)
+	//The ground at the start may have been streamed out of the physics world
+	world->ensureCollision(bear->getPosition(), camera->getPosition());
+	for (const DynamicBody& dynamicBody : dynamicBodies)
 	{
-		physicsWorld->resetBody(dynamicBody.first, dynamicBody.second, quat(1.0f, 0.0f, 0.0f, 0.0f));
+		physicsWorld->resetBody(dynamicBody.body, dynamicBody.position, dynamicBody.rotation);
 	}
 	nextCheckpoint = 0;
 	gameOver = false;
@@ -469,20 +484,34 @@ void Scene::initPhysicsBodies()
 	//Ground under the sea (a large box whose top face is at y = -5): the bear lands on it when it falls into the sea
 	physicsWorld->createStaticBox(vec3(0.0f, -6.0f, 0.0f), vec3(1000.0f, 1.0f, 1000.0f));
 
+	//The cube is 1 x 1 x 1 (see Cube::positions)
 	vec3 boxPosition = bear->getPosition() - vec3(0.0f, -10.0f, 5.0f);
-	physics::BodyHandle box = physicsWorld->createDynamicBox(boxPosition, vec3(0.4f), 1.0f);
+	physics::BodyHandle box = physicsWorld->createDynamicBox(boxPosition, vec3(0.5f), 1.0f);
 	debugCube->setPhysicsBody(physicsWorld, box);
-	dynamicBodies.emplace_back(box, boxPosition);
+	dynamicBodies.push_back({ box, boxPosition, quat(1.0f, 0.0f, 0.0f, 0.0f) });
 
 	//There is no wall at the start: the finish line is a trigger (see initFinishLine) and the checkpoints keep the bear from going backwards
 
-	physics::BodyHandle box2 = physicsWorld->createDynamicBox(crate->getPosition(), vec3(0.8f), 1.0f);
+	//The crate as it is drawn: a box around its mesh, turned like its model
+	vector<vec3> crateVertices = modelVertices(crate);
+	vec3 low(numeric_limits<float>::max()), high(numeric_limits<float>::lowest());
+	for (const vec3& vertex : crateVertices)
+	{
+		low = glm::min(low, vertex);
+		high = glm::max(high, vertex);
+	}
+	const mat4& crateMatrix = crate->modelMatrix;
+	vec3 scale(length(vec3(crateMatrix[0])), length(vec3(crateMatrix[1])), length(vec3(crateMatrix[2])));
+	quat crateRotation = normalize(quat_cast(mat3(vec3(crateMatrix[0]) / scale.x, vec3(crateMatrix[1]) / scale.y, vec3(crateMatrix[2]) / scale.z)));
+	vec3 crateCenter = vec3(crateMatrix * vec4(0.5f * (low + high), 1.0f));
+	physics::BodyHandle box2 = physicsWorld->createDynamicBox(crateCenter, 0.5f * (high - low) * scale, 1.0f, crateRotation);
 	crate->setPhysicsBody(physicsWorld, box2);
-	dynamicBodies.emplace_back(box2, crate->getPosition());
+	dynamicBodies.push_back({ box2, crateCenter, crateRotation });
 
 	for (Geometry* rock : rocks)
 	{
-		physics::BodyHandle body = physicsWorld->createStaticSphere(rock->getPosition(), 0.7f);
+		rules::Sphere collider = rules::rockCollider(worldVertices(rock));
+		physics::BodyHandle body = physicsWorld->createStaticSphere(collider.center, collider.radius);
 		rock->setPhysicsBody(physicsWorld, body);
 		bodiesRock.push_back(body);
 	}

@@ -49,7 +49,7 @@ void Geometry::update(float time_delta)
 {
 	if (!physicsWorld || physicsBody == physics::INVALID_BODY)
 		return;
-	modelMatrix = physicsWorld->getTransform(physicsBody);
+	modelMatrix = physicsWorld->getTransform(physicsBody) * bodyToModel;
 }
 
 void Geometry::draw(Shader* shader)
@@ -89,6 +89,7 @@ void Geometry::setPhysicsBody(physics::PhysicsWorld* physicsWorld, physics::Body
 {
 	this->physicsWorld = physicsWorld;
 	this->physicsBody = body;
+	bodyToModel = physicsWorld && body != physics::INVALID_BODY ? inverse(physicsWorld->getTransform(body)) * modelMatrix : mat4(1.0f);
 }
 
 bool Geometry::getHasNormalMap()

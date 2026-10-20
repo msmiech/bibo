@@ -86,7 +86,7 @@ namespace bibo
 			void update(float time_delta);
 
 			BodyHandle createStaticBox(glm::vec3 position, glm::vec3 halfExtent);
-			BodyHandle createDynamicBox(glm::vec3 position, glm::vec3 halfExtent, float density);
+			BodyHandle createDynamicBox(glm::vec3 position, glm::vec3 halfExtent, float density, glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
 			BodyHandle createStaticSphere(glm::vec3 position, float radius);
 			/**
 			* Creates a static triangle mesh. The vertices are scaled first, then rotated and translated.

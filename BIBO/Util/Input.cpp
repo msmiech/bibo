@@ -178,6 +178,11 @@ PlayerInput Input::playerInput(float timeDelta, const Settings& settings, bool f
 		result.recenter = result.recenter || wasPressed(GLFW_GAMEPAD_BUTTON_RIGHT_THUMB);
 	}
 	result.move = glm::length(stick) > glm::length(keys) ? stick : keys;
+	if (jumpBlocked)
+	{
+		jumpBlocked = result.jump;
+		result.jump = false;
+	}
 	return result;
 }
 

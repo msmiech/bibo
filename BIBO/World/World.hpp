@@ -89,7 +89,7 @@ namespace bibo
 			/**
 			* The ground under the bear is in the physics world right now (e.g. after it was moved back to the start)
 			*/
-			void ensureCollision(glm::vec3 bear);
+			void ensureCollision(glm::vec3 bear, glm::vec3 camera);
 
 			/**
 			* Sun, sky, fog, wind, time and the world map (the camera, the shadows and the settings are set by the renderer)

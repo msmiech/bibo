@@ -178,17 +178,21 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture) : 
 				float DeltaU2 = uv2.x - uv0.x;
 				float DeltaV2 = uv2.y - uv0.y;
 
-				float f = 1.0f / (DeltaU1 * DeltaV2 - DeltaU2 * DeltaV1);
+				float determinant = DeltaU1 * DeltaV2 - DeltaU2 * DeltaV1;
+				if (std::abs(determinant) < 1e-12f)
+				{
+					continue; //the texture coordinates of the triangle are degenerate, they define no tangent
+				}
+				float f = 1.0f / determinant;
 
-
+				//Solves Edge1 = DeltaU1 * T + DeltaV1 * B and Edge2 = DeltaU2 * T + DeltaV2 * B
 				Tangent.x = f * (DeltaV2 * Edge1.x - DeltaV1 * Edge2.x);
 				Tangent.y = f * (DeltaV2 * Edge1.y - DeltaV1 * Edge2.y);
 				Tangent.z = f * (DeltaV2 * Edge1.z - DeltaV1 * Edge2.z);
 
-
-				Bitangent.x = f * (-DeltaU2 * Edge1.x - DeltaU1 * Edge2.x);
-				Bitangent.y = f * (-DeltaU2 * Edge1.y - DeltaU1 * Edge2.y);
-				Bitangent.z = f * (-DeltaU2 * Edge1.z - DeltaU1 * Edge2.z);
+				Bitangent.x = f * (DeltaU1 * Edge2.x - DeltaU2 * Edge1.x);
+				Bitangent.y = f * (DeltaU1 * Edge2.y - DeltaU2 * Edge1.y);
+				Bitangent.z = f * (DeltaU1 * Edge2.z - DeltaU2 * Edge1.z);
 
 				for (unsigned int i : vertexIndices)
 				{

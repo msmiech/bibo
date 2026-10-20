@@ -30,6 +30,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <iostream>
+#include <mutex>
 #include <string>
 
 using namespace bibo::physics;
@@ -209,14 +210,40 @@ struct PhysicsWorld::Impl
 	}
 };
 
+namespace
+{
+	//The factory and the registered types of Jolt are global: they exist as long as any PhysicsWorld does
+	std::mutex joltMutex;
+	int joltUsers = 0;
+
+	void acquireJolt()
+	{
+		std::lock_guard<std::mutex> lock(joltMutex);
+		if (joltUsers++ == 0)
+		{
+			JPH::RegisterDefaultAllocator();
+			JPH::Trace = traceImpl;
+			JPH_IF_ENABLE_ASSERTS(JPH::AssertFailed = assertFailedImpl;)
+			JPH::Factory::sInstance = new JPH::Factory();
+			JPH::RegisterTypes();
+		}
+	}
+
+	void releaseJolt()
+	{
+		std::lock_guard<std::mutex> lock(joltMutex);
+		if (--joltUsers == 0)
+		{
+			JPH::UnregisterTypes();
+			delete JPH::Factory::sInstance;
+			JPH::Factory::sInstance = nullptr;
+		}
+	}
+}
+
 PhysicsWorld::PhysicsWorld()
 {
-	JPH::RegisterDefaultAllocator();
-	JPH::Trace = traceImpl;
-	JPH_IF_ENABLE_ASSERTS(JPH::AssertFailed = assertFailedImpl;)
-	JPH::Factory::sInstance = new JPH::Factory();
-	JPH::RegisterTypes();
-
+	acquireJolt();
 	impl = std::make_unique<Impl>();
 
 	//The scene has a few dozen bodies, the streamed parts of the world (terrain, trees) a few hundred more
@@ -232,9 +259,7 @@ PhysicsWorld::PhysicsWorld()
 PhysicsWorld::~PhysicsWorld()
 {
 	impl.reset();
-	JPH::UnregisterTypes();
-	delete JPH::Factory::sInstance;
-	JPH::Factory::sInstance = nullptr;
+	releaseJolt();
 }
 
 void PhysicsWorld::update(float time_delta)
@@ -257,13 +282,13 @@ BodyHandle PhysicsWorld::createStaticBox(glm::vec3 position, glm::vec3 halfExten
 	return impl->addBody(box, position, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), JPH::EMotionType::Static);
 }
 
-BodyHandle PhysicsWorld::createDynamicBox(glm::vec3 position, glm::vec3 halfExtent, float density)
+BodyHandle PhysicsWorld::createDynamicBox(glm::vec3 position, glm::vec3 halfExtent, float density, glm::quat rotation)
 {
 	float convexRadius = std::min(JPH::cDefaultConvexRadius, std::min({ halfExtent.x, halfExtent.y, halfExtent.z }));
 	JPH::BoxShapeSettings box(toJolt(halfExtent), convexRadius);
 	box.SetDensity(density);
 	box.SetEmbedded();
-	return impl->addBody(box, position, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), JPH::EMotionType::Dynamic);
+	return impl->addBody(box, position, glm::normalize(rotation), JPH::EMotionType::Dynamic);
 }
 
 BodyHandle PhysicsWorld::createStaticSphere(glm::vec3 position, float radius)

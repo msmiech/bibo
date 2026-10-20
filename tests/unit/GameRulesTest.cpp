@@ -78,6 +78,18 @@ TEST_CASE("The finish line trigger is as wide as the board and deeper than it", 
 	CHECK_FALSE(rules::isOnFinishLine(vec3(5.0f, 2.0f, -10.0f - rules::FINISH_LINE_HALF_DEPTH - 0.1f), line));
 }
 
+TEST_CASE("The collision sphere of a rock is in its middle and does not reach beyond it", "[rules]")
+{
+	//A flat rock: 3 wide, 1 high, 2 deep
+	const std::vector<vec3> points = { vec3(10.0f, 0.0f, 5.0f), vec3(13.0f, 1.0f, 7.0f), vec3(11.0f, 0.5f, 6.0f) };
+
+	rules::Sphere sphere = rules::rockCollider(points);
+
+	CHECK(sphere.center == vec3(11.5f, 0.5f, 6.0f));
+	CHECK(sphere.radius == 0.5f);
+	CHECK(rules::rockCollider({}).radius == 0.0f);
+}
+
 TEST_CASE("The lap is complete at the finish line after all checkpoints in their order", "[rules]")
 {
 	const rules::FinishLine line = testFinishLine();

@@ -27,12 +27,20 @@ namespace
 {
 	const float FRAME = 1.0f / 60.0f;
 	const vec3 DOWN(0.0f, -5.0f, 0.0f);
-	const float ROCK_RADIUS = 0.7f;
 	const float BACKWARD_SPEED = 7.5f; //Bear.cpp
 
 	vec3 startPosition(const std::string& nodeName)
 	{
 		return vec3(nodeModelMatrix(trackNode(nodeName))[3]);
+	}
+
+	//The collision sphere of a rock as the game creates it (Scene::initPhysicsBodies)
+	rules::Sphere rockCollider(const std::string& nodeName)
+	{
+		std::vector<vec3> vertices;
+		std::vector<unsigned int> indices;
+		REQUIRE(bibo::world::TrackTerrain::loadNodeMesh(trackScene(), nodeName.c_str(), vertices, indices));
+		return rules::rockCollider(vertices);
 	}
 
 	/**
@@ -51,7 +59,8 @@ namespace
 			world.createStaticBox(vec3(0.0f, -6.0f, 0.0f), vec3(1000.0f, 1.0f, 1000.0f)); //ground
 			for (int i = 1; withRocks && i <= 12; ++i)
 			{
-				rocks.push_back(world.createStaticSphere(startPosition("Rock" + std::to_string(i)), ROCK_RADIUS));
+				rules::Sphere rock = rockCollider("Rock" + std::to_string(i));
+				rocks.push_back(world.createStaticSphere(rock.center, rock.radius));
 			}
 			streamer = std::make_unique<WorldStreamer>(worldGenerator(), &world, WorldStreamer::Settings(), 2);
 			streamer->ensureCollision(bearStart, 12.0f);

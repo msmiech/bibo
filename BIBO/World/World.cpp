@@ -159,10 +159,10 @@ void World::finishLoading(glm::vec3 camera, glm::vec3 bear, float timeoutSeconds
 		<< statistics.instances << " plants and stones, " << statistics.streaming.collisionBodies << " collision bodies" << std::endl;
 }
 
-void World::ensureCollision(glm::vec3 bear)
+void World::ensureCollision(glm::vec3 bear, glm::vec3 camera)
 {
 	streamer->ensureCollision(bear, 12.0f);
-	update(0.0f, bear, bear);
+	update(0.0f, camera, bear);
 }
 
 void World::fillFrameUniforms(render::FrameUniforms& uniforms) const

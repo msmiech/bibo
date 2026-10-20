@@ -22,7 +22,8 @@ namespace bibo
 			VEGETATION_STEM, //mushroom stem
 			VEGETATION_GLOW, //glowing mushroom
 			VEGETATION_WOOD, //cut wood with year rings (uv: center at 0.5, 0.5)
-			VEGETATION_GRASS //blades of grass, translucent
+			VEGETATION_GRASS, //blades of grass, translucent
+			VEGETATION_GLOSSY //wet and shiny: eyes, noses, the scales of a fish
 		};
 
 		/**

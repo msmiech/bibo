@@ -8,6 +8,7 @@
 	<div class="dialog">
 		<h1 data-if="!game_won">Game over</h1>
 		<h1 data-if="game_won">You won!</h1>
+		<p class="score">Salmon caught: {{ salmon_caught }} &nbsp; Score: {{ score }}</p>
 		<button autofocus data-event-click="restart">Restart</button>
 		<button data-event-click="main_menu">Main menu</button>
 		<p class="hints"><span class="key first">R</span>Restart</p>

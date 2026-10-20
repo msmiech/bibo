@@ -63,7 +63,7 @@ namespace bibo::test
 	const char* const TRACK_FILE = "Model/SnowTerrain/track1.dae";
 
 	/**
-	* Nodes of the track file that the game loads (Scene, and the start position of the Bear)
+	* Nodes of the track file that the game loads (Scene, the start position of the Bear, the homes of the hedgehogs)
 	*/
 	const std::vector<std::string>& gameNodeNames();
 

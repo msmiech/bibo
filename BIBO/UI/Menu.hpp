@@ -39,9 +39,10 @@ namespace bibo
 			void showMainMenu();
 			void showPauseMenu();
 			/**
-			* Shown when the run is over (the bear hit a rock or fell off the track) or won
+			* Shown when the run is over (the bear fell off the track) or won
+			* @param score Bonus points of the run, salmon: how many salmon the bear caught
 			*/
-			void showGameOverMenu(bool won);
+			void showGameOverMenu(bool won, int score, int salmon);
 			void hide();
 			/**
 			* Returns from the settings menu to the menu it was opened from (like its Back button)

@@ -113,6 +113,12 @@
 				<span class="label">Show controls</span>
 				<input type="checkbox" data-checked="show_help"/>
 			</label>
+
+			<h2>Sound</h2>
+			<label class="row">
+				<span class="label">Music</span>
+				<input type="checkbox" data-checked="music"/>
+			</label>
 		</div>
 
 		<div class="panel-footer">

@@ -41,6 +41,9 @@ namespace bibo
 		bool showFrameTime = true;
 		bool showHelp = false;
 
+		//Sound
+		bool music = true;
+
 		/**
 		* Reads the settings written by save(). Missing entries keep their current value, invalid ones are ignored.
 		* @return false if the file could not be opened (e.g. on the first start)

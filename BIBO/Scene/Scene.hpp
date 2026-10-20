@@ -4,8 +4,11 @@
 #include "Geometry.hpp"
 #include <memory>
 #include "Bear.hpp"
-#include "Cube.hpp"
+#include "CreatureRenderer.hpp"
 #include "GameRules.hpp"
+#include "Hedgehog.hpp"
+#include "HedgehogRenderer.hpp"
+#include "Salmon.hpp"
 #include "../Render/Renderer.hpp"
 #include "../Util/Input.hpp"
 #include "../Util/Util.hpp"
@@ -21,20 +24,28 @@ namespace bibo
 	namespace scene
 	{
 		/**
-		* The race: the bear, the objects of the track (finish line, rocks, signs, ...) and the world around it (World:
-		* the island with its forest, caves, sky, water and snow)
+		* The race: the bear, the objects of the track (finish line, signs, ...), the animals (hedgehogs that stroll around
+		* on the track, salmon that jump out of the water) and the world around it (World: the island with its forest,
+		* caves, sky, water and snow)
 		*/
 		class Scene : public render::RenderableScene
 		{
 			void initPhysicsBodies();
-			void initAnimatedTextures();
 			void initWorld(const aiScene& track);
+			/**
+			* The hedgehogs live where the rocks of the track were, the salmon in the water on the track
+			*/
+			void initAnimals();
 			/**
 			* @param board The finish line (geometry), the trigger goes along it across the track
 			*/
 			void initFinishLine(Geometry* board);
-			//Called when the bear touches a physics body: obstacles (rocks) knock it down
+			//Called when the bear touches a physics body: the hedgehogs knock it down
 			void onBearHit(const physics::CharacterController::Hit& hit);
+			void updateAnimals(float time_delta);
+			//Puts the parts of the animals where they are drawn in this frame
+			void placeAnimals();
+			void placeSalmon(vec3 center, const quat& rotation, int bites, float wiggle);
 			//What the camera follows: the bear
 			Camera::FollowTarget cameraTarget();
 			/**
@@ -57,19 +68,23 @@ namespace bibo
 			vector<unique_ptr<Geometry>> geometries;
 			unique_ptr<Camera> camera;
 			vector<unique_ptr<Texture>> textures;
-			vector<unique_ptr<Texture>> monitorVideo;
 			vector<unique_ptr<Geometry>> arrows;
 			unique_ptr<world::World> world;
 
 			//special pointers
 			Bear* bear;
 			Geometry* finishLine;
-			Geometry* monitor1;
 			Geometry* crate;
-			vector<Geometry*> rocks;
-			unique_ptr<Cube> debugCube;
-			unique_ptr<Geometry> rotatingRock;
 			Texture* crateNormalMap;
+
+			//Animals
+			vector<vec2> hedgehogHomes; //where the rocks of the track are
+			vector<Hedgehog> hedgehogs;
+			vector<physics::BodyHandle> hedgehogBodies;
+			unique_ptr<SalmonPools> salmon;
+			unique_ptr<CreatureRenderer> creatures;
+			unique_ptr<HedgehogRenderer> hedgehogRenderer;
+			int score = 0;
 
 			//Physics
 			physics::PhysicsWorld* physicsWorld;
@@ -85,7 +100,6 @@ namespace bibo
 			size_t nextCheckpoint = 0;
 			rules::FinishLine finishLineTrigger;
 
-			vector<physics::BodyHandle> bodiesRock;
 			//Dynamic bodies and their start poses, which they are moved back to by restart()
 			struct DynamicBody
 			{
@@ -94,9 +108,6 @@ namespace bibo
 				quat rotation;
 			};
 			vector<DynamicBody> dynamicBodies;
-
-			float accumulatedVideoTime = 0;
-			int monitorFrame = 0;
 
 		public:
 			Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsWorld);
@@ -113,8 +124,11 @@ namespace bibo
 			Camera& getCamera() { return *camera; }
 			Bear& getBear() { return *bear; }
 			world::World& getWorld() { return *world; }
+			const vector<Hedgehog>& getHedgehogs() const { return hedgehogs; }
+			const SalmonPools& getSalmon() const { return *salmon; }
 			/**
-			* Starts the run again: the bear, the movable objects and the lap go back to the start (R key, game over menu)
+			* Starts the run again: the bear, the movable objects, the animals, the lap and the score go back to the start
+			* (R key, game over menu)
 			*/
 			void restart();
 
@@ -152,6 +166,12 @@ namespace bibo
 			int getGeometryCount();
 			int getCheckpointsPassed();
 			int getCheckpointCount();
+			/**
+			* @return Bonus points of the run (the salmon the bear caught)
+			*/
+			int getScore() const { return score; }
+			int getSalmonCaught() const { return salmon->getCaughtCount(); }
+			int getPoolCount() const { return static_cast<int>(salmon->getPools().size()); }
 			bool isGameOver();
 			bool isGameWon();
 		};

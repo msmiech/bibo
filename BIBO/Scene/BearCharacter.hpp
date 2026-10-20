@@ -28,8 +28,10 @@ namespace bibo
 
 		/**
 		* The player character without graphics: the character controller, the animation (BearRig), the ragdoll and the fur
-		* dynamics. After a knock down (e.g. running into a rock) the bear tumbles as a ragdoll until it lies still,
+		* dynamics. After a knock down (e.g. running into an obstacle) the bear tumbles as a ragdoll until it lies still,
 		* then it gets up and the player controls it again.
+		* A fish that the bear catches stays in its mouth until it stands on the ground, then the bear sits down and eats it
+		* (the player can only move it again after the last bite).
 		*/
 		class BearCharacter
 		{
@@ -39,6 +41,22 @@ namespace bibo
 				CONTROL, //the player moves the bear
 				RAGDOLL, //tumbling after a hit
 				GETTING_UP
+			};
+			enum class Fish
+			{
+				NONE,
+				CARRIED, //in the mouth (running, jumping)
+				EATING
+			};
+			/**
+			* Where the fish is that the bear holds (in the frame of the fish model: +z towards its head)
+			*/
+			struct HeldFish
+			{
+				glm::vec3 center = glm::vec3(0.0f);
+				glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+				int bites = 0; //taken so far (3: eaten)
+				float wiggle = 0.0f; //how far the tail is turned (radians)
 			};
 
 			/**
@@ -80,6 +98,24 @@ namespace bibo
 			* Plays an idle animation now (they also start on their own when the player does not move the bear for a while)
 			*/
 			void startIdle(BearRig::Idle idle);
+			/**
+			* @return true if the bear can catch a fish now (it is not tumbling and does not hold one already)
+			*/
+			bool canCatchFish() const { return state == State::CONTROL && fish == Fish::NONE; }
+			/**
+			* The bear caught a fish: it holds it in its mouth and eats it as soon as it stands on the ground
+			* @return false if it cannot catch one now (see canCatchFish)
+			*/
+			bool catchFish();
+			Fish getFish() const { return fish; }
+			/**
+			* @return false if the bear holds no fish
+			*/
+			bool getHeldFish(HeldFish& held) const;
+			/**
+			* Between the front teeth (world space)
+			*/
+			glm::vec3 getMouthPosition() const;
 
 			State getState() const { return state; }
 			/**
@@ -136,6 +172,7 @@ namespace bibo
 			void startGettingUp();
 			void updateSkin(float timeDelta);
 			LocomotionInput locomotionInput(bool jumped = false) const;
+			HeldFish carriedFish() const;
 
 			physics::PhysicsWorld& world;
 			const resources::SkinnedModel& model;
@@ -167,6 +204,8 @@ namespace bibo
 			float idleWaitTime = 0.0f; //standing without input
 			int nextIdle = BearRig::IDLE_STRETCH;
 			glm::vec3 positionOffset = glm::vec3(0.0f); //smooths getPosition when the state changes
+			Fish fish = Fish::NONE;
+			int tongueRoot, tongueTip, leftPaw, rightPaw; //bones that hold the fish
 
 			//Skinning and fur
 			std::vector<glm::mat4> skinMatrices;

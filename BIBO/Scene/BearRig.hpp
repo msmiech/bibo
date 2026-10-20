@@ -58,6 +58,8 @@ namespace bibo
 		* - Secondary motion: ears and tail are springs, the head looks around when the bear stands.
 		* - Idle animations when the bear stands still for a while (startIdle): stretching (sits down, pulls a hind paw to its
 		*   chest and sticks its tongue out) and yawning (sits down and yawns). Key poses of the body, the feet and the face.
+		*   Eating a salmon works the same way: it sits down, holds the fish with its front paws, takes three big bites,
+		*   chews happily with closed eyes and licks its lips.
 		* - Ragdoll: the bones follow the bodies of the ragdoll (ragdollParts), the bones in between are interpolated.
 		* - Getting up: from the pose of the ragdoll the bear rolls onto its belly, pushes itself up and shakes its fur.
 		*
@@ -72,7 +74,16 @@ namespace bibo
 			*/
 			enum RagdollPartIndex { PART_PELVIS, PART_CHEST, PART_HEAD, PART_UPPERARM_L, PART_FOREARM_L, PART_UPPERARM_R, PART_FOREARM_R,
 				PART_THIGH_L, PART_SHIN_L, PART_THIGH_R, PART_SHIN_R, PART_COUNT };
-			enum Idle { IDLE_STRETCH, IDLE_YAWN, IDLE_COUNT };
+			enum Idle { IDLE_STRETCH, IDLE_YAWN, IDLE_EAT, IDLE_COUNT };
+			/**
+			* The idle animations the bear plays on its own when it stands still (the first ones of Idle)
+			*/
+			static constexpr int RESTING_IDLE_COUNT = 2;
+			/**
+			* Times in the eating animation (seconds) when the fish moves from the mouth into the paws, and the three bites
+			*/
+			static constexpr float EAT_TAKE_START = 0.3f, EAT_TAKE_END = 0.85f;
+			static constexpr float EAT_BITES[3] = { 1.35f, 2.35f, 3.3f };
 			/**
 			* The mouth of the model is open in its bind pose (the inside is modelled with it), the jaw closes it by this angle (degrees)
 			*/
@@ -112,6 +123,14 @@ namespace bibo
 			*/
 			int getIdle() const { return idle; }
 			float getIdleDuration(Idle idle) const;
+			/**
+			* @return Seconds since the idle animation started
+			*/
+			float getIdleTime() const { return idleTime; }
+			/**
+			* Holding something in the mouth (e.g. a fish) while it walks, runs and jumps: the mouth stays a bit open
+			*/
+			void setCarrying(bool carrying) { this->carrying = carrying; }
 
 			/**
 			* Bodies and joints of the ragdoll in the bind pose (model space)
@@ -319,6 +338,7 @@ namespace bibo
 			float gazeYaw = 0.0f, gazePitch = 0.0f, gazeTargetYaw = 0.0f, gazeTargetPitch = 0.0f, saccadeTimer = 1.0f;
 			float blinkTimer = 3.0f, blinkProgress = -1.0f;
 			float earTwitchTimer = 4.0f;
+			bool carrying = false;
 
 			//Idle animations
 			std::array<std::vector<IdleKey>, IDLE_COUNT> idleAnimations;

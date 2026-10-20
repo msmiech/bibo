@@ -1,0 +1,258 @@
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
+
+#include "Scene/CreatureMeshes.hpp"
+#include "Resources/SkinnedModel.hpp"
+#include "Scene/Hedgehog.hpp"
+#include "Scene/HedgehogModel.hpp"
+#include "Scene/Salmon.hpp"
+#include "TestSupport.hpp"
+
+using namespace bibo::scene;
+using glm::vec2;
+using glm::vec3;
+
+namespace
+{
+	const float FRAME = 1.0f / 60.0f;
+
+	/**
+	* Flat ground at y = 2 on a strip along z (|x| < 5), like the floor of the track
+	*/
+	bool strip(vec2 position, float& height)
+	{
+		height = 2.0f;
+		return std::abs(position.x) < 5.0f;
+	}
+
+	WaterPool pool(vec3 center)
+	{
+		WaterPool water;
+		water.center = center;
+		water.radius = 3.0f;
+		for (float x = -2.0f; x <= 2.0f; x += 1.0f)
+		{
+			water.spots.push_back(vec2(center.x + x, center.z));
+		}
+		return water;
+	}
+}
+
+TEST_CASE("A hedgehog strolls around its home on the ground it can walk on", "[animals]")
+{
+	const vec2 home(0.0f, 10.0f);
+	Hedgehog hedgehog(home, vec2(0.0f, 1.0f), 7u, strip);
+	CHECK(hedgehog.getPosition() == vec3(0.0f, 2.0f, 10.0f));
+	CHECK_FALSE(hedgehog.isWalking()); //sniffs first
+
+	float walked = 0.0f, farthest = 0.0f;
+	vec3 last = hedgehog.getPosition();
+	bool walkedOnce = false;
+	for (int i = 0; i < 60 * 60; ++i)
+	{
+		hedgehog.update(FRAME);
+		vec3 position = hedgehog.getPosition();
+		walked += glm::distance(position, last);
+		last = position;
+		walkedOnce = walkedOnce || hedgehog.isWalking();
+		farthest = std::max(farthest, glm::distance(vec2(position.x, position.z), home));
+		REQUIRE(std::abs(position.x) < 5.0f); //stays on the strip
+		REQUIRE(position.y == 2.0f);
+		//The collision sphere is around the body, which stands on the ground
+		REQUIRE(hedgehog.getColliderCenter().y - hedgehog.getColliderRadius() > 1.9f);
+	}
+	CAPTURE(walked, farthest);
+	CHECK(walkedOnce);
+	CHECK(walked > 15.0f); //it walks, but slowly (and pauses)
+	CHECK(walked < Hedgehog::WALK_SPEED * 60.0f);
+	CHECK(farthest <= Hedgehog::HOME_RADIUS + 0.5f);
+
+	SECTION("Its feet are under its body and step while it walks")
+	{
+		Hedgehog::Pose pose = hedgehog.getPose();
+		for (const vec3& foot : pose.feet)
+		{
+			CHECK(glm::distance(vec2(foot.x, foot.z), vec2(last.x, last.z)) < 0.4f * Hedgehog::SCALE);
+			CHECK(foot.y >= 2.0f - 1e-4f);
+		}
+	}
+	SECTION("Reset: back home")
+	{
+		hedgehog.reset();
+		CHECK(hedgehog.getPosition() == vec3(0.0f, 2.0f, 10.0f));
+	}
+	SECTION("Startled it hops up and lands again")
+	{
+		float before = hedgehog.getColliderCenter().y;
+		hedgehog.startle();
+		hedgehog.update(0.2f);
+		CHECK(hedgehog.getColliderCenter().y > before + 0.2f);
+		hedgehog.update(0.5f);
+		CHECK(std::abs(hedgehog.getColliderCenter().y - before) < 0.1f); //it may bob with its steps
+	}
+}
+
+TEST_CASE("Salmon only jump while the bear is close to their pool, out of the water and back into it", "[animals]")
+{
+	SalmonPools salmon({ pool(vec3(0.0f, -0.5f, 0.0f)) }, 3u);
+	const vec3 far(0.0f, 1.0f, 100.0f);
+	for (int i = 0; i < 5 * 60; ++i)
+	{
+		salmon.update(FRAME, far, far, true);
+	}
+	CHECK(salmon.getJumps().empty());
+
+	const vec3 near(0.0f, 1.0f, 15.0f); //not close enough to catch one
+	float highest = -1e9f;
+	int jumps = 0;
+	for (int i = 0; i < 10 * 60; ++i)
+	{
+		std::size_t before = salmon.getJumps().size();
+		REQUIRE(salmon.update(FRAME, near, near, true) == -1);
+		jumps += salmon.getJumps().size() > before ? 1 : 0;
+		for (const SalmonPools::Jump& jump : salmon.getJumps())
+		{
+			vec3 position = jump.position();
+			highest = std::max(highest, position.y);
+			REQUIRE(position.y >= -0.5f - 0.31f); //from just below the surface
+			CHECK(glm::distance(vec2(position.x, position.z), vec2(0.0f)) < 3.0f + 4.0f); //not far from its pool
+		}
+		REQUIRE(salmon.getJumps().size() <= 2);
+	}
+	CAPTURE(jumps, highest);
+	CHECK(jumps >= 4); //every now and then
+	CHECK(highest > -0.5f + 2.0f); //high enough for the bear to catch it in a jump
+	CHECK_FALSE(salmon.getDroplets().empty()); //splashes
+	CHECK(salmon.getCaughtCount() == 0);
+}
+
+TEST_CASE("The bear can catch one salmon per pool", "[animals]")
+{
+	SalmonPools salmon({ pool(vec3(0.0f, -0.5f, 0.0f)), pool(vec3(0.0f, -0.5f, 40.0f)) }, 5u);
+	const vec3 near(0.0f, 1.0f, 8.0f);
+	//Waits for a salmon of the first pool, then puts its mouth where the salmon is
+	int caught = -1;
+	for (int i = 0; i < 10 * 60 && caught < 0; ++i)
+	{
+		vec3 mouth = near;
+		if (!salmon.getJumps().empty() && salmon.getJumps().front().time > 0.3f)
+		{
+			mouth = salmon.getJumps().front().position();
+		}
+		caught = salmon.update(FRAME, near, mouth, true);
+	}
+	REQUIRE(caught == 0);
+	CHECK(salmon.isCaught(0));
+	CHECK_FALSE(salmon.isCaught(1));
+	CHECK(salmon.getCaughtCount() == 1);
+
+	SECTION("No more salmon jump out of that pool, and none can be caught there")
+	{
+		for (int i = 0; i < 3 * 60; ++i)
+		{
+			salmon.update(FRAME, near, near, true);
+		}
+		for (int i = 0; i < 5 * 60; ++i)
+		{
+			for (const SalmonPools::Jump& jump : salmon.getJumps())
+			{
+				REQUIRE(jump.pool != 0);
+			}
+			vec3 mouth = salmon.getJumps().empty() ? near : salmon.getJumps().front().position();
+			REQUIRE(salmon.update(FRAME, near, mouth, true) == -1);
+		}
+	}
+	SECTION("Not while the bear cannot catch one (it holds one already)")
+	{
+		const vec3 second(0.0f, 1.0f, 48.0f);
+		for (int i = 0; i < 10 * 60; ++i)
+		{
+			vec3 mouth = salmon.getJumps().empty() ? second : salmon.getJumps().front().position();
+			REQUIRE(salmon.update(FRAME, second, mouth, false) == -1);
+		}
+	}
+	SECTION("Reset: none caught")
+	{
+		salmon.reset();
+		CHECK(salmon.getCaughtCount() == 0);
+		CHECK(salmon.getJumps().empty());
+	}
+}
+
+TEST_CASE("The models of the animals are closed meshes of the right size", "[animals]")
+{
+	const int index = GENERATE(range(0, CREATURE_MODEL_COUNT));
+	CAPTURE(index);
+	bibo::world::VegetationMesh mesh = buildCreatureModel(static_cast<CreatureModel>(index));
+	REQUIRE_FALSE(mesh.vertices.empty());
+	REQUIRE(mesh.indices.size() % 3 == 0);
+	for (std::uint32_t i : mesh.indices)
+	{
+		REQUIRE(i < mesh.vertices.size());
+	}
+	for (const bibo::world::VegetationVertex& vertex : mesh.vertices)
+	{
+		REQUIRE(std::isfinite(vertex.position.x + vertex.position.y + vertex.position.z));
+		REQUIRE(std::abs(glm::length(vertex.normal) - 1.0f) < 1e-3f);
+		CHECK(vertex.parameters[1] == 0); //no wind
+		CHECK(vertex.parameters[2] == 0); //no snow on them
+	}
+	CHECK(mesh.radius > 0.0f);
+	CHECK(mesh.radius <= 1.0001f); //the hedgehog and the salmon are about 1 long, a droplet has a radius of 1
+}
+
+TEST_CASE("The hedgehog has spines on its back, fur on its face and belly, eyes, a nose and claws", "[animals]")
+{
+	using bibo::resources::SkinnedModel;
+	HedgehogModel model = HedgehogModel::build();
+	const std::size_t vertices = model.positions.size();
+	REQUIRE(vertices > 0);
+	REQUIRE(model.normals.size() == vertices);
+	REQUIRE(model.colors.size() == vertices);
+	REQUIRE(model.surfaces.size() == vertices);
+	REQUIRE(model.parts.size() == vertices);
+	REQUIRE(model.combs.size() == vertices);
+	REQUIRE(model.spines.size() == vertices);
+	REQUIRE(model.indices.size() % 3 == 0);
+	for (unsigned int index : model.indices)
+	{
+		REQUIRE(index < vertices);
+	}
+	CAPTURE(model.spineTriangles.size(), model.furTriangles.size());
+	CHECK(model.spineTriangles.size() > model.furTriangles.size()); //mostly spines
+	CHECK_FALSE(model.furTriangles.empty());
+	for (std::size_t i = 0; i < model.spineTriangles.size(); i += 3)
+	{
+		//Down to the belly (they hide the legs) and behind the face
+		vec3 center = (model.positions[model.spineTriangles[i]] + model.positions[model.spineTriangles[i + 1]] + model.positions[model.spineTriangles[i + 2]]) / 3.0f;
+		REQUIRE(center.y > 0.03f);
+		REQUIRE(center.z < 0.45f);
+	}
+	int surfaces[7] = {};
+	for (std::size_t v = 0; v < vertices; ++v)
+	{
+		surfaces[static_cast<int>(model.surfaces[v])]++;
+		REQUIRE(std::abs(glm::length(model.normals[v]) - 1.0f) < 1e-3f);
+		if (model.parts[v] == HedgehogModel::BODY && model.surfaces[v] == SkinnedModel::FUR)
+		{
+			REQUIRE(model.positions[v].y >= 0.0f); //not in the ground
+		}
+	}
+	CHECK(surfaces[SkinnedModel::EYE] > 0);
+	CHECK(surfaces[SkinnedModel::NOSE] > 0);
+	CHECK(surfaces[SkinnedModel::CLAW] > 0);
+	//The snout points forward, it is the front of the hedgehog
+	float front = -1e9f;
+	for (std::size_t v = 0; v < vertices; ++v)
+	{
+		if (model.parts[v] == HedgehogModel::BODY)
+		{
+			front = std::max(front, model.positions[v].z);
+		}
+	}
+	CHECK(front > 0.5f);
+}

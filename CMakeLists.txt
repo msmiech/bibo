@@ -110,6 +110,19 @@ FetchContent_Populate(stb
 add_library(bibo_stb INTERFACE)
 target_include_directories(bibo_stb SYSTEM INTERFACE ${stb_SOURCE_DIR})
 
+# miniaudio: plays the music (single file library, only the playback devices are compiled)
+FetchContent_Populate(miniaudio
+	URL https://github.com/mackron/miniaudio/archive/refs/tags/0.11.22.tar.gz
+	URL_HASH SHA256=bcb07bfb27e6fa94d34da73ba2d5642d4940b208ec2a660dbf4e52e6b7cd492f
+	SOURCE_DIR ${FETCHCONTENT_BASE_DIR}/miniaudio-src)
+add_library(bibo_miniaudio STATIC BIBO/Audio/miniaudio.c)
+target_include_directories(bibo_miniaudio SYSTEM PUBLIC ${miniaudio_SOURCE_DIR})
+target_compile_definitions(bibo_miniaudio PUBLIC MA_NO_DECODING MA_NO_ENCODING MA_NO_GENERATION MA_NO_RESOURCE_MANAGER MA_NO_NODE_GRAPH MA_NO_ENGINE)
+target_link_libraries(bibo_miniaudio PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+if(UNIX)
+	target_link_libraries(bibo_miniaudio PUBLIC m)
+endif()
+
 # Jolt Physics: rigid bodies and character controller (replaces Nvidia PhysX 3.3)
 set(TARGET_UNIT_TESTS OFF)
 set(TARGET_HELLO_WORLD OFF)
@@ -180,6 +193,10 @@ add_library(bibo_core STATIC
 	BIBO/Animation/InverseKinematics.hpp
 	BIBO/Animation/Skeleton.cpp
 	BIBO/Animation/Skeleton.hpp
+	BIBO/Audio/Music.cpp
+	BIBO/Audio/Music.hpp
+	BIBO/Audio/MusicPlayer.cpp
+	BIBO/Audio/MusicPlayer.hpp
 	BIBO/Physics/Physics.cpp
 	BIBO/Physics/Physics.hpp
 	BIBO/Render/FrameUniforms.cpp
@@ -213,15 +230,25 @@ add_library(bibo_core STATIC
 	BIBO/Scene/BearRig.hpp
 	BIBO/Scene/Camera.cpp
 	BIBO/Scene/Camera.hpp
-	BIBO/Scene/Cube.cpp
-	BIBO/Scene/Cube.hpp
+	BIBO/Scene/CreatureMeshes.cpp
+	BIBO/Scene/CreatureMeshes.hpp
+	BIBO/Scene/CreatureRenderer.cpp
+	BIBO/Scene/CreatureRenderer.hpp
 	BIBO/Scene/Fur.cpp
 	BIBO/Scene/Fur.hpp
 	BIBO/Scene/GameRules.hpp
 	BIBO/Scene/Geometry.cpp
 	BIBO/Scene/Geometry.hpp
+	BIBO/Scene/Hedgehog.cpp
+	BIBO/Scene/Hedgehog.hpp
+	BIBO/Scene/HedgehogModel.cpp
+	BIBO/Scene/HedgehogModel.hpp
+	BIBO/Scene/HedgehogRenderer.cpp
+	BIBO/Scene/HedgehogRenderer.hpp
 	BIBO/Scene/Light.cpp
 	BIBO/Scene/Light.hpp
+	BIBO/Scene/Salmon.cpp
+	BIBO/Scene/Salmon.hpp
 	BIBO/Scene/Scene.cpp
 	BIBO/Scene/Scene.hpp
 	BIBO/Scene/SceneObject.cpp
@@ -247,6 +274,7 @@ add_library(bibo_core STATIC
 	BIBO/World/ChunkMesher.cpp
 	BIBO/World/MaterialTextures.cpp
 	BIBO/World/MaterialTextures.hpp
+	BIBO/World/MeshBuilder.hpp
 	BIBO/World/Noise.cpp
 	BIBO/World/Noise.hpp
 	BIBO/World/SkyRenderer.cpp
@@ -288,7 +316,8 @@ target_link_libraries(bibo_core PUBLIC
 	assimp::assimp
 	Jolt
 	bibo_rmlui_backend
-	bibo_stb)
+	bibo_stb
+	bibo_miniaudio)
 
 add_executable(BIBO BIBO/Main.cpp)
 target_link_libraries(BIBO PRIVATE

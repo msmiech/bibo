@@ -1,7 +1,7 @@
 # Bear-In Bear-Out
 [![Build](https://github.com/msmiech/bibo/actions/workflows/build.yml/badge.svg)](https://github.com/msmiech/bibo/actions/workflows/build.yml)
 
-Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complete a lap as fast as possible and avoiding obstacles
+Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complete a lap as fast as possible, avoid the hedgehogs on the way and catch salmon for bonus points
 
 ![Main menu, graphics settings and gameplay](Screenshots/bibo_gameplay.gif)
 
@@ -16,17 +16,22 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
   * World partitioning, streaming and level of detail: the island is split into chunks that worker threads mesh in the level of detail their distance needs, the vegetation is drawn instanced with levels of detail and fades out in the distance; the physics world only contains the terrain and the trees around the bear
   * Physically based materials (generated when the game starts): forest floor, the dirt trail, granite, snow, sand, bark, needles and leaves
   * A bright polar day: low sun, clouds and polar lights (aurora) in the sky, cascaded shadow maps, fog, falling snow and simple water
+* Animals on the track (see [The animals](#the-animals) below)
+  * Large hedgehogs stroll around on the track, rendered like the bear (banded spines and fur as strands, the same eyes and skin): they walk with little steps, stop to sniff around and walk on. Running into one knocks the bear over (ouch, the spines) and its spines stand up
+  * Salmon jump out of the pools of water on the track when the bear comes close. The bear can catch one per pool (e.g. when it jumps over the water) for 100 bonus points:
+    it carries the fish in its mouth and as soon as it is on the ground it sits down, holds it in its front paws, takes three big bites, chews happily with closed eyes and licks its lips
+* Music: a cheerful, looping calypso with steel drum, whistle, marimba, bass, percussion and slapstick effects, synthesized by the game (see [The music](#the-music) below)
 * The player character is a young brown bear (see [The bear](#the-bear) below)
   * Skeleton with inverse kinematics: procedural walking and bounding with the paws planted on the terrain, the body follows slopes and leans into turns
   * Strand based fur that is generated on the GPU and reacts to movement, wind, the ground, obstacles and hits
   * Detailed face: eyes with iris and pupil that look around and blink with their eyelids, a jaw, tongue and teeth, ears and tail that swing
-  * Running into a rock knocks the bear over: it tumbles as a ragdoll until it lies still, then gets up, shakes its fur and runs on
+  * Running into a hedgehog knocks the bear over: it tumbles as a ragdoll until it lies still, then gets up, shakes its fur and runs on
   * Idle animations when it stands still for a while: it sits down and stretches (and sticks its tongue out), or sits down and yawns
   * Jumps in a natural arc: holding the button jumps higher, it can still jump right after running over an edge and a jump pressed shortly before landing happens on landing; in the air the bear keeps its momentum
   * Jump animation: the hind legs push off, the legs tuck in, before landing they reach for the ground and the landing is absorbed (the harder, the deeper)
 * Third person camera
   * Orbits around the bear with the mouse or the right stick, the mouse wheel zooms, it goes back behind the running bear on its own
-  * Does not go into the terrain or through rocks (sphere cast into the physics world)
+  * Does not go into the terrain or through the trees (sphere cast into the physics world)
   * Unlocked mode (L) = 3d flying camera (WASD and the mouse)
 * Movable objects with physics (based on Jolt Physics, originally Nvidia PhysX)
 * Texture Mapping (including normal maps)
@@ -44,7 +49,7 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
   * Cross / A to jump (hold to jump higher)
   * Options / Start for the pause menu, D-pad, Cross / A and Circle / B in the menus
   * Other controllers work if GLFW knows them; newer mappings can be added in a `gamecontrollerdb.txt` ([SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB)) in the game folder
-* Settings for the camera sensitivity and inverting the camera up/down
+* Settings for the camera sensitivity and inverting the camera up/down, and for the music (on or off)
 * Main menu, pause menu, game over menu (restart the run or back to the main menu) and settings menu (based on RmlUi, usable with mouse, keyboard or gamepad)
   * Graphics settings (VSync, HDR, bloom, shadows, normal mapping, transparency, texture filtering, mipmapping, wireframe)
   * Resolution and window mode (windowed, fullscreen or borderless)
@@ -54,7 +59,6 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
 * Animations (procedural skeletal animation of the bear, animated objects, vegetation swaying in the wind)
 * Transparency
 * Cascaded shadow maps
-* Animated textures (e.g. the TV static of the monitor)
 * View frustum culling: objects and chunks outside of the camera's view are not drawn (F8 to switch it off, the HUD shows how many objects, chunks and plants are drawn)
 * Settings for the detail of the world (how far the levels of detail and the vegetation reach)
 
@@ -181,8 +185,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests are in the `tests` folder:
-* `unit`: game rules (falling off the track, checkpoints in their order, the finish line), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions, ray casts, sphere casts, ragdolls falling and coming to rest with connected joints), animation (transforms, forward kinematics, two bone IK, springs), the fur (guide hairs lag behind, hang down, lie on the ground and on obstacles, hits ruffle them; strand placement), the view frustum (compared with the camera matrices for random cameras), math helpers, the generated textures, the input (stick dead zones, moving relative to the camera), the noise of the world, the worker threads, the shadow cascades (they cover their slice of the view and move in whole texels) and the includes of the shader files
-* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart; the world (the height field of the track matches its mesh, the path goes around the lap through the checkpoints on the floor of the canyon, the ground on the track is the track terrain, the island is surrounded by sea with beaches and cliffs, the caves leave room for the bear to run and jump, neighboring chunks fit together without cracks, the levels of detail, trees grow next to the track but not on it, the streaming of the chunks, the vegetation and the physics); the bear model (its skeleton matches its skinning, it stands on the ground and fits its capsule, fur and bare skin, eyes, mouth, tongue, teeth and claws) and the bear in action (paws planted while it runs, knocked down by a rock it tumbles, gets up and runs again, rolling over from its back, idle animations and how moving interrupts them, blinking and looking around, steering, jumping higher the longer the button is held, jumping after running over an edge and just before landing, the legs reaching for the ground and landing without jumping paws)
+* `unit`: game rules (falling off the track, checkpoints in their order, the finish line), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions, a moving hedgehog touching the bear, ray casts, sphere casts, ragdolls falling and coming to rest with connected joints), animation (transforms, forward kinematics, two bone IK, springs), the fur (guide hairs lag behind, hang down, lie on the ground and on obstacles, hits ruffle them; strand placement), the view frustum (compared with the camera matrices for random cameras), math helpers, the generated textures, the input (stick dead zones, moving relative to the camera), the noise of the world, the worker threads, the shadow cascades (they cover their slice of the view and move in whole texels), the includes of the shader files, the animals (hedgehogs stroll around their home and stay on the ground they can walk on, salmon jump only near the bear, high enough to be caught, one per pool; the generated models) and the music (the notation of the melodies, a loud enough loop without a click where it starts again, the same every time)
+* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart; the world (the height field of the track matches its mesh, the path goes around the lap through the checkpoints on the floor of the canyon, the ground on the track is the track terrain, the island is surrounded by sea with beaches and cliffs, the caves leave room for the bear to run and jump, the pools of water on the track are deep enough for salmon, the hedgehogs stay on the floor of the track, neighboring chunks fit together without cracks, the levels of detail, trees grow next to the track but not on it, the streaming of the chunks, the vegetation and the physics); the bear model (its skeleton matches its skinning, it stands on the ground and fits its capsule, fur and bare skin, eyes, mouth, tongue, teeth and claws) and the bear in action (paws planted while it runs, knocked down by a rock it tumbles, gets up and runs again, rolling over from its back, idle animations and how moving interrupts them, carrying and eating a caught fish (and dropping it when it is knocked down), blinking and looking around, steering, jumping higher the longer the button is held, jumping after running over an edge and just before landing, the legs reaching for the ground and landing without jumping paws)
 * `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the generated materials and the sky, the camera (orbiting, following, going back behind the bear, keeping out of obstacles) and the whole scene (a frame of the renderer, culling never removes a visible pixel and leaves out the chunks and plants that are not in view, the camera never goes into the terrain of the track). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
   On Linux servers without a graphics card they run on a virtual X server with Mesa's software renderer: `xvfb-run -a ctest --test-dir build --output-on-failure`
 
@@ -252,13 +256,45 @@ In a jump the hind paws push off from where they left the ground, the legs tuck 
 the legs reach for it; on landing the paws are put down where they are, springs dip the body and the nose and the steps blend in.
 
 **Fur** (`BIBO/Scene/Fur.cpp`, `Shader/bear_fur.*`): every vertex of the skin has a guide hair, a damped spring that lags behind when the body
-accelerates, hangs down, moves in the wind, lies on the ground and on rocks and is ruffled by hits (simulated on the CPU).
+accelerates, hangs down, moves in the wind, lies on the ground and on the spines of the hedgehogs and is ruffled by hits (simulated on the CPU).
 60000 strands are generated on the GPU from the skinned vertices (no vertex buffer, only the triangle and the position on it per strand):
 each strand is a curved, camera facing ribbon that interpolates the guide hairs of its triangle, shaded with Kajiya-Kay highlights.
 Further away fewer, wider strands are drawn.
 
-**Ragdoll** (`BIBO/Scene/BearCharacter.cpp`): a hit on a rock starts a Jolt ragdoll (capsules with swing-twist and hinge joints) from the current pose and
+**Ragdoll** (`BIBO/Scene/BearCharacter.cpp`): running into a hedgehog starts a Jolt ragdoll (capsules with swing-twist and hinge joints) from the current pose and
 velocities. When it lies still, the bear rolls over if it is on its back, pushes itself up, shakes its fur and gets back the control.
+### The animals
+**Hedgehogs** (`BIBO/Scene/Hedgehog.cpp`): twelve hedgehogs live where the rocks of the track are (the nodes `Rock1` to `Rock12`).
+Each one strolls around its home: it walks to a random spot nearby on the floor of the track (not too close to the walls, never into the water), sniffs around for a while and walks on.
+It turns while it walks, its feet trot in diagonal pairs, the body bobs and waddles, and when the bear runs into it, it hops up in surprise.
+Its collision sphere is a kinematic body in the physics world that the game moves with it, so it knocks the bear over like the rocks did, also when it walks into the bear.
+
+**Salmon** (`BIBO/Scene/Salmon.cpp`): the pools of water are found along the center line of the track (where the ground is below the sea level, `findWaterPools`).
+When the bear comes close to a pool, salmon jump out of its deeper spots every now and then, near the bear, 2 to 4 meters high in a ballistic arc with the nose following the flight, the tail wiggling, and a splash of droplets where they leave and enter the water.
+A salmon that comes close to the mouth or the body of the bear is caught (one per pool, 100 points).
+
+**The look of the hedgehogs** (`BIBO/Scene/HedgehogModel.cpp`, `BIBO/Scene/HedgehogRenderer.cpp`): they are drawn like the bear, with its skin and fur shaders, so both look alike.
+The body is generated as a surface around its center: a low egg that tapers to a pointed snout, flat underneath. Its back and sides carry about 4500 spines: strands of the fur shader in a stiff mode
+(straight, lying back on the skin, pointed, smooth like horn and banded like real ones: light at the root, a long dark brown band and a light tip). The face and the belly have short brown fur (16000 strands),
+the eyes are small and dark (the eye shading of the bear), the nose is wet, the ears are round, and the feet with their claws hide under the spines.
+The vertices of all hedgehogs are moved on the CPU (the body and the feet separately) and uploaded once per frame; far away fewer, wider strands are drawn.
+
+**The salmon** (`BIBO/Scene/CreatureMeshes.cpp`) is generated like the vegetation and drawn instanced with its shaders (`BIBO/Scene/CreatureRenderer.cpp`), so it is lit, shadowed and fogged like the rest of the world.
+It is made of three parts (head, body, tail) with pink flesh where they meet: the bear eats it part by part, and the tail is turned to wiggle.
+
+**Eating** (`BIBO/Scene/BearRig.cpp`, `IDLE_EAT`): an animation of key poses like the idle animations. The fish moves from the mouth into the front paws while the bear sits down,
+then it is held so that what is left of it is at the mouth whenever the bear bites. The player can move the bear again after the last bite.
+
+### The music
+The music (`BIBO/Audio/Music.cpp`) is composed in code and synthesized when the game starts (in a background thread, under a second), nothing of it is stored in files.
+It is an original cheerful calypso in F major at 136 beats per minute, inspired by the playful, slapstick mood of the looping beach ending of Gon in Tekken 3:
+32 bars (about a minute) in the form A A' B B', with the melodies written in a small note notation (`parseMelody`), and
+* a steel drum (bright partials that fade quickly) and a whistle (a pure tone with breath and vibrato) for the melodies, with a ping-pong echo,
+* marimba chords on the offbeats and arpeggios, a plucked bass in a calypso rhythm, kick, rim shot, hi-hat and shaker,
+* a slide whistle, a spring (boing) and a wood block at the ends of the phrases.
+
+Sounds that go on past the end of the loop continue at its beginning, so it loops without a gap or a click. `BIBO/Audio/MusicPlayer.cpp` plays it on the default audio device with [miniaudio](https://miniaud.io)
+and fades it in and out when it is switched on or off in the settings. Without an audio device the game runs silently; it is not played while recording (`--record`).
 ### Libraries and Dependencies
 Downloaded automatically by CMake (see `CMakeLists.txt` for the exact versions and checksums):
 * [Assimp](https://github.com/assimp/assimp) 6.0 (model loading: Collada for the track, glTF for the bear)
@@ -269,6 +305,7 @@ Downloaded automatically by CMake (see `CMakeLists.txt` for the exact versions a
 * [Jolt Physics](https://github.com/jrouwe/JoltPhysics) 5.6 (physics, replaces Nvidia PhysX 3.3.4)
 * [RmlUi](https://github.com/mikke89/RmlUi) 6.3 (menus, written in RML and RCSS similar to HTML and CSS, see the `UI` folder)
 * [stb_image](https://github.com/nothings/stb) (image loading, replaces DevIL)
+* [miniaudio](https://miniaud.io) 0.11 (plays the music; public domain or MIT-0, also downloaded with `BIBO_USE_SYSTEM_LIBS`)
 * [Catch2](https://github.com/catchorg/Catch2) 3.16 (tests only)
 
 ## Sources
@@ -289,7 +326,8 @@ Downloaded automatically by CMake (see `CMakeLists.txt` for the exact versions a
 * BearBrown (the bear of earlier versions, still in the track file but no longer used) - http://tf3dm.com/3d-model/bear-98965.html
 * SnowTerrain (the terrain of the track) - http://tf3dm.com/3d-model/snowy-terrain-46334.html
 * The island around the track, its vegetation, the materials and the sky: generated by the game (see [The world](#the-world))
-* Rock - http://tf3dm.com/3d-model/rock-86533.html
-* Salmon - http://tf3dm.com/3d-model/salmon-44387.html
+* Rock - http://tf3dm.com/3d-model/rock-86533.html (in the track file, the hedgehogs live where the rocks are)
+* Salmon - http://tf3dm.com/3d-model/salmon-44387.html (in the track file, no longer drawn)
+* The hedgehogs, the salmon that jump out of the water and the music: generated by the game (see [The animals](#the-animals) and [The music](#the-music))
 * Font: [DejaVu Sans](https://dejavu-fonts.github.io) (see `Font/DejaVuSans-LICENSE.txt`)
-* The chequered flag of the finish line and the TV static of the monitor are generated by the game
+* The chequered flag of the finish line is generated by the game

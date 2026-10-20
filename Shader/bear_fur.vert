@@ -1,11 +1,12 @@
 #version 430 core
 /*
-* Fur strands of the bear, generated on the fly: there are no vertex buffers, every vertex is computed from gl_VertexID.
+* Fur strands of the bear (and the hedgehogs), generated on the fly: there are no vertex buffers, every vertex is computed from gl_VertexID.
 * A strand grows from a point on a triangle of the skinned mesh (barycentric coordinates in the strand buffer) and is
 * a quadratic Bezier curve: it leaves the skin along the normal, is combed backwards and down and bends with the
 * guide hairs of the triangle (simulated on the CPU, see Fur.hpp). It is drawn as a ribbon that faces the camera.
 * All strands are one triangle strip: the first and the last vertex of a strand are repeated, the degenerate
 * triangles in between connect the strands without being drawn.
+* With spines = 1 the strands are the spines of a hedgehog: straight, stiff, lying flatter on the skin and tapering to a point.
 */
 
 struct SkinVertex
@@ -32,6 +33,7 @@ uniform int segments; //of every strand
 uniform float maxFurLength; //world units for fur length 1
 uniform float strandWidth; //at the root (world units)
 uniform float pixelSize; //world units per pixel at a distance of 1 from the camera
+uniform int spines; //1: hedgehog spines instead of fur
 
 out vec3 worldPosition;
 out vec3 strandTangent;
@@ -79,15 +81,16 @@ void main()
 	float furLength = color.a * maxFurLength * strand.parameters.z;
 
 	//Every strand is combed a bit differently and stands up more or less
-	float angle = (random(seed, 1u) - 0.5) * 1.1;
+	bool stiff = spines == 1;
+	float angle = (random(seed, 1u) - 0.5) * (stiff ? 0.7 : 1.1);
 	vec3 combed = cos(angle) * comb + sin(angle) * cross(normal, comb);
-	float lift = 0.42 + 0.3 * random(seed, 2u);
+	float lift = stiff ? 0.3 + 0.25 * random(seed, 2u) : 0.42 + 0.3 * random(seed, 2u);
 	vec3 restDirection = normalize(normal * lift + combed * (1.0 - lift) * 1.5);
 	vec3 tipDirection = normalize(restDirection + bend);
 
 	//Bezier curve: the root is a bit inside of the skin, so that no gaps show where the strand leaves it
 	vec3 p0 = root - normal * (0.08 * furLength);
-	vec3 p1 = root + normalize(normal + restDirection) * (0.45 * furLength) + bend * (0.12 * furLength);
+	vec3 p1 = stiff ? 0.5 * (p0 + root + tipDirection * furLength) : root + normalize(normal + restDirection) * (0.45 * furLength) + bend * (0.12 * furLength);
 	vec3 p2 = root + tipDirection * furLength;
 	float t = float(segment) / float(segments);
 	vec3 position = mix(mix(p0, p1, t), mix(p1, p2, t), t);
@@ -100,7 +103,7 @@ void main()
 	float distance = length(toEye);
 	vec3 across = cross(tangent, toEye);
 	across = dot(across, across) > 1e-12 ? normalize(across) : cross(tangent, normal);
-	float width = strandWidth * (1.0 - 0.8 * t);
+	float width = strandWidth * (1.0 - (stiff ? 0.92 : 0.8) * t);
 	float onePixel = pixelSize * distance;
 	coverage = clamp(width / onePixel, 0.0, 1.0);
 	position += across * (side * max(width, onePixel));

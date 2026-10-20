@@ -5,14 +5,13 @@ description: How to script, build, test and visually check BIBO on the developer
 
 # BIBO development environment
 
-## Python: always through uv
-`python` / `python3` are usually **not** on the PATH on the Windows machines (the bare name opens the Microsoft Store alias).
-Python is available through [uv](https://docs.astral.sh/uv/):
+## Python
+`python` (and `python3`) is on the PATH, installed with [uv](https://docs.astral.sh/uv/) as the default Python. Run it directly:
 
 ```bash
-uv run python -c "print('ok')"          # one-liner
-uv run python script.py args            # a script
-uv run python - <<'EOF'                  # inline script (handy for multi-line file edits)
+python -c "print('ok')"          # one-liner
+python script.py args            # a script
+python - <<'EOF'                  # inline script (handy for multi-line file edits)
 p = 'BIBO/Scene/Scene.cpp'
 s = open(p, encoding='utf-8').read()
 s = s.replace('old', 'new', 1)
@@ -21,6 +20,7 @@ EOF
 ```
 
 Packages for a one-off script: `uv run --with numpy --with pillow python script.py` (no global installs, nothing added to the repository).
+If a heredoc trips over the quoting of the shell, write the script to a file outside of the repository and run that.
 Read and write files with `encoding='utf-8'`; the sources are UTF-8 and use tabs for indentation.
 
 ## Build

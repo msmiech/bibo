@@ -20,7 +20,7 @@ layout(binding = 4) uniform sampler2DArray materialNormal;
 layout(location = 0) out vec4 fragColor;
 
 //Vegetation materials (VegetationMeshes.hpp)
-const int PLAIN = 0, BARK = 1, NEEDLES = 2, LEAVES = 3, STONE = 4, CAP_SPOTTED = 5, STEM = 6, GLOW = 7, WOOD = 8, GRASS = 9;
+const int PLAIN = 0, BARK = 1, NEEDLES = 2, LEAVES = 3, STONE = 4, CAP_SPOTTED = 5, STEM = 6, GLOW = 7, WOOD = 8, GRASS = 9, GLOSSY = 10;
 //Layers of the material textures (MaterialTextures.hpp)
 const float LAYER_SNOW = 0.0, LAYER_FOREST = 1.0, LAYER_ROCK = 3.0, LAYER_BARK = 5.0, LAYER_NEEDLES = 6.0, LAYER_LEAVES = 7.0;
 
@@ -136,6 +136,10 @@ void main()
 		roughness = 0.55;
 		specular = 0.4;
 		translucency = 0.6;
+	}
+	else if (material == GLOSSY)
+	{
+		roughness = 0.2;
 	}
 
 	//Snow on everything that faces up and can hold it

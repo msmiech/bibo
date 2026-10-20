@@ -298,6 +298,26 @@ BodyHandle PhysicsWorld::createStaticSphere(glm::vec3 position, float radius)
 	return impl->addBody(sphere, position, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), JPH::EMotionType::Static);
 }
 
+BodyHandle PhysicsWorld::createKinematicSphere(glm::vec3 position, float radius)
+{
+	JPH::SphereShapeSettings sphere(radius);
+	sphere.SetEmbedded();
+	return impl->addBody(sphere, position, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), JPH::EMotionType::Kinematic);
+}
+
+void PhysicsWorld::moveKinematic(BodyHandle body, glm::vec3 position, glm::quat rotation, float time_delta)
+{
+	JPH::BodyInterface& bodyInterface = impl->system.GetBodyInterface();
+	JPH::BodyID bodyID(body);
+	if (time_delta <= 0.0f)
+	{
+		bodyInterface.SetPositionAndRotation(bodyID, JPH::RVec3(toJolt(position)), toJolt(glm::normalize(rotation)), JPH::EActivation::Activate);
+		bodyInterface.SetLinearAndAngularVelocity(bodyID, JPH::Vec3::sZero(), JPH::Vec3::sZero());
+		return;
+	}
+	bodyInterface.MoveKinematic(bodyID, JPH::RVec3(toJolt(position)), toJolt(glm::normalize(rotation)), time_delta);
+}
+
 BodyHandle PhysicsWorld::createStaticMesh(const float* vertices, unsigned int numVertices, const unsigned int* indices, unsigned int numTriangles,
 	float scale, glm::vec3 position, glm::quat rotation)
 {

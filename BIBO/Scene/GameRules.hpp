@@ -95,35 +95,8 @@ namespace bibo
 				return checkpointsPassed == CHECKPOINT_COUNT && isOnFinishLine(playerPosition, line);
 			}
 
-			struct Sphere
-			{
-				glm::vec3 center = glm::vec3(0.0f);
-				float radius = 0.0f;
-			};
-
-			/**
-			* Collision sphere of a rock (an obstacle that knocks the bear down): in the middle of the rock as it is drawn and
-			* as large as its smallest half extent, so the bear never runs into empty air next to a rock
-			* @param points The vertices of the rock in world space
-			*/
-			inline Sphere rockCollider(const std::vector<glm::vec3>& points)
-			{
-				Sphere sphere;
-				if (points.empty())
-				{
-					return sphere;
-				}
-				glm::vec3 low = points[0], high = points[0];
-				for (const glm::vec3& point : points)
-				{
-					low = glm::min(low, point);
-					high = glm::max(high, point);
-				}
-				glm::vec3 halfExtent = 0.5f * (high - low);
-				sphere.center = 0.5f * (low + high);
-				sphere.radius = std::min({ halfExtent.x, halfExtent.y, halfExtent.z });
-				return sphere;
-			}
+			//Bonus points for a salmon that the bear catches (one per pool of water on the track)
+			const int SALMON_POINTS = 100;
 		}
 	}
 }

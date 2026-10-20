@@ -11,6 +11,7 @@ add_executable(bibo_tests
 	TestSupport.cpp
 	TestSupport.hpp
 	# Game logic, no assets or graphics card needed
+	unit/AnimalsTest.cpp
 	unit/AnimationTest.cpp
 	unit/CharacterControllerTest.cpp
 	unit/DemoScriptTest.cpp
@@ -18,12 +19,14 @@ add_executable(bibo_tests
 	unit/GameRulesTest.cpp
 	unit/InputTest.cpp
 	unit/MathTest.cpp
+	unit/MusicTest.cpp
 	unit/PhysicsWorldTest.cpp
 	unit/RagdollTest.cpp
 	unit/TextureGeneratorTest.cpp
 	unit/ViewFrustumTest.cpp
 	unit/WorldUnitTest.cpp
 	# Content of the asset files, no graphics card needed
+	assets/AnimalsTrackTest.cpp
 	assets/AssetFilesTest.cpp
 	assets/BearCharacterTest.cpp
 	assets/BearModelTest.cpp

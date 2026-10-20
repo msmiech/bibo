@@ -69,7 +69,7 @@ namespace bibo::test
 	{
 		static const std::vector<std::string> names = {
 			"BearBody",
-			"Boden", "FinishLine", "Torus", "Water", "Cube", "Monitor1",
+			"Boden", "FinishLine", "Torus", "Water", "Cube",
 			"Rock1", "Rock2", "Rock3", "Rock4", "Rock5", "Rock6", "Rock7", "Rock8", "Rock9", "Rock10", "Rock11", "Rock12",
 			"Pfeil0", "Pfeil1", "Pfeil2", "Pfeil3" };
 		return names;
@@ -77,8 +77,7 @@ namespace bibo::test
 
 	const std::vector<std::string>& normalMappedNodeNames()
 	{
-		static const std::vector<std::string> names = {
-			"Cube", "Rock1", "Rock2", "Rock3", "Rock4", "Rock5", "Rock6", "Rock7", "Rock8", "Rock9", "Rock10", "Rock11", "Rock12" };
+		static const std::vector<std::string> names = { "Cube" };
 		return names;
 	}
 
@@ -121,7 +120,7 @@ namespace bibo::test
 			float waterRadius;
 			REQUIRE(world::TrackTerrain::nodeSphere(trackScene(), "Water", water, waterRadius));
 			description.seaLevel = water.y;
-			std::vector<std::string> keep = { "FinishLine", "Cube", "Monitor1", "Torus", "Pfeil0", "Pfeil1", "Pfeil2", "Pfeil3" };
+			std::vector<std::string> keep = { "FinishLine", "Cube", "Torus", "Pfeil0", "Pfeil1", "Pfeil2", "Pfeil3" };
 			for (int i = 1; i <= 12; ++i)
 			{
 				keep.push_back("Rock" + std::to_string(i));

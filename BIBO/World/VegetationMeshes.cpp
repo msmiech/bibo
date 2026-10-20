@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include "MeshBuilder.hpp"
 #include "Noise.hpp"
 
 using namespace bibo::world;
@@ -11,107 +12,10 @@ namespace
 	const float TAU = 6.28318531f;
 	const glm::vec3 UP(0.0f, 1.0f, 0.0f);
 
-	std::uint8_t toByte(float value)
-	{
-		return static_cast<std::uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f);
-	}
-
-	/**
-	* Colors are given in sRGB (0 to 255) like in a paint program
-	*/
-	glm::vec3 rgb(float r, float g, float b)
-	{
-		return glm::vec3(r, g, b) / 255.0f;
-	}
-
-	class Builder
-	{
-	public:
-		VegetationMesh mesh;
-
-		std::uint32_t add(glm::vec3 position, glm::vec3 normal, glm::vec2 uv, glm::vec3 color, VegetationMaterial material,
-			float wind, float snow, float occlusion)
-		{
-			VegetationVertex vertex;
-			vertex.position = position;
-			vertex.normal = glm::length(normal) > 1e-6f ? glm::normalize(normal) : UP;
-			vertex.uv = uv;
-			vertex.color[0] = toByte(color.r);
-			vertex.color[1] = toByte(color.g);
-			vertex.color[2] = toByte(color.b);
-			vertex.color[3] = 255;
-			vertex.parameters[0] = material;
-			vertex.parameters[1] = toByte(wind);
-			vertex.parameters[2] = toByte(snow);
-			vertex.parameters[3] = toByte(occlusion);
-			mesh.vertices.push_back(vertex);
-			return static_cast<std::uint32_t>(mesh.vertices.size() - 1);
-		}
-
-		/**
-		* The triangle faces where its vertex normals point (the order of the vertices does not matter)
-		*/
-		void triangle(std::uint32_t a, std::uint32_t b, std::uint32_t c)
-		{
-			const VegetationVertex& va = mesh.vertices[a];
-			const VegetationVertex& vb = mesh.vertices[b];
-			const VegetationVertex& vc = mesh.vertices[c];
-			glm::vec3 face = glm::cross(vb.position - va.position, vc.position - va.position);
-			if (glm::dot(face, va.normal + vb.normal + vc.normal) < 0.0f)
-			{
-				std::swap(b, c);
-			}
-			mesh.indices.insert(mesh.indices.end(), { a, b, c });
-		}
-
-		void quad(std::uint32_t a, std::uint32_t b, std::uint32_t c, std::uint32_t d)
-		{
-			triangle(a, b, c);
-			triangle(a, c, d);
-		}
-
-		/**
-		* Normals of the vertices from the triangles (for displaced, round shapes)
-		*/
-		void smoothNormals(std::size_t firstVertex, std::size_t firstIndex)
-		{
-			std::vector<glm::vec3> sums(mesh.vertices.size() - firstVertex, glm::vec3(0.0f));
-			for (std::size_t i = firstIndex; i + 2 < mesh.indices.size(); i += 3)
-			{
-				std::uint32_t a = mesh.indices[i], b = mesh.indices[i + 1], c = mesh.indices[i + 2];
-				glm::vec3 face = glm::cross(mesh.vertices[b].position - mesh.vertices[a].position, mesh.vertices[c].position - mesh.vertices[a].position);
-				for (std::uint32_t v : { a, b, c })
-				{
-					if (v >= firstVertex)
-					{
-						sums[v - firstVertex] += face;
-					}
-				}
-			}
-			for (std::size_t v = 0; v < sums.size(); ++v)
-			{
-				if (glm::length(sums[v]) > 1e-9f)
-				{
-					mesh.vertices[firstVertex + v].normal = glm::normalize(sums[v]);
-				}
-			}
-		}
-
-		VegetationMesh finish()
-		{
-			mesh.radius = 0.0f;
-			for (const VegetationVertex& vertex : mesh.vertices)
-			{
-				mesh.radius = std::max(mesh.radius, glm::length(vertex.position));
-			}
-			return std::move(mesh);
-		}
-	};
-
 	/**
 	* Tapered cylinder along y, e.g. a trunk
 	*/
-	void addTrunk(Builder& builder, float height, float baseRadius, float topRadius, int sides, int rings, glm::vec3 bottomColor, glm::vec3 topColor,
+	void addTrunk(MeshBuilder& builder, float height, float baseRadius, float topRadius, int sides, int rings, glm::vec3 bottomColor, glm::vec3 topColor,
 		float bottomOcclusion, float flare)
 	{
 		std::uint32_t first = static_cast<std::uint32_t>(builder.mesh.vertices.size());
@@ -145,7 +49,7 @@ namespace
 	* Its cross section is a flat roof (the needles go to the sides and down), its edges are serrated (the needle tufts).
 	* Seen from both sides (the vegetation of trees is drawn without culling).
 	*/
-	void addBranch(Builder& builder, noise::Random& random, float y, float angle, float length, float width, int segments, bool serrated,
+	void addBranch(MeshBuilder& builder, noise::Random& random, float y, float angle, float length, float width, int segments, bool serrated,
 		glm::vec3 color, float heightFraction, float lowerOcclusion, float droopFactor)
 	{
 		glm::vec3 direction(std::cos(angle), 0.0f, std::sin(angle));
@@ -193,7 +97,7 @@ namespace
 	/**
 	* The branches of a conifer at one height, around the trunk
 	*/
-	void addBranchWhorl(Builder& builder, noise::Random& random, float y, float radius, int branches, int segments, bool serrated,
+	void addBranchWhorl(MeshBuilder& builder, noise::Random& random, float y, float radius, int branches, int segments, bool serrated,
 		glm::vec3 color, float heightFraction, float lowerOcclusion, float droop)
 	{
 		float rotation = random.range(0.0f, TAU);
@@ -210,7 +114,7 @@ namespace
 	/**
 	* Dark cone inside of the crown: through the gaps between the branches the inside of the tree is seen, not the sky
 	*/
-	void addCore(Builder& builder, float bottom, float top, float radius, glm::vec3 color, int sides)
+	void addCore(MeshBuilder& builder, float bottom, float top, float radius, glm::vec3 color, int sides)
 	{
 		std::uint32_t apex = builder.add(UP * top, UP, glm::vec2(0.0f), color, VEGETATION_NEEDLES, 0.8f, 0.0f, 0.3f);
 		std::vector<std::uint32_t> ring;
@@ -237,7 +141,7 @@ namespace
 
 	VegetationMesh buildSpruce(const SpruceShape& shape, int detail)
 	{
-		Builder builder;
+		MeshBuilder builder;
 		noise::Random random(shape.seed);
 		const int sides[3] = { 8, 5, 3 };
 		const int trunkRings[3] = { 6, 2, 1 };
@@ -284,7 +188,7 @@ namespace
 	/**
 	* Sphere (latitude and longitude) whose radius is changed by noise, e.g. a clump of needles or leaves
 	*/
-	void addBlob(Builder& builder, glm::vec3 center, glm::vec3 radii, int longitude, int latitude, std::uint32_t seed, float bumpiness,
+	void addBlob(MeshBuilder& builder, glm::vec3 center, glm::vec3 radii, int longitude, int latitude, std::uint32_t seed, float bumpiness,
 		glm::vec3 color, VegetationMaterial material, float wind, float bottomOcclusion)
 	{
 		std::uint32_t first = static_cast<std::uint32_t>(builder.mesh.vertices.size());
@@ -320,7 +224,7 @@ namespace
 	*/
 	VegetationMesh buildPine(int detail)
 	{
-		Builder builder;
+		MeshBuilder builder;
 		noise::Random random(4242u);
 		const float HEIGHT = 17.0f;
 		const int sides[3] = { 8, 5, 3 };
@@ -336,7 +240,7 @@ namespace
 			glm::vec3 center(std::cos(angle) * distance, glm::mix(0.52f, 0.94f, t) * HEIGHT + random.range(-0.3f, 0.3f), std::sin(angle) * distance);
 			float radius = random.range(2.0f, 2.9f) * (1.0f - 0.35f * t) * (detail == 2 ? 1.25f : 1.0f);
 			//A flat whorl of short fronds, moved to the end of its branch
-			Builder pad;
+			MeshBuilder pad;
 			addBranchWhorl(pad, random, 0.0f, radius, branchCount[detail], segments[detail], detail == 0, rgb(82, 108, 70) * random.range(0.9f, 1.1f),
 				center.y / HEIGHT, 0.6f, 0.18f);
 			if (detail == 0)
@@ -379,7 +283,7 @@ namespace
 
 	VegetationMesh buildBush(int detail)
 	{
-		Builder builder;
+		MeshBuilder builder;
 		noise::Random random(777u);
 		int blobs = detail == 0 ? 7 : 3;
 		for (int b = 0; b < blobs; ++b)
@@ -405,7 +309,7 @@ namespace
 
 	VegetationMesh buildJuniper(int detail)
 	{
-		Builder builder;
+		MeshBuilder builder;
 		noise::Random random(31337u);
 		const float RADII[3] = { 1.5f, 1.15f, 0.7f };
 		for (int layer = 0; layer < 3; ++layer)
@@ -423,7 +327,7 @@ namespace
 
 	VegetationMesh buildFern()
 	{
-		Builder builder;
+		MeshBuilder builder;
 		noise::Random random(2024u);
 		const int FRONDS = 9, SEGMENTS = 12;
 		for (int f = 0; f < FRONDS; ++f)
@@ -464,7 +368,7 @@ namespace
 
 	VegetationMesh buildGrass(bool dry)
 	{
-		Builder builder;
+		MeshBuilder builder;
 		noise::Random random(dry ? 99u : 98u);
 		int blades = dry ? 16 : 13;
 		const int SEGMENTS = 4;
@@ -511,7 +415,7 @@ namespace
 	VegetationMesh buildMushroom(float stemHeight, float stemRadius, float bulge, float capRadius, float capHeight, glm::vec3 stemColor,
 		glm::vec3 capColor, glm::vec3 gillColor, VegetationMaterial capMaterial, VegetationMaterial stemMaterial)
 	{
-		Builder builder;
+		MeshBuilder builder;
 		const int SIDES = 10, RINGS = 4;
 		std::uint32_t first = static_cast<std::uint32_t>(builder.mesh.vertices.size());
 		for (int k = 0; k <= RINGS; ++k)
@@ -620,7 +524,7 @@ namespace
 			}
 			triangles.swap(next);
 		}
-		Builder builder;
+		MeshBuilder builder;
 		for (const glm::vec3& direction : positions)
 		{
 			float bump = noise::fbm(direction * 1.5f, 4, seed);
@@ -641,7 +545,7 @@ namespace
 		return builder.finish();
 	}
 
-	void addDisk(Builder& builder, glm::vec3 center, glm::vec3 normal, glm::vec3 a, glm::vec3 b, float radius, int sides, glm::vec3 color, float wind)
+	void addDisk(MeshBuilder& builder, glm::vec3 center, glm::vec3 normal, glm::vec3 a, glm::vec3 b, float radius, int sides, glm::vec3 color, float wind)
 	{
 		std::uint32_t middle = builder.add(center, normal, glm::vec2(0.5f), color, VEGETATION_WOOD, wind, 0.6f, 0.8f);
 		std::vector<std::uint32_t> ring;
@@ -659,7 +563,7 @@ namespace
 
 	VegetationMesh buildLog(int detail)
 	{
-		Builder builder;
+		MeshBuilder builder;
 		const int sides = detail == 0 ? 10 : 6, segments = detail == 0 ? 6 : 2;
 		const float LENGTH = 4.4f, RADIUS = 0.33f;
 		std::uint32_t first = static_cast<std::uint32_t>(builder.mesh.vertices.size());
@@ -693,7 +597,7 @@ namespace
 
 	VegetationMesh buildStump(int detail)
 	{
-		Builder builder;
+		MeshBuilder builder;
 		const int sides = detail == 0 ? 14 : 7, rings = detail == 0 ? 5 : 2;
 		const float HEIGHT = 0.6f, RADIUS = 0.42f;
 		std::uint32_t first = static_cast<std::uint32_t>(builder.mesh.vertices.size());

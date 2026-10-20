@@ -12,6 +12,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include "Audio/MusicPlayer.hpp"
 #include "Scene/Scene.hpp"
 #include "Physics/Physics.hpp"
 #include "UI/Menu.hpp"
@@ -81,6 +82,7 @@ const float MAX_TIME_STEP = 0.1f;
 //so that a script always plays the same way (e.g. tools/readme_demo.txt for the GIF of the README)
 float fixedTimeStep = 0; //0: the time step is the duration of the last frame
 bool useSavedSettings = true;
+bool recording = false; //--record
 unique_ptr<DemoScript> demoScript;
 unique_ptr<FrameRecorder> recorder;
 bool recordingFailed = false;
@@ -101,6 +103,9 @@ unique_ptr<Shader> mainShader;
 unique_ptr<Shader> textShader;
 
 unique_ptr<Scene> gameScene;
+//The music of the race (not while recording: the game runs faster or slower than real time then)
+unique_ptr<audio::MusicPlayer> music;
+int lastSalmonCaught = 0;
 //Shadow maps, HDR image, bloom, auto exposure and tone mapping
 unique_ptr<render::Renderer> renderer;
 
@@ -162,7 +167,8 @@ int main(int argc, char** argv)
 		}
 	}
 
-	if (!demoPath.empty() || !recordPath.empty())
+	recording = !recordPath.empty();
+	if (!demoPath.empty() || recording)
 	{
 		fixedTimeStep = 1.0f / fps;
 		useSavedSettings = false;
@@ -516,6 +522,10 @@ void init(GLFWwindow* window) {
 	initTextRendering();
 
 	cout << "Loading assets from files via assimp and setting up scene..." << endl;
+	if (!recording)
+	{
+		music = make_unique<audio::MusicPlayer>(); //synthesizes the music while the scene loads
+	}
 	gameScene = make_unique<Scene>(window, mainShader.get(), physicsWorld.get());
 	gameScene->setViewportSize(windowWidth, windowHeight);
 	//The scene stands still behind the main menu. Simulating the first second (without input) lets the bear land
@@ -549,6 +559,10 @@ void applyGraphicsSettings()
 	texSettings::bilinear = settings.bilinearFiltering;
 	texSettings::mipMappingQuality = settings.mipmapping;
 	gameScene->getWorld().setDetail(settings.worldDetail);
+	if (music)
+	{
+		music->setEnabled(settings.music);
+	}
 }
 
 void onMenuAction(ui::MenuAction action)
@@ -613,7 +627,7 @@ void resumeGame()
 //Without menus the game shows GAME OVER or YOU WON and R restarts as in earlier versions
 void showGameOver()
 {
-	menu->showGameOverMenu(gameScene->isGameWon());
+	menu->showGameOverMenu(gameScene->isGameWon(), gameScene->getScore(), gameScene->getSalmonCaught());
 	if (menu->isVisible())
 	{
 		gameState = GAME_OVER;
@@ -800,6 +814,12 @@ void gameLoop()
 		{
 			mainShader->enable();
 			update(std::min(time_delta, MAX_TIME_STEP));
+			if (gameScene->getSalmonCaught() > lastSalmonCaught)
+			{
+				lastMessage = "Caught a salmon! +" + to_string(rules::SALMON_POINTS) + " points";
+				messageTimeLeft = 3;
+			}
+			lastSalmonCaught = gameScene->getSalmonCaught();
 			if (gameScene->isGameOver() || gameScene->isGameWon())
 			{
 				showGameOver();
@@ -933,6 +953,7 @@ void cleanup() {
 	cout << "Cleaning up memory..." << endl;
 	//Releases the OpenGL resources of the menus, so it must happen before the window (and its context) is destroyed
 	menu.reset(nullptr);
+	music.reset(nullptr);
 	gameScene.reset(nullptr);
 	renderer.reset(nullptr);
 	//The glyphs and the quad of the text
@@ -1100,7 +1121,7 @@ void textRendering()
 		renderText(textShader.get(), "SPACE / Cross or A to jump (hold to jump higher)", windowWidth / 10.f, windowHeight - 4.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Press R key to restart", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Pass all checkpoints and make it around the track!", windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
-		renderText(textShader.get(), "Watch out: the rocks knock the bear over", windowWidth / 10.f, windowHeight - 7.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "Mind the hedgehogs, catch salmon for bonus points", windowWidth / 10.f, windowHeight - 7.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 	}
 	if (settings.showFrameTime)
 	{
@@ -1129,6 +1150,10 @@ void textRendering()
 		lapProgress += " - cross the finish line!";
 	}
 	renderText(textShader.get(), lapProgress, windowWidth / 10.f, 2.f * windowHeight / 10.f, 0.5f, vec3(0.9f, 0.8f, 0.3f));
+	//Bonus: the salmon caught in the pools of water
+	string bonus = "Salmon: " + to_string(gameScene->getSalmonCaught()) + "/" + to_string(gameScene->getPoolCount())
+		+ "   Score: " + to_string(gameScene->getScore());
+	renderText(textShader.get(), bonus, windowWidth / 10.f, 1.5f * windowHeight / 10.f, 0.5f, vec3(0.95f, 0.6f, 0.45f));
 
 	if (messageTimeLeft > 0)
 	{

@@ -2,6 +2,7 @@
 
 #include <GL/glew.h>
 #include <catch2/catch_test_macros.hpp>
+#include <glm/gtc/constants.hpp>
 #include <catch2/matchers/catch_matchers_container_properties.hpp>
 
 #include "Physics/Physics.hpp"
@@ -148,6 +149,8 @@ TEST_CASE("The bear waits at the start of the race without losing", "[gl][scene]
 		glDisable(GL_DEPTH_TEST);
 		silhouetteShader.enable();
 		REQUIRE(scene.isViewFrustumCullingEnabled()); //default
+		//Looking back over the start: the stone ring far ahead on the track is behind the camera
+		scene.getCamera().rotate(glm::pi<float>(), 0.0f);
 
 		framebuffer.clear();
 		scene.renderFromCamera(&silhouetteShader);

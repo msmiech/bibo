@@ -163,6 +163,11 @@ button:active
 {
 	margin-top: 22dp;
 }
+.dialog .score
+{
+	margin: -12dp 0 22dp;
+	color: #ffd27a;
+}
 
 
 /* ---------- Settings menu: panel with a scrollable list of settings ---------- */

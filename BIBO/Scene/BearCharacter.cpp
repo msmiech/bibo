@@ -3,6 +3,7 @@
 #include <cmath>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/rotate_vector.hpp>
+#include "CreatureMeshes.hpp"
 #include "../Animation/Skeleton.hpp"
 
 using namespace bibo;
@@ -74,6 +75,10 @@ BearCharacter::BearCharacter(physics::PhysicsWorld& world, const resources::Skin
 		}
 	});
 	ragdoll = std::make_unique<physics::Ragdoll>(world, rig.ragdollParts());
+	tongueRoot = rig.getBone("tongue.1");
+	tongueTip = rig.getBone("tongue.3");
+	leftPaw = rig.getBone("hand.L");
+	rightPaw = rig.getBone("hand.R");
 	//The feet and the fur only stand on static bodies (terrain, rocks), not on the ragdoll itself
 	probe = [this](glm::vec3 from, glm::vec3 to, glm::vec3& point, glm::vec3& normal) {
 		physics::RayHit hit;
@@ -123,6 +128,8 @@ void BearCharacter::reset()
 	knockDownPending = false;
 	stateTime = restTime = protectedTime = idleWaitTime = 0.0f;
 	positionOffset = glm::vec3(0.0f);
+	fish = Fish::NONE;
+	rig.setCarrying(false);
 	controller->setPosition(startPosition);
 	rig.reset(locomotionInput(), probe);
 	updateSkin(0.0f);
@@ -220,8 +227,29 @@ float BearCharacter::steer(float timeDelta, const BearInput& input, bool& hasInp
 	return forward >= 0.0f ? forward * FORWARD_SPEED : forward * BACKWARD_SPEED;
 }
 
-void BearCharacter::updateControl(float timeDelta, const BearInput& input)
+void BearCharacter::updateControl(float timeDelta, const BearInput& playerInput)
 {
+	//A caught fish is eaten as soon as the bear stands on the ground, the player waits until the last bite
+	BearInput input = playerInput;
+	if (fish == Fish::CARRIED && standingOnGround && !jumping)
+	{
+		rig.startIdle(BearRig::IDLE_EAT);
+		fish = Fish::EATING;
+		idleWaitTime = 0.0f;
+	}
+	if (fish == Fish::EATING)
+	{
+		if (rig.getIdle() != BearRig::IDLE_EAT)
+		{
+			fish = Fish::NONE; //finished (or the player moved on after the last bite)
+		}
+		else if (rig.getIdleTime() < BearRig::EAT_BITES[2])
+		{
+			input = BearInput();
+			jumpWasHeld = playerInput.jump; //a jump needs a new press afterwards
+		}
+	}
+
 	bool hasInput = false;
 	float targetSpeed = steer(timeDelta, input, hasInput);
 	glm::vec3 horizontal;
@@ -301,6 +329,7 @@ void BearCharacter::updateControl(float timeDelta, const BearInput& input)
 		}
 	}
 
+	rig.setCarrying(fish == Fish::CARRIED);
 	rig.updateLocomotion(timeDelta, locomotionInput(jumped), probe);
 	if (knockDownPending)
 	{
@@ -316,12 +345,88 @@ void BearCharacter::startIdle(BearRig::Idle idle)
 	}
 	rig.startIdle(idle);
 	idleWaitTime = 0.0f;
-	nextIdle = (idle + 1) % BearRig::IDLE_COUNT;
+	nextIdle = (idle + 1) % BearRig::RESTING_IDLE_COUNT;
+}
+
+bool BearCharacter::catchFish()
+{
+	if (!canCatchFish())
+	{
+		return false;
+	}
+	fish = Fish::CARRIED;
+	rig.stopIdle(); //e.g. it was stretching at the edge of the water
+	return true;
+}
+
+glm::vec3 BearCharacter::getMouthPosition() const
+{
+	return rig.getBonePosition(tongueTip);
+}
+
+BearCharacter::HeldFish BearCharacter::carriedFish() const
+{
+	//Across the mouth, its back up
+	glm::vec3 forward = rig.getBonePosition(tongueTip) - rig.getBonePosition(tongueRoot);
+	forward = glm::length(forward) > 1e-4f ? glm::normalize(forward) : direction;
+	glm::vec3 left = glm::cross(UP, forward);
+	left = glm::length(left) > 1e-4f ? glm::normalize(left) : glm::vec3(1.0f, 0.0f, 0.0f);
+	glm::vec3 up = glm::cross(forward, left);
+	HeldFish held;
+	held.center = getMouthPosition() + forward * 0.04f;
+	held.rotation = glm::quat_cast(glm::mat3(-forward, up, left));
+	held.wiggle = 0.45f * std::sin(time * 14.0f); //it flaps
+	return held;
+}
+
+bool BearCharacter::getHeldFish(HeldFish& held) const
+{
+	if (fish == Fish::NONE)
+	{
+		return false;
+	}
+	held = carriedFish();
+	if (fish == Fish::CARRIED)
+	{
+		return true;
+	}
+	//In the front paws, upright with its head towards the mouth: the end that is left is at the mouth when the bear bites
+	float idleTime = rig.getIdleTime();
+	int bites = 0;
+	for (float bite : BearRig::EAT_BITES)
+	{
+		bites += idleTime >= bite ? 1 : 0;
+	}
+	if (bites >= 3)
+	{
+		return false; //eaten
+	}
+	glm::vec3 mouth = getMouthPosition();
+	glm::vec3 paws = 0.5f * (rig.getBonePosition(leftPaw) + rig.getBonePosition(rightPaw));
+	glm::vec3 axis = mouth - paws;
+	axis = glm::length(axis) > 1e-4f ? glm::normalize(axis) : UP;
+	glm::vec3 back = direction - axis * glm::dot(direction, axis);
+	back = glm::length(back) > 1e-4f ? glm::normalize(back) : glm::vec3(0.0f, 0.0f, 1.0f);
+	const float TOPS[3] = { 0.5f, SALMON_HEAD_JOINT, SALMON_TAIL_JOINT }; //of what is left after 0, 1 and 2 bites
+	float nextBite = BearRig::EAT_BITES[bites];
+	float gap = 0.04f + 0.14f * glm::smoothstep(0.0f, 0.4f, nextBite - idleTime); //closer to the mouth when it bites
+	HeldFish eating;
+	eating.center = mouth - axis * (TOPS[bites] + gap);
+	eating.rotation = glm::quat_cast(glm::mat3(glm::cross(back, axis), back, axis));
+	eating.bites = bites;
+	eating.wiggle = 0.12f * std::sin(time * 6.0f);
+	float take = glm::smoothstep(BearRig::EAT_TAKE_START, BearRig::EAT_TAKE_END, idleTime);
+	eating.center = glm::mix(held.center, eating.center, take);
+	eating.rotation = glm::slerp(held.rotation, eating.rotation, take);
+	held = eating;
+	return true;
 }
 
 void BearCharacter::startRagdoll()
 {
 	knockDownPending = false;
+	fish = Fish::NONE; //drops it
+	rig.setCarrying(false);
 	std::vector<glm::mat4> transforms;
 	std::vector<glm::vec3> velocities;
 	rig.ragdollTransforms(transforms);

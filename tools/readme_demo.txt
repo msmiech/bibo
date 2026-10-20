@@ -47,7 +47,7 @@ wait 0.3
 press Enter
 wait 0.3
 
-# Run along the track: left with the track, then right around a rock
+# Run along the track: left with the track, then right past a hedgehog
 hold Up 8
 wait 1.5
 press Space         # jump

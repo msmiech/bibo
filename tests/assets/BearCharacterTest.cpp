@@ -581,3 +581,84 @@ TEST_CASE("Steering: the bear turns towards where it should go and runs there", 
 		CHECK_THAT(scene.bear->getVelocity().x, WithinAbs(-0.5f * BearCharacter::FORWARD_SPEED, 0.5f));
 	}
 }
+
+TEST_CASE("A caught fish stays in the mouth in the air, on the ground the bear sits down and eats it", "[assets][bear][animation][animals]")
+{
+	BearOnGround scene;
+	scene.run(1.0f);
+	BearInput jump = forward();
+	jump.jump = true;
+	scene.run(0.1f, jump);
+	REQUIRE(scene.bear->isAirborne());
+	REQUIRE(scene.bear->canCatchFish());
+	REQUIRE(scene.bear->catchFish());
+	CHECK_FALSE(scene.bear->canCatchFish()); //only one at a time
+	CHECK_FALSE(scene.bear->catchFish());
+
+	//Carried in the mouth while it flies on
+	scene.run(0.1f, jump);
+	REQUIRE(scene.bear->getFish() == BearCharacter::Fish::CARRIED);
+	BearCharacter::HeldFish held;
+	REQUIRE(scene.bear->getHeldFish(held));
+	CHECK(glm::distance(held.center, scene.bear->getMouthPosition()) < 0.2f);
+	CHECK(held.bites == 0);
+
+	//Lands: eats it, the player cannot run off before the last bite
+	for (int i = 0; i < 120 && scene.bear->getFish() == BearCharacter::Fish::CARRIED; ++i)
+	{
+		scene.run(FRAME, forward());
+	}
+	REQUIRE(scene.bear->getFish() == BearCharacter::Fish::EATING);
+	CHECK(scene.bear->getRig().getIdle() == BearRig::IDLE_EAT);
+	vec3 start = scene.bear->getPosition();
+	scene.run(BearRig::EAT_BITES[0] + 0.05f, forward());
+	CHECK(glm::distance(scene.bear->getPosition(), start) < 1.0f); //only slows down
+	REQUIRE(scene.bear->getHeldFish(held));
+	CHECK(held.bites == 1);
+	CHECK(glm::distance(held.center, scene.bear->getMouthPosition()) < 0.6f);
+	{
+		//It sits: the pelvis is low, and holds the fish with its front paws
+		const BearRig& rig = scene.bear->getRig();
+		CHECK(rig.getBonePosition(rig.getBone("pelvis")).y < 0.6f);
+		vec3 paws = 0.5f * (rig.getBonePosition(rig.getBone("hand.L")) + rig.getBonePosition(rig.getBone("hand.R")));
+		CHECK(glm::distance(paws, held.center) < 0.8f);
+	}
+	scene.run(BearRig::EAT_BITES[2] - BearRig::EAT_BITES[0], forward());
+	CHECK_FALSE(scene.bear->getHeldFish(held)); //all three bites taken
+
+	SECTION("After the last bite the player can run on")
+	{
+		vec3 before = scene.bear->getPosition();
+		scene.run(1.0f, forward());
+		CHECK(scene.bear->getFish() == BearCharacter::Fish::NONE);
+		CHECK(glm::distance(scene.bear->getPosition(), before) > 4.0f);
+		CHECK(scene.bear->canCatchFish());
+	}
+	SECTION("Without input it licks its lips and gets up")
+	{
+		scene.run(scene.bear->getRig().getIdleDuration(BearRig::IDLE_EAT) - BearRig::EAT_BITES[2] + 0.1f);
+		CHECK_FALSE(scene.bear->getRig().isIdling());
+		CHECK(scene.bear->getFish() == BearCharacter::Fish::NONE);
+	}
+}
+
+TEST_CASE("A knocked down bear drops its fish", "[assets][bear][ragdoll][animals]")
+{
+	BearOnGround scene;
+	scene.run(0.5f);
+	BearInput jump = forward();
+	jump.jump = true;
+	scene.run(0.1f, jump);
+	REQUIRE(scene.bear->catchFish());
+	CharacterController::Hit hit;
+	hit.position = scene.bear->getPosition() + vec3(0.0f, 0.0f, 1.0f);
+	hit.normal = vec3(0.0f, 0.0f, -1.0f);
+	scene.bear->knockDown(hit);
+	scene.run(FRAME, jump);
+
+	REQUIRE(scene.bear->getState() == State::RAGDOLL);
+	CHECK(scene.bear->getFish() == BearCharacter::Fish::NONE);
+	BearCharacter::HeldFish held;
+	CHECK_FALSE(scene.bear->getHeldFish(held));
+	CHECK_FALSE(scene.bear->canCatchFish()); //not while it tumbles
+}

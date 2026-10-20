@@ -11,6 +11,7 @@
 #include "Physics/Physics.hpp"
 #include "Scene/Bear.hpp"
 #include "Scene/GameRules.hpp"
+#include "Scene/Hedgehog.hpp"
 #include "World/WorldGenerator.hpp"
 #include "World/WorldStreamer.hpp"
 #include "TestSupport.hpp"
@@ -18,6 +19,7 @@
 using namespace bibo::physics;
 using namespace bibo::test;
 using bibo::scene::Bear;
+using bibo::scene::Hedgehog;
 using bibo::world::TrackPath;
 using bibo::world::WorldStreamer;
 namespace rules = bibo::scene::rules;
@@ -34,33 +36,28 @@ namespace
 		return vec3(nodeModelMatrix(trackNode(nodeName))[3]);
 	}
 
-	//The collision sphere of a rock as the game creates it (Scene::initPhysicsBodies)
-	rules::Sphere rockCollider(const std::string& nodeName)
-	{
-		std::vector<vec3> vertices;
-		std::vector<unsigned int> indices;
-		REQUIRE(bibo::world::TrackTerrain::loadNodeMesh(trackScene(), nodeName.c_str(), vertices, indices));
-		return rules::rockCollider(vertices);
-	}
-
 	/**
-	* The static bodies of the track as the game creates them: the ground under the sea and the rocks
-	* (Scene::initPhysicsBodies), the terrain and the trees around the bear streamed by the world (WorldStreamer)
+	* The bodies of the track as the game creates them: the ground under the sea (Scene::initPhysicsBodies), the hedgehogs
+	* at their homes where the rocks of the track are (Scene::initAnimals), the terrain and the trees around the bear streamed
+	* by the world (WorldStreamer)
 	*/
 	struct TrackPhysics
 	{
 		PhysicsWorld world;
-		std::vector<BodyHandle> rocks;
+		std::vector<BodyHandle> hedgehogs;
 		const vec3 bearStart = startPosition("BearBody");
 		std::unique_ptr<WorldStreamer> streamer;
 
-		explicit TrackPhysics(bool withRocks = true)
+		explicit TrackPhysics(bool withHedgehogs = true)
 		{
 			world.createStaticBox(vec3(0.0f, -6.0f, 0.0f), vec3(1000.0f, 1.0f, 1000.0f)); //ground
-			for (int i = 1; withRocks && i <= 12; ++i)
+			for (int i = 0; withHedgehogs && i < 12; ++i)
 			{
-				rules::Sphere rock = rockCollider("Rock" + std::to_string(i));
-				rocks.push_back(world.createStaticSphere(rock.center, rock.radius));
+				vec3 home;
+				float radius;
+				REQUIRE(bibo::world::TrackTerrain::nodeSphere(trackScene(), ("Rock" + std::to_string(i + 1)).c_str(), home, radius));
+				Hedgehog hedgehog(glm::vec2(home.x, home.z), Hedgehog::startDirection(i), Hedgehog::seedOf(i), Hedgehog::trackFloor(worldGenerator()));
+				hedgehogs.push_back(world.createKinematicSphere(hedgehog.getColliderCenter(), hedgehog.getColliderRadius()));
 			}
 			streamer = std::make_unique<WorldStreamer>(worldGenerator(), &world, WorldStreamer::Settings(), 2);
 			streamer->ensureCollision(bearStart, 12.0f);
@@ -107,7 +104,7 @@ namespace
 	};
 }
 
-TEST_CASE("The bear starts standing on the terrain without touching a rock", "[assets][physics][bear][world]")
+TEST_CASE("The bear starts standing on the terrain without touching a hedgehog", "[assets][physics][bear][world]")
 {
 	TrackPhysics track;
 
@@ -119,9 +116,9 @@ TEST_CASE("The bear starts standing on the terrain without touching a rock", "[a
 	CHECK_FALSE(rules::hasFallenOff(position)); //did not fall through the terrain onto the ground box
 	CHECK(std::abs(position.y - track.bearStart.y) < 2.0f); //starts close to the surface
 	CHECK(glm::distance(vec3(position.x, 0.0f, position.z), vec3(track.bearStart.x, 0.0f, track.bearStart.z)) < 0.5f); //does not slide away
-	for (BodyHandle rock : track.rocks)
+	for (BodyHandle hedgehog : track.hedgehogs)
 	{
-		CHECK_FALSE(run.touched(rock)); //would be game over
+		CHECK_FALSE(run.touched(hedgehog)); //would knock it over
 	}
 }
 

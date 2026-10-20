@@ -19,7 +19,7 @@ namespace
 
 	//Settings that are applied to the game as soon as they are changed in the settings menu
 	const char* const GRAPHICS_VARIABLES[] = { "vsync", "hdr", "bloom", "shadows", "normal_mapping", "transparency",
-		"bilinear_filtering", "mipmapping", "wireframe", "world_detail", "show_frame_time", "show_help" };
+		"bilinear_filtering", "mipmapping", "wireframe", "world_detail", "show_frame_time", "show_help", "music" };
 
 	/**
 	* GLFW system interface of RmlUi that prints its messages (e.g. errors in the RML and RCSS files) to the console
@@ -95,6 +95,7 @@ struct Menu::Impl : public Rml::EventListener
 	bool displayChanged = false;
 
 	bool gameWon = false; //title of the game over menu
+	int score = 0, salmonCaught = 0; //result of the run in the game over menu
 };
 
 Menu::Impl::Impl(GLFWwindow* window, Settings& settings, function<void(MenuAction)> onAction)
@@ -171,6 +172,9 @@ void Menu::Impl::bindDataModel()
 	constructor.Bind("resolutions", &resolutionNames);
 	constructor.Bind("display_changed", &displayChanged);
 	constructor.Bind("game_won", &gameWon);
+	constructor.Bind("score", &score);
+	constructor.Bind("salmon_caught", &salmonCaught);
+	constructor.Bind("music", &settings.music);
 
 	auto action = [this](MenuAction menuAction) {
 		return [this, menuAction](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) { pendingActions.push_back(menuAction); };
@@ -345,12 +349,16 @@ void Menu::showPauseMenu()
 	impl->show(impl->pauseMenu);
 }
 
-void Menu::showGameOverMenu(bool won)
+void Menu::showGameOverMenu(bool won, int score, int salmon)
 {
 	impl->gameWon = won;
+	impl->score = score;
+	impl->salmonCaught = salmon;
 	if (impl->model)
 	{
 		impl->model.DirtyVariable("game_won");
+		impl->model.DirtyVariable("score");
+		impl->model.DirtyVariable("salmon_caught");
 	}
 	impl->show(impl->gameOverMenu);
 }

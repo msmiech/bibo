@@ -244,3 +244,32 @@ TEST_CASE_METHOD(BearOnGround, "Jumping lifts the bear off the ground", "[physic
 	CHECK_FALSE(supported);
 	CHECK_THAT(bear.getPosition().y - standingHeight, WithinAbs(jumpSpeed * maxJumpTime, 0.3f));
 }
+
+TEST_CASE_METHOD(BearOnGround, "A kinematic sphere (a hedgehog) that walks into the standing bear touches it, ray casts for the ground do not find it", "[physics][bear][animals]")
+{
+	land();
+	const float radius = 1.4f;
+	vec3 position(6.0f, standingHeight, 0.0f);
+	BodyHandle hedgehog = world.createKinematicSphere(position, radius);
+	for (int i = 0; i < 4 * 60 && !contains(touchedBodies, hedgehog); ++i)
+	{
+		position.x -= 1.5f * FRAME; //walks towards the bear
+		world.moveKinematic(hedgehog, position, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), FRAME);
+		world.update(FRAME);
+		bear.move(DOWN * FRAME, FRAME);
+	}
+	CHECK(contains(touchedBodies, hedgehog));
+	CHECK_THAT(world.getTransform(hedgehog)[3].x, WithinAbs(position.x, 0.01f)); //where it was moved to
+
+	RayHit hit;
+	CHECK(world.castRay(position + vec3(0.0f, 5.0f, 0.0f), vec3(0.0f, -20.0f, 0.0f), hit, true));
+	CHECK(hit.body == ground);
+	CHECK(world.castRay(position + vec3(0.0f, 5.0f, 0.0f), vec3(0.0f, -20.0f, 0.0f), hit, false));
+	CHECK(hit.body == hedgehog);
+
+	SECTION("Moving it without time puts it there at once")
+	{
+		world.moveKinematic(hedgehog, vec3(20.0f, 0.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), 0.0f);
+		CHECK_THAT(world.getTransform(hedgehog)[3].x, WithinAbs(20.0f, 1e-4f));
+	}
+}

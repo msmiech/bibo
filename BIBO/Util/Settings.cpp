@@ -101,6 +101,7 @@ bool Settings::load(const string& path)
 
 	read(values, "show_frame_time", showFrameTime);
 	read(values, "show_help", showHelp);
+	read(values, "music", music);
 	return true;
 }
 
@@ -130,6 +131,7 @@ bool Settings::save(const string& path) const
 		<< "camera_sensitivity = " << cameraSensitivity << endl
 		<< "invert_camera_y = " << toString(invertCameraY) << endl
 		<< "show_frame_time = " << toString(showFrameTime) << endl
-		<< "show_help = " << toString(showHelp) << endl;
+		<< "show_help = " << toString(showHelp) << endl
+		<< "music = " << toString(music) << endl;
 	return static_cast<bool>(file);
 }

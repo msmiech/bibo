@@ -857,7 +857,7 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		c.face.gazePitch = gazePitch - 0.15f * reach * airPose;
 		c.face.lids = blinkAmount() * (1.0f - airPose);
 		c.face.earsBack = std::max(0.35f * bounding, 0.5f * airPose);
-		c.face.jawOpen = std::max(0.12f * bounding, 0.2f * airPose); //panting a little
+		c.face.jawOpen = std::max({ 0.12f * bounding, 0.2f * airPose, carrying ? 0.34f : 0.0f }); //panting a little
 	}
 
 	evaluate(bind, c, timeDelta);
@@ -1075,6 +1075,94 @@ void BearRig::buildIdleAnimations()
 		lookRight.face.gazeYaw = 0.15f;
 		keys.push_back(at(lookRight, 6.6f));
 		keys.push_back(at(standing, 7.5f));
+	}
+
+	//Eating a salmon: sits down and takes the fish from its mouth into its front paws, looks at it, takes three big bites
+	//(chewing happily with closed eyes and rocking in between, the last one with the head back), licks its lips and gets up
+	{
+		std::vector<IdleKey>& keys = idleAnimations[IDLE_EAT];
+		IdleKey carry = standing;
+		carry.face.jawOpen = 0.34f; //the fish is still in its mouth
+		keys.push_back(at(carry, 0.0f));
+		IdleKey hold = sitting;
+		hold.headPitch = -0.95f; //looks at the fish
+		hold.neckPitch = -0.6f;
+		hold.face.gazePitch = -0.15f;
+		hold.face.earsBack = 0.0f;
+		for (int leg : { FRONT_LEFT, FRONT_RIGHT })
+		{
+			hold.feet[leg] = glm::vec3(0.12f * legs[leg].side, 1.0f, 0.42f); //the paws hold the fish in front of the chest
+			hold.toePitch[leg] = 0.9f;
+		}
+		IdleKey take = hold;
+		take.headPitch = -1.05f;
+		take.face.jawOpen = 0.34f;
+		keys.push_back(at(take, EAT_TAKE_START));
+		take.face.jawOpen = 0.1f;
+		keys.push_back(at(take, EAT_TAKE_END));
+		IdleKey look = hold;
+		look.headRoll = 0.18f; //tilts its head: yummy
+		look.face.gazeYaw = 0.05f;
+		keys.push_back(at(look, 1.05f));
+
+		for (int bite = 0; bite < 3; ++bite)
+		{
+			float time = EAT_BITES[bite];
+			bool last = bite == 2;
+			IdleKey open = hold;
+			open.headPitch = last ? -0.2f : -0.55f; //the last bite with the head back, like gulping it down
+			open.neckPitch = last ? -0.65f : -0.25f;
+			open.face.jawOpen = last ? 0.85f : 0.65f;
+			open.face.earsBack = 0.3f;
+			for (int leg : { FRONT_LEFT, FRONT_RIGHT })
+			{
+				open.feet[leg] = glm::vec3(0.1f * legs[leg].side, last ? 1.25f : 1.12f, 0.4f); //lifts the fish to its mouth
+			}
+			keys.push_back(at(open, time - 0.18f));
+			IdleKey chomp = open;
+			chomp.face.jawOpen = 0.0f;
+			chomp.face.lids = 0.7f;
+			chomp.headPitch += 0.08f;
+			keys.push_back(at(chomp, time));
+			//Chewing with closed eyes, rocking happily
+			IdleKey chew = hold;
+			chew.face.lids = 0.85f;
+			chew.face.earsBack = 0.0f;
+			chew.sway = 0.08f;
+			chew.headPitch = -0.8f;
+			float chewEnd = last ? time + 0.85f : EAT_BITES[bite + 1] - 0.3f;
+			int chews = 0;
+			for (float t = time + 0.14f; t < chewEnd - 0.05f; t += 0.14f)
+			{
+				chew.face.jawOpen = chews++ % 2 == 0 ? 0.17f : 0.02f;
+				chew.headRoll = chews % 4 < 2 ? 0.1f : -0.06f;
+				keys.push_back(at(chew, t));
+			}
+			chew.face.jawOpen = 0.0f;
+			keys.push_back(at(chew, chewEnd));
+		}
+		//Licks its lips, left and right, with the paws on its belly
+		IdleKey lick = sitting;
+		lick.headPitch = -0.35f;
+		lick.face.lids = 0.6f;
+		lick.face.jawOpen = 0.14f;
+		lick.face.tongueOut = 0.4f;
+		lick.face.tongueSide = 0.7f;
+		lick.face.tongueCurl = -0.4f;
+		lick.sway = 0.06f;
+		float lickStart = EAT_BITES[2] + 1.0f;
+		keys.push_back(at(lick, lickStart + 0.2f));
+		lick.face.tongueSide = -0.7f;
+		keys.push_back(at(lick, lickStart + 0.55f));
+		IdleKey content = sitting;
+		content.face.lids = 0.9f; //blissful
+		content.headPitch = -0.3f;
+		content.headRoll = -0.12f;
+		content.sway = 0.1f;
+		keys.push_back(at(content, lickStart + 0.85f));
+		keys.push_back(at(content, lickStart + 1.25f));
+		keys.push_back(at(sitting, lickStart + 1.6f));
+		keys.push_back(at(standing, lickStart + 2.3f));
 	}
 }
 

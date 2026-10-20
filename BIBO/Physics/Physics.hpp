@@ -89,6 +89,16 @@ namespace bibo
 			BodyHandle createDynamicBox(glm::vec3 position, glm::vec3 halfExtent, float density, glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
 			BodyHandle createStaticSphere(glm::vec3 position, float radius);
 			/**
+			* A sphere that the game moves (moveKinematic), e.g. an animal walking around: it pushes dynamic bodies and the
+			* character away, but nothing pushes it. Ray and sphere casts with staticOnly do not find it.
+			*/
+			BodyHandle createKinematicSphere(glm::vec3 position, float radius);
+			/**
+			* The kinematic body reaches the position and rotation at the end of the next update (with the velocity that takes)
+			* @param time_delta Of the next update, 0: moves it there right away (e.g. when the game is restarted)
+			*/
+			void moveKinematic(BodyHandle body, glm::vec3 position, glm::quat rotation, float time_delta);
+			/**
 			* Creates a static triangle mesh. The vertices are scaled first, then rotated and translated.
 			* @param vertices 3 floats per vertex
 			* @param indices 3 indices per triangle

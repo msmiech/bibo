@@ -1,0 +1,198 @@
+/*
+ * Style of the HUD of the quests (conversations, countdown, race time), in the colors of the menus (menu.rcss).
+ * Sizes are given in dp: the window is always 720dp high, whatever its resolution.
+ */
+
+body
+{
+	width: 100%;
+	height: 100%;
+	font-family: DejaVu Sans;
+	font-weight: normal;
+	font-style: normal;
+	font-size: 18dp;
+	color: #e4edf6;
+	pointer-events: none;
+}
+
+div, p
+{
+	display: block;
+}
+
+.key
+{
+	display: inline-block;
+	min-width: 14dp;
+	margin-right: 10dp;
+	padding: 2dp 7dp;
+	border: 1dp #e4edf6a0;
+	border-radius: 4dp;
+	background-color: #ffffff1a;
+	font-size: 15dp;
+	text-align: center;
+	color: #ffffff;
+}
+
+/* ---------- The race: at the top in the middle ---------- */
+
+.race
+{
+	position: absolute;
+	top: 22dp;
+	left: 0;
+	right: 0;
+	text-align: center;
+}
+.race .time
+{
+	font-size: 40dp;
+	letter-spacing: 2dp;
+	color: #ffffff;
+	font-effect: shadow(0dp 2dp #000000b0);
+}
+.race .details
+{
+	margin-top: 2dp;
+	font-size: 16dp;
+	color: #ffd27a;
+	font-effect: shadow(0dp 1dp #000000c0);
+}
+.race .separator
+{
+	margin: 0 12dp;
+	color: #93a7bb;
+}
+
+/* ---------- 3, 2, 1, GO! in the middle ---------- */
+
+.countdown
+{
+	position: absolute;
+	top: 210dp;
+	left: 0;
+	right: 0;
+	text-align: center;
+	font-size: 150dp;
+	color: #ffffff;
+	font-effect: shadow(0dp 5dp #000000a0);
+}
+.countdown.go
+{
+	color: #8be36f;
+}
+
+/* ---------- The result of the race ---------- */
+
+.banner
+{
+	position: absolute;
+	top: 150dp;
+	left: 50%;
+	width: 560dp;
+	margin-left: -280dp;
+	box-sizing: border-box;
+	padding: 20dp 30dp 22dp;
+	border: 1dp #ffffff1a;
+	border-left: 4dp #ff8a6a;
+	border-radius: 8dp;
+	background-color: #0a121ed9;
+	text-align: center;
+}
+.banner.success
+{
+	border-left-color: #8be36f;
+}
+.banner .title
+{
+	font-size: 30dp;
+	letter-spacing: 4dp;
+	text-transform: uppercase;
+	color: #ff8a6a;
+}
+.banner.success .title
+{
+	color: #8be36f;
+}
+.banner .detail
+{
+	margin-top: 8dp;
+	font-size: 17dp;
+	color: #e4edf6;
+}
+
+/* ---------- What the player can do: above the conversation box ---------- */
+
+.prompt
+{
+	position: absolute;
+	bottom: 150dp;
+	left: 0;
+	right: 0;
+	text-align: center;
+	font-size: 19dp;
+	font-effect: shadow(0dp 2dp #000000c0);
+}
+
+/* ---------- Conversation: a box at the bottom ---------- */
+
+.conversation
+{
+	position: absolute;
+	bottom: 36dp;
+	left: 50%;
+	width: 760dp;
+	margin-left: -380dp;
+	min-height: 120dp;
+	box-sizing: border-box;
+	padding: 18dp 28dp 16dp;
+	border: 1dp #ffffff1a;
+	border-radius: 10dp;
+	background-color: #0a121ee6;
+	box-shadow: 0dp 10dp 30dp #00000090;
+}
+.conversation .speaker
+{
+	margin-bottom: 8dp;
+	font-size: 15dp;
+	letter-spacing: 3dp;
+	text-transform: uppercase;
+	color: #ffc424;
+}
+.conversation .text
+{
+	font-size: 21dp;
+	line-height: 1.45;
+}
+.conversation .choices
+{
+	margin-top: 14dp;
+	text-align: center;
+}
+.choice
+{
+	display: inline-block;
+	width: 150dp;
+	margin: 0 10dp;
+	padding: 8dp 0;
+	border: 1dp #ffffff26;
+	border-radius: 6dp;
+	font-size: 19dp;
+	letter-spacing: 2dp;
+	text-transform: uppercase;
+	text-align: center;
+	color: #b4c4d4;
+}
+.choice.selected
+{
+	border-color: #74c7ff;
+	background-color: #74c7ff30;
+	color: #ffffff;
+}
+.conversation .continue
+{
+	margin-top: 8dp;
+	text-align: right;
+	font-size: 15dp;
+	color: #93a7bb;
+}

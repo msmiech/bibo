@@ -6,6 +6,7 @@
 #include <catch2/generators/catch_generators_range.hpp>
 
 #include "Scene/GameRules.hpp"
+#include "World/WorldGenerator.hpp"
 #include "TestSupport.hpp"
 
 using namespace bibo::test;
@@ -102,7 +103,7 @@ TEST_CASE("The bear starts on the finish line, the lap is only complete after al
 	const rules::FinishLine finishLine = trackFinishLine();
 
 	CAPTURE(bear, finishLine.center, finishLine.halfWidth);
-	CHECK_FALSE(rules::hasFallenOff(bear));
+	CHECK(bear.y > worldGenerator().getSeaLevel() + 2.0f); //not in the water
 	CHECK(rules::isOnFinishLine(bear, finishLine)); //the race is a lap
 	CHECK(rules::passCheckpoint(bear, 0) == 0); //no checkpoint at the start
 	CHECK_FALSE(rules::hasCompletedLap(0, bear, finishLine));

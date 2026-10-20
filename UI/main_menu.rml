@@ -8,7 +8,7 @@
 	<div class="side">
 		<h1 class="title">Bear-In<br/>Bear-Out</h1>
 		<div class="accent"></div>
-		<p class="tagline">Complete a lap as fast as possible and avoid the obstacles on the way.</p>
+		<p class="tagline">Roam the island, swim and catch salmon. The beaver at the start has a race around the track for you.</p>
 
 		<button autofocus data-event-click="start">Start</button>
 		<button data-event-click="settings">Settings</button>

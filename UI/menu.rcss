@@ -121,9 +121,9 @@ button:active
 }
 
 
-/* ---------- Pause and game over menu: dialog in the middle of the dimmed scene ---------- */
+/* ---------- Pause menu: dialog in the middle of the dimmed scene ---------- */
 
-#pause-menu, #game-over-menu
+#pause-menu
 {
 	display: flex;
 	justify-content: center;
@@ -162,11 +162,6 @@ button:active
 .dialog .hints
 {
 	margin-top: 22dp;
-}
-.dialog .score
-{
-	margin: -12dp 0 22dp;
-	color: #ffd27a;
 }
 
 

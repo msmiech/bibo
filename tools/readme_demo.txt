@@ -1,5 +1,5 @@
 # Input for the gameplay GIF of the README (Screenshots/bibo_gameplay.gif), recorded by tools/record_gameplay.sh.
-# Shows the main menu, the graphics settings, a run on the track with a few F-key effects and the pause menu.
+# Shows the main menu, the graphics settings, the conversation with the beaver, the start of the race and the pause menu.
 # Commands: wait <seconds>, press <key>, hold <key> <seconds>, quit (see BIBO/Util/DemoScript.hpp).
 # Preview it in real time in the build folder: BIBO --demo ../tools/readme_demo.txt 960 540
 
@@ -47,7 +47,32 @@ wait 0.3
 press Enter
 wait 0.3
 
-# Run along the track: left with the track, then right past a hedgehog
+# Talk to the beaver next to the starting line: the conversation appears letter by letter (it chatters, it does not speak)
+hold Up 0.9
+hold Left 0.6
+wait 1.6
+press E             # talk
+wait 1.5
+press E             # the whole page
+wait 1
+press E             # next page
+wait 1.5
+press E
+wait 1.2
+press E
+wait 1.5
+press E
+wait 1.2
+press E             # the question
+wait 2.5
+press Right         # No
+wait 0.5
+press Left          # Yes
+wait 0.5
+press E             # the bear walks up to the starting line, 3, 2, 1, GO!
+wait 9
+
+# The race: along the track, then right past a hedgehog
 hold Up 8
 wait 1.5
 press Space         # jump
@@ -58,12 +83,6 @@ hold Right 0.4
 wait 1
 press Space
 wait 1
-
-# Wireframe (F3) for a moment
-press F3
-wait 1
-press F3
-wait 0.7
 
 # Pause menu
 press Escape

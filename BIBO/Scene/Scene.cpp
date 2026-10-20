@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include "BeaverModel.hpp"
 #include "../Util/Console.hpp"
 #include "../Util/Input.hpp"
 #include "../World/MaterialTextures.hpp"
@@ -20,6 +21,17 @@ namespace
 	const int HEDGEHOG_COUNT = 12;
 	//The fur of the bear lies on the spines of a hedgehog when it runs into it
 	const float SPINE_LENGTH = 0.8f * HedgehogRenderer::SPINE_LENGTH;
+	const vec3 UP(0.0f, 1.0f, 0.0f);
+	//The race goes along -z at the start (the bear looks there, Bear::Bear)
+	const vec3 START_DIRECTION(0.0f, 0.0f, -1.0f);
+	//The bear starts behind the starting line (left of the crate), the beaver sits next to the line at the left side of the track
+	const float SPAWN_BEHIND_LINE = 7.0f, SPAWN_SIDE = -0.8f;
+	const float BEAVER_SIDE = -5.0f, BEAVER_BEHIND_LINE = 1.5f;
+	const std::size_t BEAVER_FUR_COUNT = 16000;
+	//Height of the exclamation mark above the beaver
+	const float MARKER_SCALE = 0.8f;
+	//The race is lost when the bear is this deep in the water (its paws)
+	const float IN_WATER_DEPTH = 0.35f;
 
 	//The vertices of the meshes of a geometry in model space (the model matrix is not applied)
 	vector<vec3> modelVertices(Geometry* geometry)
@@ -102,6 +114,7 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 
 	initWorld(*trackScene);
 	initAnimals();
+	initQuest();
 	camera->snapBehind(cameraTarget());
 	world->finishLoading(camera->getPosition(), bear->getPosition(), WORLD_LOADING_TIMEOUT);
 	placeAnimals();
@@ -177,50 +190,234 @@ void Scene::initAnimals()
 	cout << hedgehogs.size() << " hedgehogs, " << salmon->getPools().size() << " pools with salmon" << endl;
 }
 
+void Scene::initQuest()
+{
+	raceQuest = make_unique<RaceQuest>(finishLineTrigger, START_DIRECTION);
+	const vec3 behind = -START_DIRECTION;
+	//The beaver sits at the side of the track next to the starting line and looks across it, towards the bear coming from the start
+	vec3 seat = groundAt(finishLineTrigger.center + finishLineTrigger.across * BEAVER_SIDE + behind * BEAVER_BEHIND_LINE);
+	beaver = make_unique<Beaver>(seat, normalize(finishLineTrigger.across * (BEAVER_SIDE > 0.0f ? -1.0f : 1.0f) + 0.6f * behind));
+	beaverBody = physicsWorld->createKinematicSphere(beaver->getColliderCenter(), beaver->getColliderRadius());
+	FurryRenderer::Strands strands;
+	strands.furCount = BEAVER_FUR_COUNT;
+	strands.furSeed = 91;
+	FurryRenderer::Bounds bounds;
+	bounds.center = vec3(0.0f, 0.5f, 0.0f);
+	bounds.radius = 0.8f;
+	beaverRenderer = make_unique<FurryRenderer>(BeaverModel::build(), 1, strands, bounds);
+
+	//The bear starts behind the line, the beaver and the line are in front of it. In deep water it swims.
+	BearCharacter& character = bear->getCharacter();
+	character.setWaterLevel(world->getGenerator().getSeaLevel());
+	vec3 spawn = groundAt(bear->getPosition() + behind * SPAWN_BEHIND_LINE + finishLineTrigger.across * SPAWN_SIDE) + UP * (BearCharacter::groundOffset() + 0.05f);
+	character.setStart(spawn, START_DIRECTION);
+	bear->reset();
+}
+
+vec3 Scene::groundAt(vec3 position) const
+{
+	return vec3(position.x, world->getGenerator().height(vec2(position.x, position.z)), position.z);
+}
+
+bool Scene::isBearInWater()
+{
+	return bear->getCharacter().getWaterDepth() > IN_WATER_DEPTH;
+}
+
+RaceQuest::Situation Scene::questSituation(const input::PlayerInput& player)
+{
+	RaceQuest::Situation situation;
+	const BearCharacter& character = bear->getCharacter();
+	situation.bear = bear->getPosition();
+	vec3 toBeaver = beaver->getPosition() - situation.bear;
+	//It can talk when it stands (not while it tumbles, swims or eats)
+	situation.nearBeaver = length(vec2(toBeaver.x, toBeaver.z)) < RaceQuest::TALK_DISTANCE && character.getState() == BearCharacter::State::CONTROL
+		&& !character.isSwimming() && character.getFish() == BearCharacter::Fish::NONE;
+	situation.swimming = isBearInWater();
+	situation.onTrack = RaceQuest::isOnTrack(world->getGenerator().getPath(), situation.bear);
+	situation.atStart = atStart;
+	situation.interact = player.interact;
+	situation.dialog.confirm = player.confirm;
+	situation.dialog.navigate = player.navigate;
+	situation.dialog.cancel = player.cancel;
+	return situation;
+}
+
+bool Scene::turnTowards(vec3 direction, BearInput& input)
+{
+	vec3 facing = bear->getDirection();
+	direction.y = 0.0f;
+	if (length(direction) < 1e-4f)
+	{
+		return true;
+	}
+	direction = normalize(direction);
+	//Positive: the direction is to the left
+	float angle = std::atan2(cross(facing, direction).y, dot(facing, direction));
+	if (std::abs(angle) < 0.08f)
+	{
+		return true;
+	}
+	input.turn = std::copysign(std::clamp(std::abs(angle) * 2.0f, 0.35f, 1.0f), angle);
+	return false;
+}
+
+BearInput Scene::bearInput(const input::PlayerInput& player)
+{
+	BearInput input;
+	RaceQuest::Stage stage = raceQuest->getStage();
+	if (stage != RaceQuest::Stage::WALKING_TO_START)
+	{
+		atStart = false;
+	}
+	if (raceQuest->isPlayerInControl())
+	{
+		input.move = input::cameraRelative(player.move, camera->getForward(), camera->getRight());
+		//The button that answered the beaver must be released before the bear jumps
+		jumpBlocked = jumpBlocked && player.jump;
+		input.jump = player.jump && !jumpBlocked;
+		return input;
+	}
+	jumpBlocked = true;
+	if (stage == RaceQuest::Stage::TALKING)
+	{
+		turnTowards(beaver->getPosition() - bear->getPosition(), input); //it looks at the beaver
+	}
+	else if (stage == RaceQuest::Stage::WALKING_TO_START)
+	{
+		//Walks up to the starting line and turns along the track
+		vec3 toStart = raceQuest->getStartPosition() - bear->getPosition();
+		toStart.y = 0.0f;
+		float distance = length(toStart);
+		if (distance > 0.35f)
+		{
+			input.move = toStart / distance * glm::mix(0.15f, 0.35f, std::clamp(distance / 2.0f, 0.0f, 1.0f));
+		}
+		else
+		{
+			atStart = turnTowards(raceQuest->getStartDirection(), input);
+		}
+	}
+	return input; //the countdown: it stands still
+}
+
+void Scene::updateCamera(float time_delta)
+{
+	RaceQuest::Stage stage = raceQuest->getStage();
+	if (camera->isLocked() && stage == RaceQuest::Stage::TALKING)
+	{
+		//Both from the side, a bit behind the bear (the beaver faces the camera), from the side with more room
+		vec3 bearHead = bear->getPosition() + UP * 0.4f;
+		vec3 beaverHead = beaver->getHeadPosition();
+		vec3 across = beaverHead - bearHead;
+		across.y = 0.0f;
+		across = length(across) > 1e-3f ? normalize(across) : START_DIRECTION;
+		vec3 middle = 0.5f * (bearHead + beaverHead);
+		vec3 best = middle;
+		float bestRoom = -1.0f;
+		for (float side : { 1.0f, -1.0f })
+		{
+			vec3 eye = middle + cross(across, UP) * (6.5f * side) - across * 2.0f + UP * 1.4f;
+			physics::RayHit hit;
+			float room = physicsWorld->castSphere(middle, eye - middle, Camera::COLLISION_RADIUS, hit, true) ? hit.fraction : 1.0f;
+			if (room > bestRoom + 0.05f)
+			{
+				best = eye;
+				bestRoom = room;
+			}
+		}
+		camera->shot(best, middle + UP * 0.1f, time_delta);
+	}
+	else if (camera->isLocked() && stage == RaceQuest::Stage::WALKING_TO_START)
+	{
+		//From beyond the starting line: the bear walks up to it, the beaver cheers next to it
+		vec3 start = groundAt(raceQuest->getStartPosition());
+		vec3 forward = raceQuest->getStartDirection();
+		vec3 right = cross(forward, UP);
+		camera->shot(start + forward * 6.5f - right * 1.5f + UP * 2.4f, bear->getPosition() + UP * 0.2f, time_delta);
+	}
+	else if (camera->isLocked())
+	{
+		camera->follow(cameraTarget(), time_delta);
+	}
+	camera->update(time_delta);
+}
+
 void Scene::update(float time_delta, const input::PlayerInput& player) {
 	physicsWorld->update(time_delta);
-	if (gameWon != true && gameOver != true){
-	//The camera turns first, the bear moves relative to where the camera looks then
-	camera->rotate(player.look.x, player.look.y);
-	camera->zoom(player.zoom);
-	if (player.recenter)
+	//The camera turns first, the bear moves relative to where the camera looks then (not in a conversation or a cutscene)
+	if (raceQuest->isPlayerInControl() || !camera->isLocked())
 	{
-		camera->recenter();
+		camera->rotate(player.look.x, player.look.y);
+		camera->zoom(player.zoom);
+		if (player.recenter)
+		{
+			camera->recenter();
+		}
 	}
-	BearInput bearInput;
-	bearInput.move = input::cameraRelative(player.move, camera->getForward(), camera->getRight());
-	bearInput.jump = player.jump;
-	bear->setInput(bearInput);
+
+	//The race quest: the conversation with the beaver, the cutscene, the countdown and the race
+	raceQuest->update(time_delta, questSituation(player));
+	for (RaceQuest::Event event : raceQuest->takeEvents())
+	{
+		if (event == RaceQuest::Event::BEAVER_SOUND)
+		{
+			beaver->speak();
+		}
+		else if (event == RaceQuest::Event::ACCEPTED || event == RaceQuest::Event::COMPLETED)
+		{
+			beaver->cheer();
+		}
+		events.push_back(event);
+	}
+	RaceQuest::Stage stage = raceQuest->getStage();
+	if (stage != lastStage && stage == RaceQuest::Stage::COUNTDOWN)
+	{
+		//The race starts at the line, looking along the track (also if the bear did not get there in the cutscene, e.g. it was knocked over)
+		vec3 start = raceQuest->getStartPosition();
+		vec3 here = bear->getPosition();
+		if (!atStart || length(vec2(start.x - here.x, start.z - here.z)) > 1.0f)
+		{
+			world->ensureCollision(start, camera->getPosition());
+			bear->getCharacter().placeAt(groundAt(start) + UP * (BearCharacter::groundOffset() + 0.05f), raceQuest->getStartDirection());
+		}
+		camera->snapBehind(cameraTarget());
+	}
+	lastStage = stage;
+	beaver->setTalking(raceQuest->getDialog().isOpen());
+	bear->setInput(bearInput(player));
 
 	for (unsigned int i = 0; i < geometries.size(); ++i)
 	{
 		geometries[i]->update(time_delta);
 	}
 	updateAnimals(time_delta);
+	//The bear splashes into the water
+	int newSplashes = bear->getCharacter().takeSplashes();
+	if (newSplashes > 0)
+	{
+		salmon->splash(bear->getPosition(), bear->getCharacter().getWaterLevel(), 26);
+		splashes += newSplashes;
+	}
+	updateCamera(time_delta);
 
-	if (camera->isLocked())
-	{
-		camera->follow(cameraTarget(), time_delta);
-	}
-	camera->update(time_delta);
-
-	vec3 playerPosition = bear->getPosition();
-	if (rules::hasFallenOff(playerPosition))
-	{
-		gameOver = true;
-	}
-	else
-	{
-		nextCheckpoint = rules::passCheckpoint(playerPosition, nextCheckpoint);
-		if (rules::hasCompletedLap(nextCheckpoint, playerPosition, finishLineTrigger))
-		{
-			gameWon = true;
-		}
-	}
-	}
 	//The world streams around the camera, the physics around the bear
 	world->update(time_delta, camera->getPosition(), bear->getPosition());
 	placeAnimals();
+}
+
+vector<RaceQuest::Event> Scene::takeEvents()
+{
+	vector<RaceQuest::Event> result;
+	result.swap(events);
+	return result;
+}
+
+int Scene::takeSplashes()
+{
+	int result = splashes;
+	splashes = 0;
+	return result;
 }
 
 void Scene::updateAnimals(float time_delta)
@@ -234,6 +431,10 @@ void Scene::updateAnimals(float time_delta)
 		obstacles.push_back({ hedgehogs[i].getColliderCenter(), hedgehogs[i].getColliderRadius() + SPINE_LENGTH });
 	}
 	bear->setObstacles(obstacles);
+
+	//The beaver at the start turns to the bear and looks at its head
+	beaver->update(time_delta, bear->getPosition() + UP * 0.4f);
+	physicsWorld->moveKinematic(beaverBody, beaver->getColliderCenter(), quat(1.0f, 0.0f, 0.0f, 0.0f), time_delta);
 
 	//Salmon jump out of the water when the bear comes close, one per pool can be caught for bonus points
 	BearCharacter& character = bear->getCharacter();
@@ -290,6 +491,13 @@ void Scene::placeAnimals()
 	{
 		creatures->add(CreatureModel::DROPLET, droplet.position, quat(1.0f, 0.0f, 0.0f, 0.0f), droplet.size);
 	}
+	beaverRenderer->setPose(0, beaver->getPose());
+	//The beaver offers the race: a golden exclamation mark above it, a blue one once the race was completed
+	if (raceQuest->isOffered())
+	{
+		CreatureModel marker = raceQuest->hasCompleted() ? CreatureModel::QUEST_MARKER_REPEATABLE : CreatureModel::QUEST_MARKER;
+		creatures->add(marker, beaver->getMarkerPosition(), beaver->getMarkerRotation(), MARKER_SCALE);
+	}
 }
 
 Camera::FollowTarget Scene::cameraTarget()
@@ -320,9 +528,14 @@ void Scene::restart()
 	}
 	salmon->reset();
 	score = 0;
-	nextCheckpoint = 0;
-	gameOver = false;
-	gameWon = false;
+	raceQuest->abort();
+	lastStage = raceQuest->getStage();
+	atStart = false;
+	jumpBlocked = false;
+	events.clear();
+	splashes = 0;
+	beaver->reset();
+	physicsWorld->moveKinematic(beaverBody, beaver->getColliderCenter(), quat(1.0f, 0.0f, 0.0f, 0.0f), 0.0f);
 	placeAnimals();
 }
 
@@ -355,6 +568,7 @@ void Scene::drawShadowCasters(const render::ShadowCascade& cascade)
 	depthShader->enable();
 	glUniformMatrix4fv(depthShader->getUniformLocation("lightSpaceMatrix"), 1, GL_FALSE, value_ptr(cascade.lightSpace));
 	hedgehogRenderer->drawSurfaces(depthShader.get());
+	beaverRenderer->drawSurfaces(depthShader.get());
 	for (const unique_ptr<Geometry>& geometry : geometries)
 	{
 		if (geometry.get() == bear)
@@ -409,6 +623,7 @@ void Scene::drawMain(const render::RenderSettings& settings)
 		++drawnGeometryCount;
 	}
 	hedgehogRenderer->drawShaded(context, frustum);
+	beaverRenderer->drawShaded(context, frustum);
 
 	//4. Transparent: the water, the falling snow
 	world->drawTransparent(settings.transparency);
@@ -499,16 +714,6 @@ bool Scene::isViewFrustumCullingEnabled()
 	return viewFrustumCullingEnabled;
 }
 
-bool Scene::isGameOver()
-{
-	return gameOver;
-}
-
-bool Scene::isGameWon()
-{
-	return gameWon;
-}
-
 int Scene::getDrawnGeometryCount()
 {
 	return drawnGeometryCount;
@@ -519,22 +724,13 @@ int Scene::getGeometryCount()
 	return static_cast<int>(geometries.size());
 }
 
-int Scene::getCheckpointsPassed()
-{
-	return static_cast<int>(nextCheckpoint);
-}
-
-int Scene::getCheckpointCount()
-{
-	return static_cast<int>(rules::CHECKPOINT_COUNT);
-}
-
 void Scene::initPhysicsBodies()
 {
-	//Ground under the sea (a large box whose top face is at y = -5): the bear lands on it when it falls into the sea
+	//Ground under the sea (a large box whose top face is at y = -5), far out where the sea floor of the world ends
 	physicsWorld->createStaticBox(vec3(0.0f, -6.0f, 0.0f), vec3(1000.0f, 1.0f, 1000.0f));
 
 	//There is no wall at the start: the finish line is a trigger (see initFinishLine) and the checkpoints keep the bear from going backwards
+	//(the bear starts a bit behind the line, see initQuest)
 
 	//The crate as it is drawn: a box around its mesh, turned like its model
 	vector<vec3> crateVertices = modelVertices(crate);

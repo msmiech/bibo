@@ -6,6 +6,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "Audio/Music.hpp"
+#include "Audio/SoundEffects.hpp"
 
 using namespace bibo::audio;
 using Catch::Matchers::WithinAbs;
@@ -99,5 +100,46 @@ TEST_CASE("The music is a loop of 32 bars that is loud, but not too loud, and ha
 	{
 		Song again = composeIslandTune(sampleRate);
 		CHECK(again.samples == song.samples);
+	}
+}
+
+TEST_CASE("The sound effects are synthesized: short, not silent, without clipping", "[audio]")
+{
+	const int SAMPLE_RATE = 22050;
+	for (int effect = 0; effect < SOUND_EFFECT_COUNT; ++effect)
+	{
+		REQUIRE(soundEffectVariants(static_cast<SoundEffect>(effect)) >= 1);
+		for (int variant = 0; variant < soundEffectVariants(static_cast<SoundEffect>(effect)); ++variant)
+		{
+			CAPTURE(effect, variant);
+			std::vector<float> samples = synthesizeSoundEffect(static_cast<SoundEffect>(effect), variant, SAMPLE_RATE);
+			REQUIRE_FALSE(samples.empty());
+			CHECK(samples.size() < static_cast<std::size_t>(3 * SAMPLE_RATE));
+			float peak = 0.0f;
+			for (float sample : samples)
+			{
+				REQUIRE(std::isfinite(sample));
+				peak = std::max(peak, std::abs(sample));
+			}
+			CHECK(peak > 0.2f);
+			CHECK(peak <= 1.0f);
+			//Starts and ends quietly (no click)
+			CHECK(std::abs(samples.front()) < 0.05f);
+			CHECK(std::abs(samples.back()) < 0.05f);
+		}
+	}
+}
+
+TEST_CASE("The beaver makes short sounds that differ from each other, the same every time", "[audio]")
+{
+	const int SAMPLE_RATE = 22050;
+	REQUIRE(soundEffectVariants(SoundEffect::BEAVER) > 3);
+	std::vector<float> first = synthesizeSoundEffect(SoundEffect::BEAVER, 0, SAMPLE_RATE);
+	CHECK(first == synthesizeSoundEffect(SoundEffect::BEAVER, 0, SAMPLE_RATE));
+	CHECK(first != synthesizeSoundEffect(SoundEffect::BEAVER, 1, SAMPLE_RATE));
+	//Shorter than the time between two sounds while the beaver talks, so they do not pile up
+	for (int variant = 0; variant < soundEffectVariants(SoundEffect::BEAVER); ++variant)
+	{
+		CHECK(synthesizeSoundEffect(SoundEffect::BEAVER, variant, SAMPLE_RATE).size() < static_cast<std::size_t>(0.21f * SAMPLE_RATE));
 	}
 }

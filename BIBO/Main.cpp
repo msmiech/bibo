@@ -58,8 +58,9 @@ render::RenderSettings renderSettings();
 void applyGraphicsSettings();
 bool pauseGame();
 void resumeGame();
-void showGameOver();
 void restartGame();
+void playSounds();
+void updateHud();
 void onMenuAction(ui::MenuAction action);
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);
@@ -91,8 +92,7 @@ enum GameState
 {
 	MAIN_MENU,
 	PLAYING,
-	PAUSED,
-	GAME_OVER //lost or won, the game over menu offers to restart
+	PAUSED
 };
 GameState gameState = MAIN_MENU;
 unique_ptr<ui::Menu> menu;
@@ -103,8 +103,9 @@ unique_ptr<Shader> mainShader;
 unique_ptr<Shader> textShader;
 
 unique_ptr<Scene> gameScene;
-//The music of the race (not while recording: the game runs faster or slower than real time then)
+//The music and the sounds (not while recording: the game runs faster or slower than real time then)
 unique_ptr<audio::MusicPlayer> music;
+unsigned int beaverSound = 0; //the beaver does not make the same sound twice in a row
 int lastSalmonCaught = 0;
 //Shadow maps, HDR image, bloom, auto exposure and tone mapping
 unique_ptr<render::Renderer> renderer;
@@ -563,6 +564,7 @@ void applyGraphicsSettings()
 	if (music)
 	{
 		music->setEnabled(settings.music);
+		music->setEffectsEnabled(settings.soundEffects);
 	}
 }
 
@@ -623,16 +625,6 @@ void resumeGame()
 	menu->hide();
 	//The button that pressed Start or Resume in the menu may be the jump button
 	controls->blockJumpUntilReleased();
-}
-
-//Without menus the game shows GAME OVER or YOU WON and R restarts as in earlier versions
-void showGameOver()
-{
-	menu->showGameOverMenu(gameScene->isGameWon(), gameScene->getScore(), gameScene->getSalmonCaught());
-	if (menu->isVisible())
-	{
-		gameState = GAME_OVER;
-	}
 }
 
 void restartGame()
@@ -742,15 +734,14 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 			}
 			break;
 		case MAIN_MENU:
-		case GAME_OVER:
 			menu->back();
 			break;
 		}
 		return;
 	}
-	if ((gameState == PLAYING || gameState == GAME_OVER) && key == GLFW_KEY_R && action == GLFW_PRESS)
+	if (gameState == PLAYING && key == GLFW_KEY_R && action == GLFW_PRESS)
 	{
-		restartGame(); //once per press, also from the game over menu
+		restartGame(); //once per press
 		return;
 	}
 
@@ -821,20 +812,16 @@ void gameLoop()
 				messageTimeLeft = 3;
 			}
 			lastSalmonCaught = gameScene->getSalmonCaught();
-			if (gameScene->isGameOver() || gameScene->isGameWon())
-			{
-				showGameOver();
-			}
+			playSounds();
 		}
+		updateHud();
 		//Do drawing of game here
 		draw();
 
-		if (menu->isVisible())
-		{
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); //also in wireframe mode
-			menu->render();
-			glPolygonMode(GL_FRONT_AND_BACK, settings.wireframe ? GL_LINE : GL_FILL);
-		}
+		//The HUD of the quests and the menus
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); //also in wireframe mode
+		menu->render();
+		glPolygonMode(GL_FRONT_AND_BACK, settings.wireframe ? GL_LINE : GL_FILL);
 
 		if (recorder && !recordingFailed && !recorder->recordFrame(windowWidth, windowHeight))
 		{
@@ -874,6 +861,119 @@ void playDemoFrame(int frame)
 void update(float time_delta) {
 	//WASD moves the free camera (L) instead of the bear
 	gameScene->update(time_delta, controls->playerInput(time_delta, settings, !gameScene->isCameraLocked()));
+}
+
+//The sounds of what happened in the scene
+void playSounds()
+{
+	vector<RaceQuest::Event> events = gameScene->takeEvents();
+	int splashes = gameScene->takeSplashes();
+	if (!music)
+	{
+		return;
+	}
+	for (RaceQuest::Event event : events)
+	{
+		switch (event)
+		{
+		case RaceQuest::Event::BEAVER_SOUND:
+			//The beaver chatters while its words appear (it does not speak), never the same sound twice in a row
+			beaverSound += 1 + (beaverSound * 7u + 3u) % 3u;
+			music->play(audio::SoundEffect::BEAVER, static_cast<int>(beaverSound), 0.85f);
+			break;
+		case RaceQuest::Event::COUNTDOWN_TICK:
+			music->play(audio::SoundEffect::COUNTDOWN);
+			break;
+		case RaceQuest::Event::START:
+			music->play(audio::SoundEffect::GO);
+			break;
+		case RaceQuest::Event::CHECKPOINT:
+			music->play(audio::SoundEffect::CHECKPOINT, 0, 0.7f);
+			break;
+		case RaceQuest::Event::COMPLETED:
+			music->play(audio::SoundEffect::SUCCESS);
+			break;
+		case RaceQuest::Event::FAILED:
+			music->play(audio::SoundEffect::FAILURE);
+			break;
+		default:
+			break;
+		}
+	}
+	if (splashes > 0)
+	{
+		music->play(audio::SoundEffect::SPLASH, 0, 0.8f);
+	}
+}
+
+/**
+* The race quest on the HUD: what the player can do near the beaver, the conversation, the countdown, the race and its result
+*/
+void updateHud()
+{
+	ui::Hud hud;
+	hud.visible = gameState != MAIN_MENU;
+	const RaceQuest& quest = gameScene->getRaceQuest();
+	const Dialog& dialog = quest.getDialog();
+	bool gamepad = controls->hasGamepad();
+	if (quest.canTalk())
+	{
+		hud.prompt = "Talk to the beaver";
+		hud.promptKey = gamepad ? "X" : "E";
+	}
+	if (dialog.isOpen())
+	{
+		hud.speaker = dialog.getSpeaker();
+		hud.text = dialog.getText();
+		hud.canContinue = dialog.canContinue();
+		hud.continueKey = gamepad ? "A" : "E";
+		if (dialog.isChoosing())
+		{
+			hud.choices = dialog.getChoices();
+			hud.selectedChoice = dialog.getSelectedChoice();
+		}
+	}
+	int countdown = quest.getCountdownNumber();
+	if (countdown >= 0)
+	{
+		hud.countdown = countdown > 0 ? to_string(countdown) : "GO!";
+	}
+	if (quest.getStage() == RaceQuest::Stage::RACING)
+	{
+		hud.racing = true;
+		hud.raceTime = RaceQuest::formatTime(quest.getRaceTime());
+		hud.checkpoints = to_string(quest.getCheckpointsPassed()) + "/" + to_string(quest.getCheckpointCount());
+		hud.timeLimit = to_string(static_cast<int>(RaceQuest::TIME_LIMIT) / 60) + " min";
+	}
+	const float BANNER_TIME = 6.0f;
+	if (quest.getStage() == RaceQuest::Stage::IDLE && quest.getOutcomeAge() < BANNER_TIME)
+	{
+		const string again = "Talk to the beaver to try again.";
+		switch (quest.getOutcome())
+		{
+		case RaceQuest::Outcome::COMPLETED:
+			hud.banner = "Race complete!";
+			hud.bannerSuccess = true;
+			hud.bannerDetail = "Your time: " + RaceQuest::formatTime(quest.getRaceTime())
+				+ (quest.isNewBest() ? (quest.getCompletions() > 1 ? "  -  a new best time!" : "") : "  -  best: " + RaceQuest::formatTime(quest.getBestTime()));
+			break;
+		case RaceQuest::Outcome::TOO_SLOW:
+			hud.banner = "Race failed";
+			hud.bannerDetail = "Out of time. " + again;
+			break;
+		case RaceQuest::Outcome::LEFT_TRACK:
+			hud.banner = "Race failed";
+			hud.bannerDetail = "You left the track. " + again;
+			break;
+		case RaceQuest::Outcome::FELL_INTO_WATER:
+			hud.banner = "Race failed";
+			hud.bannerDetail = "You fell into the water. " + again;
+			break;
+		case RaceQuest::Outcome::NONE:
+			break;
+		}
+	}
+	menu->setHud(hud);
 }
 
 /**
@@ -1120,8 +1220,8 @@ void textRendering()
 		renderText(textShader.get(), "WASD or arrow keys / left stick to run", windowWidth / 10.f, windowHeight - 2.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Mouse / right stick to look around, wheel to zoom", windowWidth / 10.f, windowHeight - 3.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "SPACE / Cross or A to jump (hold to jump higher)", windowWidth / 10.f, windowHeight - 4.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
-		renderText(textShader.get(), "Press R key to restart", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
-		renderText(textShader.get(), "Pass all checkpoints and make it around the track!", windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "E / Square or X to talk, R to restart", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "The beaver at the start has a race for you!", windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Mind the hedgehogs, catch salmon for bonus points", windowWidth / 10.f, windowHeight - 7.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 	}
 	if (settings.showFrameTime)
@@ -1142,16 +1242,11 @@ void textRendering()
 			+ "  Jobs: " + to_string(world.streaming.pendingJobs), windowWidth / 10.f, windowHeight - 1.45f * windowHeight / 10.f, 0.4f, vec3(0.9, 0.5f, 0.5f));
 	}
 
-	//Lap progress (the finish line only counts after all checkpoints)
-	int checkpointsPassed = gameScene->getCheckpointsPassed();
-	int checkpointCount = gameScene->getCheckpointCount();
-	string lapProgress = "Checkpoints: " + to_string(checkpointsPassed) + "/" + to_string(checkpointCount);
-	if (checkpointsPassed == checkpointCount && !gameScene->isGameWon())
+	//Bonus: the salmon caught in the pools of water (not under the conversation box)
+	if (gameScene->getRaceQuest().getDialog().isOpen() && menu->hasHud())
 	{
-		lapProgress += " - cross the finish line!";
+		return;
 	}
-	renderText(textShader.get(), lapProgress, windowWidth / 10.f, 2.f * windowHeight / 10.f, 0.5f, vec3(0.9f, 0.8f, 0.3f));
-	//Bonus: the salmon caught in the pools of water
 	string bonus = "Salmon: " + to_string(gameScene->getSalmonCaught()) + "/" + to_string(gameScene->getPoolCount())
 		+ "   Score: " + to_string(gameScene->getScore());
 	renderText(textShader.get(), bonus, windowWidth / 10.f, 1.5f * windowHeight / 10.f, 0.5f, vec3(0.95f, 0.6f, 0.45f));
@@ -1161,18 +1256,37 @@ void textRendering()
 		renderText(textShader.get(), lastMessage, windowWidth / 10.f, windowHeight / 10.f, 0.4f, vec3(0.7, 0.5f, 0.8f));
 	}
 
-	//The game over menu shows the result if there are menus
-	if (gameState == GAME_OVER)
+	//Without the HUD document (e.g. missing UI folder) the quest is shown as plain text
+	if (!menu->hasHud())
 	{
-		return;
-	}
-	if (gameScene->isGameWon())
-	{
-		renderText(textShader.get(), "YOU WON!", windowWidth / 2.f - windowWidth / 5.f, windowHeight / 2.f, 0.6f, vec3(1.0, 0.1f, 0.1f));
-	}
-	else if (gameScene->isGameOver())
-	{
-		renderText(textShader.get(), "GAME OVER!", windowWidth / 2.f - windowWidth / 5.f, windowHeight / 2.f, 0.6f, vec3(1.0, 0.1f, 0.1f));
+		const RaceQuest& quest = gameScene->getRaceQuest();
+		const Dialog& dialog = quest.getDialog();
+		vec3 color(0.95f, 0.85f, 0.4f);
+		if (dialog.isOpen())
+		{
+			renderText(textShader.get(), dialog.getSpeaker() + ": " + dialog.getText(), windowWidth / 10.f, 3.f * windowHeight / 10.f, 0.4f, color);
+			string choices;
+			for (std::size_t i = 0; i < dialog.getChoices().size() && dialog.isChoosing(); ++i)
+			{
+				bool selected = static_cast<int>(i) == dialog.getSelectedChoice();
+				choices += (selected ? "[" : " ") + dialog.getChoices()[i] + (selected ? "]  " : "   ");
+			}
+			renderText(textShader.get(), choices, windowWidth / 10.f, 2.5f * windowHeight / 10.f, 0.45f, color);
+		}
+		else if (quest.canTalk())
+		{
+			renderText(textShader.get(), "E: Talk to the beaver", windowWidth / 10.f, 3.f * windowHeight / 10.f, 0.45f, color);
+		}
+		int countdown = quest.getCountdownNumber();
+		if (countdown >= 0)
+		{
+			renderText(textShader.get(), countdown > 0 ? to_string(countdown) : "GO!", windowWidth / 2.f, windowHeight / 2.f, 1.5f, color);
+		}
+		if (quest.getStage() == RaceQuest::Stage::RACING)
+		{
+			string race = RaceQuest::formatTime(quest.getRaceTime()) + "   Checkpoints: " + to_string(quest.getCheckpointsPassed()) + "/" + to_string(quest.getCheckpointCount());
+			renderText(textShader.get(), race, windowWidth / 10.f, 2.f * windowHeight / 10.f, 0.5f, color);
+		}
 	}
 }
 

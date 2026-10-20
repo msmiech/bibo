@@ -1,7 +1,6 @@
 #include "HedgehogModel.hpp"
 #include <algorithm>
 #include <cmath>
-#include <glm/gtc/constants.hpp>
 #include "../Resources/SkinnedModel.hpp"
 
 using namespace bibo;
@@ -10,9 +9,7 @@ using resources::SkinnedModel;
 
 namespace
 {
-	const float PI = glm::pi<float>();
 	const glm::vec3 UP(0.0f, 1.0f, 0.0f);
-	const glm::vec3 BACKWARDS(0.0f, 0.0f, -1.0f);
 	//The body is a surface around this point: an egg with a pointed snout that points forward and a bit down, flat underneath
 	const glm::vec3 CENTER(0.0f, HEDGEHOG_BODY_HEIGHT, -0.02f);
 	const glm::vec3 RADII(0.33f, 0.25f, 0.47f);
@@ -63,108 +60,12 @@ namespace
 	{
 		return direction.z - (0.5f + 0.3f * std::max(direction.y, 0.0f));
 	}
-
-	class Builder
-	{
-	public:
-		HedgehogModel model;
-
-		unsigned int add(glm::vec3 position, glm::vec3 normal, glm::vec4 color, SkinnedModel::Surface surface, int part, bool spine)
-		{
-			model.positions.push_back(position);
-			model.normals.push_back(glm::length(normal) > 1e-6f ? glm::normalize(normal) : UP);
-			model.colors.push_back(color);
-			model.surfaces.push_back(static_cast<float>(surface));
-			model.parts.push_back(part);
-			model.combs.push_back(BACKWARDS);
-			model.spines.push_back(spine);
-			return static_cast<unsigned int>(model.positions.size() - 1);
-		}
-
-		/**
-		* Rings of latitude around the y axis, the vertices come from a function of the direction
-		* @param vertex Adds the vertex in a direction and returns its index
-		* @return The first triangle (index into indices / 3)
-		*/
-		template <typename Vertex>
-		std::size_t sphere(int longitude, int latitude, Vertex vertex)
-		{
-			std::size_t firstTriangle = model.indices.size() / 3;
-			std::vector<unsigned int> grid;
-			for (int i = 0; i <= latitude; ++i)
-			{
-				float polar = PI * static_cast<float>(i) / static_cast<float>(latitude);
-				for (int j = 0; j <= longitude; ++j)
-				{
-					float azimuth = 2.0f * PI * static_cast<float>(j % longitude) / static_cast<float>(longitude);
-					grid.push_back(vertex(glm::vec3(std::sin(polar) * std::sin(azimuth), std::cos(polar), std::sin(polar) * std::cos(azimuth))));
-				}
-			}
-			for (int i = 0; i < latitude; ++i)
-			{
-				for (int j = 0; j < longitude; ++j)
-				{
-					unsigned int a = grid[i * (longitude + 1) + j], b = grid[(i + 1) * (longitude + 1) + j];
-					unsigned int c = grid[(i + 1) * (longitude + 1) + j + 1], d = grid[i * (longitude + 1) + j + 1];
-					triangle(a, b, c);
-					triangle(a, c, d);
-				}
-			}
-			return firstTriangle;
-		}
-
-		void ellipsoid(glm::vec3 center, glm::vec3 radii, int longitude, int latitude, glm::vec4 color, SkinnedModel::Surface surface, int part)
-		{
-			sphere(longitude, latitude, [&](glm::vec3 direction) {
-				return add(center + direction * radii, direction / radii, color, surface, part, false);
-			});
-		}
-
-		/**
-		* The triangle faces outwards (where its vertex normals point)
-		*/
-		void triangle(unsigned int a, unsigned int b, unsigned int c)
-		{
-			const std::vector<glm::vec3>& p = model.positions;
-			glm::vec3 face = glm::cross(p[b] - p[a], p[c] - p[a]);
-			if (glm::dot(face, model.normals[a] + model.normals[b] + model.normals[c]) < 0.0f)
-			{
-				std::swap(b, c);
-			}
-			model.indices.insert(model.indices.end(), { a, b, c });
-		}
-
-		/**
-		* Normals of the vertices from the triangles from firstTriangle on (for the body, whose shape is not an ellipsoid)
-		*/
-		void smoothNormals(std::size_t firstTriangle, std::size_t lastTriangle)
-		{
-			std::vector<glm::vec3> sums(model.positions.size(), glm::vec3(0.0f));
-			std::vector<bool> used(model.positions.size(), false);
-			for (std::size_t t = firstTriangle; t < lastTriangle; ++t)
-			{
-				unsigned int a = model.indices[t * 3], b = model.indices[t * 3 + 1], c = model.indices[t * 3 + 2];
-				glm::vec3 face = glm::cross(model.positions[b] - model.positions[a], model.positions[c] - model.positions[a]);
-				for (unsigned int v : { a, b, c })
-				{
-					sums[v] += face;
-					used[v] = true;
-				}
-			}
-			for (std::size_t v = 0; v < sums.size(); ++v)
-			{
-				if (used[v] && glm::length(sums[v]) > 1e-12f)
-				{
-					model.normals[v] = glm::normalize(sums[v]);
-				}
-			}
-		}
-	};
 }
 
 HedgehogModel HedgehogModel::build()
 {
-	Builder builder;
+	HedgehogModel model;
+	FurryModelBuilder builder(model);
 
 	//Body: spines on the back and the sides, short fur on the face and the belly
 	std::size_t firstBodyTriangle = builder.sphere(72, 44, [&](glm::vec3 direction) {
@@ -186,18 +87,9 @@ HedgehogModel HedgehogModel::build()
 		}
 		return builder.add(bodyPoint(direction), direction, color, SkinnedModel::FUR, BODY, spine);
 	});
-	std::size_t lastBodyTriangle = builder.model.indices.size() / 3;
+	std::size_t lastBodyTriangle = builder.triangleCount();
 	builder.smoothNormals(firstBodyTriangle, lastBodyTriangle);
-	for (std::size_t t = firstBodyTriangle; t < lastBodyTriangle; ++t)
-	{
-		int spineVertices = 0;
-		for (int k = 0; k < 3; ++k)
-		{
-			spineVertices += builder.model.spines[builder.model.indices[t * 3 + k]] ? 1 : 0;
-		}
-		std::vector<unsigned int>& target = spineVertices >= 2 ? builder.model.spineTriangles : builder.model.furTriangles;
-		target.insert(target.end(), builder.model.indices.begin() + t * 3, builder.model.indices.begin() + t * 3 + 3);
-	}
+	builder.growFurAndSpines(firstBodyTriangle, lastBodyTriangle);
 
 	//Wet nose at the tip of the snout
 	glm::vec3 tip = bodyPoint(SNOUT);
@@ -220,9 +112,8 @@ HedgehogModel HedgehogModel::build()
 		//Round ears just in front of the spines
 		glm::vec3 earDirection = glm::normalize(glm::vec3(0.5f * side, 0.62f, 0.4f));
 		glm::vec3 ear = bodyPoint(earDirection);
-		std::size_t firstEarTriangle = builder.model.indices.size() / 3;
-		builder.ellipsoid(ear, glm::vec3(0.045f, 0.05f, 0.022f), 12, 8, glm::vec4(FACE_COLOR * 1.1f, 0.12f), SkinnedModel::FUR, BODY);
-		builder.model.furTriangles.insert(builder.model.furTriangles.end(), builder.model.indices.begin() + firstEarTriangle * 3, builder.model.indices.end());
+		std::size_t firstEarTriangle = builder.ellipsoid(ear, glm::vec3(0.045f, 0.05f, 0.022f), 12, 8, glm::vec4(FACE_COLOR * 1.1f, 0.12f), SkinnedModel::FUR, BODY);
+		builder.growFur(firstEarTriangle, builder.triangleCount());
 	}
 
 	//Feet with bare soles and dark claws, each in the space of its foot
@@ -235,5 +126,5 @@ HedgehogModel HedgehogModel::build()
 			builder.ellipsoid(glm::vec3(x, 0.01f, 0.06f), glm::vec3(0.006f, 0.006f, 0.018f), 6, 4, glm::vec4(CLAW_COLOR, 0.0f), SkinnedModel::CLAW, part);
 		}
 	}
-	return builder.model;
+	return model;
 }

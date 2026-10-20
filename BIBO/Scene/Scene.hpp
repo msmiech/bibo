@@ -4,10 +4,13 @@
 #include "Geometry.hpp"
 #include <memory>
 #include "Bear.hpp"
+#include "Beaver.hpp"
 #include "CreatureRenderer.hpp"
+#include "FurryRenderer.hpp"
 #include "GameRules.hpp"
 #include "Hedgehog.hpp"
 #include "HedgehogRenderer.hpp"
+#include "RaceQuest.hpp"
 #include "Salmon.hpp"
 #include "../Render/Renderer.hpp"
 #include "../Util/Input.hpp"
@@ -24,9 +27,10 @@ namespace bibo
 	namespace scene
 	{
 		/**
-		* The race: the bear, the objects of the track (finish line, signs, ...), the animals (hedgehogs that stroll around
-		* on the track, salmon that jump out of the water) and the world around it (World: the island with its forest,
-		* caves, sky, water and snow)
+		* The island: the bear, the objects of the track (finish line, signs, ...), the animals (hedgehogs that stroll around
+		* on the track, salmon that jump out of the water, the beaver at the start who offers the race as a quest) and the world
+		* around it (World: the island with its forest, caves, sky, water and snow). The bear roams freely and swims in the water;
+		* the race around the track is a quest (RaceQuest), during its conversation and cutscene the scene moves the bear and the camera.
 		*/
 		class Scene : public render::RenderableScene
 		{
@@ -40,6 +44,31 @@ namespace bibo
 			* @param board The finish line (geometry), the trigger goes along it across the track
 			*/
 			void initFinishLine(Geometry* board);
+			/**
+			* The beaver next to the starting line, the race quest, and the start of the bear behind the line
+			*/
+			void initQuest();
+			/**
+			* What the bear does for the quest in this frame (where it is, whether it talks to the beaver, ...)
+			*/
+			RaceQuest::Situation questSituation(const input::PlayerInput& player);
+			/**
+			* The input of the bear: from the player, or from the cutscene and the conversation
+			*/
+			BearInput bearInput(const input::PlayerInput& player);
+			/**
+			* Turns the bear on the spot towards a direction
+			* @return true if it looks there
+			*/
+			bool turnTowards(vec3 direction, BearInput& input);
+			/**
+			* The camera of the conversation and the cutscene (or the camera that follows the bear)
+			*/
+			void updateCamera(float time_delta);
+			/**
+			* The ground under a point (the height field of the world)
+			*/
+			vec3 groundAt(vec3 position) const;
 			//Called when the bear touches a physics body: the hedgehogs knock it down
 			void onBearHit(const physics::CharacterController::Hit& hit);
 			void updateAnimals(float time_delta);
@@ -84,6 +113,9 @@ namespace bibo
 			unique_ptr<SalmonPools> salmon;
 			unique_ptr<CreatureRenderer> creatures;
 			unique_ptr<HedgehogRenderer> hedgehogRenderer;
+			unique_ptr<Beaver> beaver;
+			physics::BodyHandle beaverBody = physics::INVALID_BODY;
+			unique_ptr<FurryRenderer> beaverRenderer;
 			int score = 0;
 
 			//Physics
@@ -93,12 +125,14 @@ namespace bibo
 			bool normalMappingEnabled = true;
 			int drawnGeometryCount = 0;
 
-			bool gameOver = false;
-			bool gameWon = false;
-
-			//Index of the checkpoint the bear has to pass next, see rules::passCheckpoint
-			size_t nextCheckpoint = 0;
+			//The race around the track
 			rules::FinishLine finishLineTrigger;
+			unique_ptr<RaceQuest> raceQuest;
+			RaceQuest::Stage lastStage = RaceQuest::Stage::IDLE;
+			bool atStart = false; //the bear reached the starting line in the cutscene
+			bool jumpBlocked = false; //after a conversation until the jump button is released (it may have answered)
+			vector<RaceQuest::Event> events; //for takeEvents
+			int splashes = 0;
 
 			//Dynamic bodies and their start poses, which they are moved back to by restart()
 			struct DynamicBody
@@ -132,6 +166,21 @@ namespace bibo
 			*/
 			void restart();
 
+			const RaceQuest& getRaceQuest() const { return *raceQuest; }
+			const Beaver& getBeaver() const { return *beaver; }
+			/**
+			* @return true if the bear is in the water (swimming or wading deep), the race is lost then
+			*/
+			bool isBearInWater();
+			/**
+			* @return What happened in the quest since the last call (e.g. for the sounds)
+			*/
+			vector<RaceQuest::Event> takeEvents();
+			/**
+			* @return How often the bear fell into the water since the last call
+			*/
+			int takeSplashes();
+
 			//render::RenderableScene (the frame is rendered by render::Renderer)
 			render::CameraView cameraView() override;
 			void fillFrameUniforms(render::FrameUniforms& uniforms) override;
@@ -164,16 +213,12 @@ namespace bibo
 			* @return Number of geometries in the scene
 			*/
 			int getGeometryCount();
-			int getCheckpointsPassed();
-			int getCheckpointCount();
 			/**
 			* @return Bonus points of the run (the salmon the bear caught)
 			*/
 			int getScore() const { return score; }
 			int getSalmonCaught() const { return salmon->getCaughtCount(); }
 			int getPoolCount() const { return static_cast<int>(salmon->getPools().size()); }
-			bool isGameOver();
-			bool isGameWon();
 		};
 	}
 }

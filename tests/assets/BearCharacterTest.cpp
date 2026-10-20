@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -661,4 +662,135 @@ TEST_CASE("A knocked down bear drops its fish", "[assets][bear][ragdoll][animals
 	BearCharacter::HeldFish held;
 	CHECK_FALSE(scene.bear->getHeldFish(held));
 	CHECK_FALSE(scene.bear->canCatchFish()); //not while it tumbles
+}
+
+namespace
+{
+	/**
+	* The bear on a shore (top at y = 0) in front of deep water from z = 8 to z = 22 (its floor at y = -3), another shore behind it.
+	* The water surface is a bit below the shores.
+	*/
+	struct BearAtWater
+	{
+		static constexpr float WATER_LEVEL = -0.4f;
+		PhysicsWorld world;
+		std::unique_ptr<BearCharacter> bear;
+
+		BearAtWater()
+		{
+			world.createStaticBox(vec3(0.0f, -1.0f, -12.0f), vec3(50.0f, 1.0f, 20.0f)); //z up to 8
+			world.createStaticBox(vec3(0.0f, -4.0f, 15.0f), vec3(50.0f, 1.0f, 7.0f)); //the floor of the water
+			world.createStaticBox(vec3(0.0f, -1.0f, 42.0f), vec3(50.0f, 1.0f, 20.0f)); //from z = 22
+			world.optimizeBroadPhase();
+			bear = std::make_unique<BearCharacter>(world, bearModel(), vec3(0.0f, 1.4f, 0.0f), vec3(0.0f, 0.0f, 1.0f), nullptr);
+			bear->setWaterLevel(WATER_LEVEL);
+		}
+
+		void run(float seconds, BearInput input = {})
+		{
+			int frames = static_cast<int>(std::lround(seconds / FRAME));
+			for (int i = 0; i < frames; ++i)
+			{
+				world.update(FRAME);
+				bear->update(FRAME, input);
+			}
+		}
+
+		/**
+		* Runs forward until the bear swims
+		*/
+		void runIntoWater()
+		{
+			for (int i = 0; i < 4 * 60 && !bear->isSwimming(); ++i)
+			{
+				run(FRAME, forward());
+			}
+			REQUIRE(bear->isSwimming());
+		}
+	};
+}
+
+TEST_CASE("In deep water the bear swims: it floats with its head out of the water and paddles", "[assets][bear][swimming]")
+{
+	BearAtWater scene;
+	scene.run(0.5f);
+	CHECK_FALSE(scene.bear->isSwimming()); //on the shore
+	CHECK(scene.bear->getWaterDepth() < 0.0f);
+	scene.runIntoWater();
+	CHECK(scene.bear->getPosition().z > 8.0f);
+	CHECK(scene.bear->takeSplashes() == 1);
+	CHECK(scene.bear->takeSplashes() == 0);
+	CHECK_FALSE(scene.bear->isAirborne());
+
+	//Slower than on land, it floats at its depth (before it reaches the other shore)
+	scene.run(1.5f, forward());
+	REQUIRE(scene.bear->isSwimming());
+	glm::vec3 velocity = scene.bear->getVelocity();
+	CAPTURE(velocity, scene.bear->getWaterDepth());
+	CHECK(glm::length(glm::vec2(velocity.x, velocity.z)) <= BearCharacter::SWIM_SPEED + 0.1f);
+	CHECK(glm::length(glm::vec2(velocity.x, velocity.z)) > 0.5f * BearCharacter::SWIM_SPEED);
+	CHECK_THAT(scene.bear->getWaterDepth(), WithinAbs(BearCharacter::FLOAT_DEPTH, 0.15f));
+	const BearRig& rig = scene.bear->getRig();
+	CHECK(rig.getBonePosition(rig.getBone("head")).y > BearAtWater::WATER_LEVEL + 0.2f);
+	CHECK(rig.getBonePosition(rig.getBone("pelvis")).y < BearAtWater::WATER_LEVEL + 0.4f);
+
+	SECTION("The paws paddle in circles, they do not stand on anything")
+	{
+		vec3 before = rig.getFootTarget(BearRig::FRONT_LEFT) - scene.bear->getPosition();
+		scene.run(0.3f);
+		vec3 after = rig.getFootTarget(BearRig::FRONT_LEFT) - scene.bear->getPosition();
+		CHECK(glm::distance(before, after) > 0.05f);
+		CHECK_FALSE(rig.isIdling());
+	}
+	SECTION("Without input it stays floating where it is (no idle animations)")
+	{
+		scene.run(10.0f);
+		CHECK(scene.bear->isSwimming());
+		CHECK_FALSE(scene.bear->getRig().isIdling());
+		CHECK(glm::length(scene.bear->getVelocity()) < 0.5f);
+	}
+	SECTION("A jump at the surface takes it out of the water onto the shore")
+	{
+		BearInput swimAndJump = forward();
+		for (int i = 0; i < 12 * 60 && scene.bear->getPosition().z < 24.0f; ++i)
+		{
+			swimAndJump.jump = (i / 15) % 2 == 0; //presses again and again
+			scene.run(FRAME, swimAndJump);
+		}
+		scene.run(1.0f, forward());
+		CAPTURE(scene.bear->getPosition());
+		CHECK(scene.bear->getPosition().z > 24.0f);
+		CHECK_FALSE(scene.bear->isSwimming());
+		CHECK(scene.bear->getWaterDepth() < 0.0f);
+	}
+}
+
+TEST_CASE("Without a water level the bear never swims", "[assets][bear][swimming]")
+{
+	BearAtWater scene;
+	scene.bear->setWaterLevel(std::numeric_limits<float>::lowest());
+	scene.run(3.0f, forward());
+	CHECK_FALSE(scene.bear->isSwimming());
+	CHECK(scene.bear->getPosition().y < -1.0f); //at the bottom of the water
+}
+
+TEST_CASE("The bear can be placed somewhere else, standing", "[assets][bear]")
+{
+	BearOnGround scene;
+	scene.run(1.0f, forward());
+	scene.bear->placeAt(vec3(20.0f, 1.4f, -5.0f), vec3(-1.0f, 0.0f, 0.0f));
+	CHECK(scene.bear->getState() == State::CONTROL);
+	CHECK(glm::distance(scene.bear->getPosition(), vec3(20.0f, 1.4f, -5.0f)) < 1e-3f);
+	CHECK(glm::distance(scene.bear->getDirection(), vec3(-1.0f, 0.0f, 0.0f)) < 1e-4f);
+	CHECK(glm::length(scene.bear->getVelocity()) < 1e-4f);
+	scene.run(1.0f);
+	CHECK(glm::distance(scene.bear->getPosition(), vec3(20.0f, 1.4f, -5.0f)) < 0.3f);
+
+	SECTION("reset goes back to the start, which can be changed")
+	{
+		scene.bear->setStart(vec3(-3.0f, 1.4f, 2.0f), vec3(0.0f, 0.0f, -1.0f));
+		scene.bear->reset();
+		CHECK(glm::distance(scene.bear->getPosition(), vec3(-3.0f, 1.4f, 2.0f)) < 1e-3f);
+		CHECK(glm::distance(scene.bear->getDirection(), vec3(0.0f, 0.0f, -1.0f)) < 1e-4f);
+	}
 }

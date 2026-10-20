@@ -30,6 +30,7 @@ namespace bibo
 			float yawRate = 0.0f; //radians per second, positive: turning left
 			bool grounded = true;
 			bool jumped = false; //took off for a jump in this frame (not when it walks over an edge)
+			bool swimming = false; //floating in deep water (the paws paddle)
 		};
 
 		/**
@@ -60,6 +61,8 @@ namespace bibo
 		*   chest and sticks its tongue out) and yawning (sits down and yawns). Key poses of the body, the feet and the face.
 		*   Eating a salmon works the same way: it sits down, holds the fish with its front paws, takes three big bites,
 		*   chews happily with closed eyes and licks its lips.
+		* - Swimming: dog paddle, the paws go round in circles under the body (the front and the hind legs of opposite sides together),
+		*   the head stays up out of the water, the body rocks with the strokes.
 		* - Ragdoll: the bones follow the bodies of the ragdoll (ragdollParts), the bones in between are interpolated.
 		* - Getting up: from the pose of the ragdoll the bear rolls onto its belly, pushes itself up and shakes its fur.
 		*
@@ -284,6 +287,10 @@ namespace bibo
 		* Legs in the air: pushing off, tucked in, reaching for the ground before landing
 		*/
 		void updateAirborne(float timeDelta, const LocomotionInput& input, const GroundProbe& probe, Controls& controls);
+			/**
+			* Swimming: the paws paddle in circles relative to the body
+			*/
+			void updateSwimming(float timeDelta, const LocomotionInput& input, Controls& controls);
 			void updateSecondary(float timeDelta, bool moving);
 			float blinkAmount() const;
 			/**
@@ -326,6 +333,9 @@ namespace bibo
 			float reach = 0.0f; //0: legs tucked, 1: reaching for the ground before landing
 			std::array<glm::vec3, LEG_COUNT> airOffsets{}; //paws in the air, relative to the root (they move with the body)
 			float landingBlend = 1.0f; //0 right after landing: the steps start smoothly from where the paws landed
+			float swimPhase = 0.0f; //strokes (1 per cycle of every leg)
+			float swimEffort = 0.0f; //0 treading water, 1 swimming fast
+			bool wasSwimming = false;
 			animation::SpringValue squash;
 			animation::SpringValue pitchKick; //nose up when taking off, down when the front legs take the landing
 			std::array<animation::SpringPoint, 2> earSprings;

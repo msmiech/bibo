@@ -87,11 +87,15 @@ namespace bibo
 			const std::vector<Droplet>& getDroplets() const { return droplets; }
 			bool isCaught(int pool) const { return caught[pool]; }
 			int getCaughtCount() const;
+			/**
+			* Droplets of water fly up where something falls into the water (e.g. a salmon or the bear)
+			* @param surface Height of the water surface
+			*/
+			void splash(glm::vec3 position, float surface, int count);
 
 		private:
 			float uniform(float from, float to);
 			void startJump(int pool, glm::vec3 bearCenter);
-			void splash(glm::vec3 position, float surface, int count);
 
 			std::vector<WaterPool> pools;
 			std::vector<bool> caught;

@@ -47,6 +47,7 @@ namespace
 	//Phase in the step cycle when the stance of a leg begins (front left, front right, hind left, hind right)
 	const float WALK_OFFSETS[BearRig::LEG_COUNT] = { 0.25f, 0.75f, 0.0f, 0.5f }; //lateral sequence walk
 	const float BOUND_OFFSETS[BearRig::LEG_COUNT] = { 0.5f, 0.6f, 0.0f, 0.1f }; //half bound: hind legs together, then the front legs
+	const float SWIM_OFFSETS[BearRig::LEG_COUNT] = { 0.0f, 0.5f, 0.5f, 0.0f }; //dog paddle: diagonal pairs of legs together
 
 	glm::quat rotationOf(const glm::mat4& matrix)
 	{
@@ -563,6 +564,51 @@ void BearRig::updateAirborne(float timeDelta, const LocomotionInput& input, cons
 	bodyHeight += (0.0f - bodyHeight) * smoothingFactor(0.1f, timeDelta);
 }
 
+void BearRig::updateSwimming(float timeDelta, const LocomotionInput& input, Controls& c)
+{
+	glm::quat yaw = glm::angleAxis(c.yaw, UP);
+	if (!wasSwimming)
+	{
+		//The paws start paddling from where they are
+		for (int leg = 0; leg < LEG_COUNT; ++leg)
+		{
+			feet[leg].swinging = false;
+			airOffsets[leg] = feet[leg].position - input.rootPosition;
+		}
+	}
+	airborneTime = 0.0f;
+	launchTime = -1.0f;
+	reach = 0.0f;
+
+	//Faster strokes and wider circles when the bear swims fast, small ones when it treads water
+	float speed = glm::length(glm::vec2(input.velocity.x, input.velocity.z));
+	float effort = std::clamp(speed / 3.5f + std::abs(input.yawRate) * 0.25f, 0.0f, 1.0f);
+	swimEffort += (effort - swimEffort) * smoothingFactor(0.2f, timeDelta);
+	swimPhase += glm::mix(1.1f, 1.8f, swimEffort) * timeDelta;
+	float size = glm::mix(0.55f, 1.0f, swimEffort);
+	for (int leg = 0; leg < LEG_COUNT; ++leg)
+	{
+		const LegRig& rig = legs[leg];
+		Foot& foot = feet[leg];
+		float phase = 2.0f * PI * (swimPhase + SWIM_OFFSETS[leg]);
+		//The paw goes round: forward high, down, back under the body and up again (relative to the ground point under the hip)
+		glm::vec3 offset = rig.front
+			? glm::vec3(0.0f, 0.34f + 0.13f * size * std::sin(phase), 0.14f + 0.2f * size * std::cos(phase))
+			: glm::vec3(0.0f, 0.3f + 0.1f * size * std::sin(phase), -0.08f + 0.2f * size * std::cos(phase));
+		offset.x = 0.05f * rig.side;
+		glm::vec3 target = input.rootPosition + yaw * (rig.neutral + offset);
+		airOffsets[leg] = glm::mix(airOffsets[leg], target - input.rootPosition, smoothingFactor(wasSwimming ? 0.03f : 0.08f, timeDelta));
+		foot.position = foot.planted = foot.swingFrom = input.rootPosition + airOffsets[leg];
+		foot.normal = glm::normalize(glm::mix(foot.normal, UP, smoothingFactor(0.05f, timeDelta)));
+		//The paw pushes the water with its sole on the way back and turns on the way forward
+		c.toePitch[leg] = rig.front ? 0.35f + 0.45f * std::sin(phase) : 0.1f + 0.5f * std::sin(phase);
+	}
+	//Nose up, the body lies in the water
+	bodyPitch += (0.12f - bodyPitch) * smoothingFactor(0.15f, timeDelta);
+	bodyHeight += (0.0f - bodyHeight) * smoothingFactor(0.1f, timeDelta);
+	wasSwimming = true;
+}
+
 void BearRig::reset(const LocomotionInput& input, const GroundProbe& probe)
 {
 	if (!isValid())
@@ -576,6 +622,8 @@ void BearRig::reset(const LocomotionInput& input, const GroundProbe& probe)
 	launchTime = -1.0f;
 	airPose = reach = 0.0f;
 	landingBlend = 1.0f;
+	swimPhase = swimEffort = 0.0f;
+	wasSwimming = false;
 	squash = animation::SpringValue();
 	pitchKick = animation::SpringValue();
 	lookYaw = lookPitch = lookTargetYaw = lookTargetPitch = 0.0f;
@@ -727,9 +775,13 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 			launchTime = 0.0f;
 			pitchKick.velocity += 1.2f;
 		}
-		if (input.grounded && !input.jumped)
+		if (input.swimming)
 		{
-			if (airborneTime > TUCK_DELAY || launchTime >= 0.0f)
+			updateSwimming(timeDelta, input, c);
+		}
+		else if (input.grounded && !input.jumped)
+		{
+			if (airborneTime > TUCK_DELAY || launchTime >= 0.0f || wasSwimming)
 			{
 				//Landing: the paws are on the ground again, the legs give way (the harder the landing, the more),
 				//the front legs take the impact first
@@ -821,6 +873,8 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		{
 			updateAirborne(timeDelta, input, probe, c);
 		}
+		bool swimming = input.swimming;
+		wasSwimming = swimming;
 		for (int leg = 0; leg < LEG_COUNT; ++leg)
 		{
 			c.feet[leg] = feet[leg].position;
@@ -828,7 +882,7 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		}
 		squash.update(0.0f, 170.0f, 13.0f, timeDelta);
 		pitchKick.update(0.0f, 110.0f, 12.0f, timeDelta);
-		if (input.grounded && !input.jumped)
+		if ((input.grounded && !input.jumped) || swimming)
 		{
 			airPose -= std::min(airPose, timeDelta / 0.25f);
 		}
@@ -846,6 +900,15 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		c.spineYaw = bend;
 		c.spinePitch = 0.16f * std::sin(cycle + 0.4f) * bounding + 0.8f * squash.value + breathing;
 		c.neckYaw = 0.5f * bend;
+		if (swimming)
+		{
+			//The body bobs and rocks a little with the strokes
+			float stroke = 2.0f * PI * swimPhase;
+			c.pelvisOffset.y = STAND_HEIGHT + bodyHeight + 0.025f * std::sin(2.0f * stroke);
+			c.pelvisPitch = bodyPitch + 0.03f * std::sin(2.0f * stroke + 1.0f);
+			c.pelvisRoll = lean + 0.05f * std::sin(stroke) * swimEffort;
+			c.spinePitch = 0.03f * std::sin(2.0f * stroke);
+		}
 
 		updateSecondary(timeDelta, moving > 0.1f);
 		//The head stays level and looks around, running flattens the ears a bit
@@ -858,6 +921,13 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		c.face.lids = blinkAmount() * (1.0f - airPose);
 		c.face.earsBack = std::max(0.35f * bounding, 0.5f * airPose);
 		c.face.jawOpen = std::max({ 0.12f * bounding, 0.2f * airPose, carrying ? 0.34f : 0.0f }); //panting a little
+		if (swimming)
+		{
+			//The head is held up out of the water, the ears flat against the splashes
+			c.neckPitch += 0.25f;
+			c.headPitch += 0.12f;
+			c.face.earsBack = 0.45f;
+		}
 	}
 
 	evaluate(bind, c, timeDelta);

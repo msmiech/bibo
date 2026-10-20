@@ -142,6 +142,40 @@ namespace
 		}
 	}
 
+	/**
+	* Exclamation mark: a stroke that gets thinner towards the bottom and a dot under it, glowing
+	*/
+	world::VegetationMesh buildQuestMarker(glm::vec3 color)
+	{
+		MeshBuilder builder;
+		const glm::vec3 STROKE_CENTER(0.0f, 0.63f, 0.0f), STROKE_RADII(0.12f, 0.37f, 0.12f);
+		std::uint32_t first = static_cast<std::uint32_t>(builder.mesh.vertices.size());
+		const int LONGITUDE = 16, LATITUDE = 14;
+		for (int i = 0; i <= LATITUDE; ++i)
+		{
+			float polar = PI * static_cast<float>(i) / static_cast<float>(LATITUDE);
+			for (int j = 0; j <= LONGITUDE; ++j)
+			{
+				float azimuth = 2.0f * PI * static_cast<float>(j % LONGITUDE) / static_cast<float>(LONGITUDE);
+				glm::vec3 direction(std::sin(polar) * std::cos(azimuth), std::cos(polar), std::sin(polar) * std::sin(azimuth));
+				float taper = glm::mix(0.45f, 1.0f, 0.5f + 0.5f * direction.y);
+				glm::vec3 radii = STROKE_RADII * glm::vec3(taper, 1.0f, taper);
+				builder.add(STROKE_CENTER + direction * radii, direction / radii, glm::vec2(0.0f), color, world::VEGETATION_GLOW, 0.0f, 0.0f, 1.0f);
+			}
+		}
+		for (int i = 0; i < LATITUDE; ++i)
+		{
+			for (int j = 0; j < LONGITUDE; ++j)
+			{
+				std::uint32_t a = first + i * (LONGITUDE + 1) + j;
+				std::uint32_t b = a + LONGITUDE + 1;
+				builder.quad(a, b, b + 1, a + 1);
+			}
+		}
+		addEllipsoid(builder, glm::vec3(0.0f, 0.1f, 0.0f), glm::vec3(0.1f), 12, 8, world::VEGETATION_GLOW, color);
+		return builder.finish();
+	}
+
 	world::VegetationMesh buildSalmonHead()
 	{
 		MeshBuilder builder;
@@ -195,6 +229,10 @@ world::VegetationMesh bibo::scene::buildCreatureModel(CreatureModel model)
 		addEllipsoid(builder, glm::vec3(0.0f), glm::vec3(1.0f), 8, 6, world::VEGETATION_GLOSSY, rgb(215, 232, 245));
 		return builder.finish();
 	}
+	case CreatureModel::QUEST_MARKER:
+		return buildQuestMarker(rgb(255, 196, 36));
+	case CreatureModel::QUEST_MARKER_REPEATABLE:
+		return buildQuestMarker(rgb(70, 160, 255));
 	case CreatureModel::COUNT:
 		break;
 	}

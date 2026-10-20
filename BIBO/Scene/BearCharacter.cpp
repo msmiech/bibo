@@ -30,6 +30,13 @@ namespace
 	const float COYOTE_TIME = 0.12f, JUMP_BUFFER_TIME = 0.15f;
 	//In the air the bear keeps its momentum, the player can only change it a little
 	const float AIR_ACCELERATION = 14.0f;
+	//Swimming: slower to speed up, it glides on in the water; it turns slower than on the ground
+	const float SWIM_ACCELERATION = 9.0f, SWIM_DECELERATION = 5.0f;
+	const float STEER_RATE_SWIM = glm::radians(150.0f);
+	//The water pulls the bear to its floating depth (1/s^2) and slows it down (1/s), falling in it loses most of its speed
+	const float BUOYANCY = 24.0f, WATER_DRAG = 7.0f, ENTRY_DAMPING = 0.3f;
+	//A jump at the surface (out onto the shore), it may start this far from the floating depth
+	const float SWIM_JUMP_SPEED = 8.0f, SWIM_JUMP_TOLERANCE = 0.3f;
 	//Ragdoll: it lies still when all parts are slower than this for a moment
 	const float REST_SPEED = 0.35f, REST_ANGULAR_SPEED = 1.2f, REST_TIME = 0.3f;
 	const float MIN_RAGDOLL_TIME = 0.8f, MAX_RAGDOLL_TIME = 4.0f;
@@ -112,28 +119,67 @@ LocomotionInput BearCharacter::locomotionInput(bool jumped) const
 	input.yawRate = yawRate;
 	input.grounded = standingOnGround;
 	input.jumped = jumped;
+	input.swimming = swimming;
 	return input;
 }
 
 void BearCharacter::reset()
 {
+	fish = Fish::NONE;
+	splashes = 0;
+	jumpWasHeld = false;
+	placeAt(startPosition, startDirection);
+}
+
+void BearCharacter::setStart(glm::vec3 position, glm::vec3 direction)
+{
+	startPosition = position;
+	glm::vec3 horizontal(direction.x, 0.0f, direction.z);
+	startDirection = glm::length(horizontal) > 1e-6f ? glm::normalize(horizontal) : startDirection;
+}
+
+float BearCharacter::groundOffset()
+{
+	return rootOffset();
+}
+
+void BearCharacter::placeAt(glm::vec3 position, glm::vec3 newDirection)
+{
 	ragdoll->deactivate();
 	state = State::CONTROL;
-	direction = startDirection;
+	glm::vec3 horizontal(newDirection.x, 0.0f, newDirection.z);
+	direction = glm::length(horizontal) > 1e-6f ? glm::normalize(horizontal) : startDirection;
 	speed = yawRate = 0.0f;
 	velocity = airVelocity = glm::vec3(0.0f);
 	verticalSpeed = airTime = jumpBuffer = fallingTime = 0.0f;
-	jumping = jumpWasHeld = false;
+	jumping = false;
 	standingOnGround = false;
+	swimming = false;
 	knockDownPending = false;
 	stateTime = restTime = protectedTime = idleWaitTime = 0.0f;
 	positionOffset = glm::vec3(0.0f);
-	fish = Fish::NONE;
-	rig.setCarrying(false);
-	controller->setPosition(startPosition);
+	rig.setCarrying(fish == Fish::CARRIED);
+	controller->setPosition(position);
 	rig.reset(locomotionInput(), probe);
 	updateSkin(0.0f);
 	guideHairs.reset(positions);
+}
+
+float BearCharacter::capsuleWaterDepth() const
+{
+	return waterLevel - (controller->getPosition().y - rootOffset());
+}
+
+float BearCharacter::getWaterDepth() const
+{
+	return waterLevel - (getPosition().y - rootOffset());
+}
+
+int BearCharacter::takeSplashes()
+{
+	int result = splashes;
+	splashes = 0;
+	return result;
 }
 
 glm::vec3 BearCharacter::rawPosition() const
@@ -205,7 +251,7 @@ float BearCharacter::steer(float timeDelta, const BearInput& input, bool& hasInp
 		glm::vec3 wanted = glm::normalize(move);
 		//Positive: the wanted direction is to the left
 		float angle = std::atan2(glm::cross(direction, wanted).y, glm::dot(direction, wanted));
-		float maxRate = standingOnGround
+		float maxRate = swimming ? STEER_RATE_SWIM : standingOnGround
 			? glm::mix(STEER_RATE_STANDING, STEER_RATE_RUNNING, std::clamp(std::abs(speed) / FORWARD_SPEED, 0.0f, 1.0f))
 			: STEER_RATE_AIR;
 		float targetRate = std::clamp(angle / STEER_RESPONSE, -maxRate, maxRate);
@@ -217,13 +263,17 @@ float BearCharacter::steer(float timeDelta, const BearInput& input, bool& hasInp
 		direction = glm::normalize(glm::rotateY(direction, yawRate * timeDelta));
 		//Slows down while turning around (instead of running sideways)
 		float alignment = glm::dot(direction, wanted);
-		return amount * FORWARD_SPEED * std::clamp(0.35f + 0.65f * alignment, 0.0f, 1.0f);
+		return amount * (swimming ? SWIM_SPEED : FORWARD_SPEED) * std::clamp(0.35f + 0.65f * alignment, 0.0f, 1.0f);
 	}
 
 	yawRate = std::clamp(input.turn, -1.0f, 1.0f) * TURN_RATE;
 	direction = glm::normalize(glm::rotateY(direction, yawRate * timeDelta));
 	float forward = std::clamp(input.forward, -1.0f, 1.0f);
 	hasInput = forward != 0.0f || input.turn != 0.0f;
+	if (swimming)
+	{
+		return forward * SWIM_SPEED * (forward >= 0.0f ? 1.0f : 0.5f);
+	}
 	return forward >= 0.0f ? forward * FORWARD_SPEED : forward * BACKWARD_SPEED;
 }
 
@@ -231,7 +281,7 @@ void BearCharacter::updateControl(float timeDelta, const BearInput& playerInput)
 {
 	//A caught fish is eaten as soon as the bear stands on the ground, the player waits until the last bite
 	BearInput input = playerInput;
-	if (fish == Fish::CARRIED && standingOnGround && !jumping)
+	if (fish == Fish::CARRIED && standingOnGround && !jumping && !swimming)
 	{
 		rig.startIdle(BearRig::IDLE_EAT);
 		fish = Fish::EATING;
@@ -250,10 +300,29 @@ void BearCharacter::updateControl(float timeDelta, const BearInput& playerInput)
 		}
 	}
 
+	//In deep water the bear swims (until it is shallow enough to walk), not while it rises from a jump out of the water
+	float depth = capsuleWaterDepth();
+	bool wasSwimming = swimming;
+	swimming = depth > (swimming ? WADE_DEPTH : SWIM_DEPTH) && !(jumping && verticalSpeed > 0.0f);
+	if (swimming && !wasSwimming)
+	{
+		++splashes;
+		verticalSpeed *= ENTRY_DAMPING;
+		jumping = false;
+		rig.stopIdle();
+	}
+
 	bool hasInput = false;
 	float targetSpeed = steer(timeDelta, input, hasInput);
 	glm::vec3 horizontal;
-	if (standingOnGround)
+	if (swimming)
+	{
+		bool speedingUp = std::abs(targetSpeed) > std::abs(speed) && targetSpeed * speed >= 0.0f;
+		float change = (speedingUp ? SWIM_ACCELERATION : SWIM_DECELERATION) * timeDelta;
+		speed += std::clamp(targetSpeed - speed, -change, change);
+		horizontal = airVelocity = direction * speed;
+	}
+	else if (standingOnGround)
 	{
 		bool speedingUp = std::abs(targetSpeed) > std::abs(speed) && targetSpeed * speed >= 0.0f;
 		float change = (speedingUp ? ACCELERATION : DECELERATION) * timeDelta;
@@ -281,9 +350,26 @@ void BearCharacter::updateControl(float timeDelta, const BearInput& playerInput)
 	bool jumpPressed = input.jump && !jumpWasHeld;
 	jumpWasHeld = input.jump;
 	jumpBuffer = jumpPressed ? JUMP_BUFFER_TIME : std::max(0.0f, jumpBuffer - timeDelta);
-	airTime = standingOnGround ? 0.0f : airTime + timeDelta;
+	airTime = standingOnGround || swimming ? 0.0f : airTime + timeDelta;
 	bool jumped = false;
-	if (jumpBuffer > 0.0f && !jumping && airTime <= COYOTE_TIME)
+	if (swimming)
+	{
+		if (jumpBuffer > 0.0f && std::abs(depth - FLOAT_DEPTH) < SWIM_JUMP_TOLERANCE)
+		{
+			//Out of the water, e.g. onto the shore
+			verticalSpeed = SWIM_JUMP_SPEED;
+			jumping = jumped = true;
+			jumpBuffer = 0.0f;
+			swimming = false;
+		}
+		else
+		{
+			//Floats at its depth and bobs a little, the water slows it down
+			float bob = 0.04f * std::sin(time * 2.6f);
+			verticalSpeed += ((depth - FLOAT_DEPTH - bob) * BUOYANCY - verticalSpeed * WATER_DRAG) * timeDelta;
+		}
+	}
+	else if (jumpBuffer > 0.0f && !jumping && airTime <= COYOTE_TIME)
 	{
 		verticalSpeed = JUMP_SPEED;
 		jumping = jumped = true;
@@ -320,7 +406,7 @@ void BearCharacter::updateControl(float timeDelta, const BearInput& playerInput)
 		idleWaitTime = 0.0f;
 		rig.stopIdle();
 	}
-	else if (!rig.isIdling() && standingOnGround && std::abs(speed) < 0.05f)
+	else if (!rig.isIdling() && standingOnGround && !swimming && std::abs(speed) < 0.05f)
 	{
 		idleWaitTime += timeDelta;
 		if (idleWaitTime > IDLE_DELAY)
@@ -425,6 +511,7 @@ bool BearCharacter::getHeldFish(HeldFish& held) const
 void BearCharacter::startRagdoll()
 {
 	knockDownPending = false;
+	swimming = false;
 	fish = Fish::NONE; //drops it
 	rig.setCarrying(false);
 	std::vector<glm::mat4> transforms;

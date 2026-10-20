@@ -112,8 +112,9 @@ void Input::update()
 	//The left stick works like the D-pad: one step each time it is pushed
 	float x = state.axes[GLFW_GAMEPAD_AXIS_LEFT_X], y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
 	glm::ivec2 direction(x > MENU_STICK_THRESHOLD ? 1 : (x < -MENU_STICK_THRESHOLD ? -1 : 0), y > MENU_STICK_THRESHOLD ? 1 : (y < -MENU_STICK_THRESHOLD ? -1 : 0));
-	if (direction.y != 0 && direction.y != stickDirection.y) menuKeys.push_back(direction.y < 0 ? GLFW_KEY_UP : GLFW_KEY_DOWN);
-	if (direction.x != 0 && direction.x != stickDirection.x) menuKeys.push_back(direction.x < 0 ? GLFW_KEY_LEFT : GLFW_KEY_RIGHT);
+	stickPushed = glm::ivec2(direction.x != stickDirection.x ? direction.x : 0, direction.y != stickDirection.y ? direction.y : 0);
+	if (stickPushed.y != 0) menuKeys.push_back(stickPushed.y < 0 ? GLFW_KEY_UP : GLFW_KEY_DOWN);
+	if (stickPushed.x != 0) menuKeys.push_back(stickPushed.x < 0 ? GLFW_KEY_LEFT : GLFW_KEY_RIGHT);
 	stickDirection = direction;
 	if (wasPressed(GLFW_GAMEPAD_BUTTON_A)) menuKeys.push_back(GLFW_KEY_ENTER);
 	if (wasPressed(GLFW_GAMEPAD_BUTTON_B)) menuKeys.push_back(GLFW_KEY_ESCAPE);
@@ -122,6 +123,14 @@ void Input::update()
 bool Input::wasPressed(int button) const
 {
 	return state.buttons[button] == GLFW_PRESS && previousState.buttons[button] != GLFW_PRESS;
+}
+
+bool Input::keyPressed(int key)
+{
+	bool down = isKeyDown(window, key);
+	bool pressed = down && !keysWereDown[key];
+	keysWereDown[key] = down;
+	return pressed;
 }
 
 std::string Input::getGamepadName() const
@@ -178,6 +187,26 @@ PlayerInput Input::playerInput(float timeDelta, const Settings& settings, bool f
 		result.recenter = result.recenter || wasPressed(GLFW_GAMEPAD_BUTTON_RIGHT_THUMB);
 	}
 	result.move = glm::length(stick) > glm::length(keys) ? stick : keys;
+
+	//Conversations: every key once per press (all of them are checked, so that none is pressed by an old state)
+	bool talk = keyPressed(GLFW_KEY_E);
+	bool enter = keyPressed(GLFW_KEY_ENTER);
+	enter = keyPressed(GLFW_KEY_KP_ENTER) || enter;
+	bool space = keyPressed(GLFW_KEY_SPACE);
+	int previous = (keyPressed(GLFW_KEY_LEFT) ? 1 : 0) + (keyPressed(GLFW_KEY_UP) ? 1 : 0) + (keyPressed(GLFW_KEY_A) ? 1 : 0) + (keyPressed(GLFW_KEY_W) ? 1 : 0);
+	int next = (keyPressed(GLFW_KEY_RIGHT) ? 1 : 0) + (keyPressed(GLFW_KEY_DOWN) ? 1 : 0) + (keyPressed(GLFW_KEY_D) ? 1 : 0) + (keyPressed(GLFW_KEY_S) ? 1 : 0);
+	result.cancel = keyPressed(GLFW_KEY_BACKSPACE);
+	if (gamepad >= 0)
+	{
+		talk = talk || wasPressed(GLFW_GAMEPAD_BUTTON_X);
+		enter = enter || wasPressed(GLFW_GAMEPAD_BUTTON_A);
+		previous += (wasPressed(GLFW_GAMEPAD_BUTTON_DPAD_LEFT) ? 1 : 0) + (wasPressed(GLFW_GAMEPAD_BUTTON_DPAD_UP) ? 1 : 0) + (stickPushed.x < 0 || stickPushed.y < 0 ? 1 : 0);
+		next += (wasPressed(GLFW_GAMEPAD_BUTTON_DPAD_RIGHT) ? 1 : 0) + (wasPressed(GLFW_GAMEPAD_BUTTON_DPAD_DOWN) ? 1 : 0) + (stickPushed.x > 0 || stickPushed.y > 0 ? 1 : 0);
+		result.cancel = result.cancel || wasPressed(GLFW_GAMEPAD_BUTTON_B);
+	}
+	result.interact = talk;
+	result.confirm = talk || enter || space;
+	result.navigate = next > 0 && previous == 0 ? 1 : (previous > 0 && next == 0 ? -1 : 0);
 	if (jumpBlocked)
 	{
 		jumpBlocked = result.jump;

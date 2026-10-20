@@ -197,6 +197,8 @@ add_library(bibo_core STATIC
 	BIBO/Audio/Music.hpp
 	BIBO/Audio/MusicPlayer.cpp
 	BIBO/Audio/MusicPlayer.hpp
+	BIBO/Audio/SoundEffects.cpp
+	BIBO/Audio/SoundEffects.hpp
 	BIBO/Physics/Physics.cpp
 	BIBO/Physics/Physics.hpp
 	BIBO/Render/FrameUniforms.cpp
@@ -228,14 +230,24 @@ add_library(bibo_core STATIC
 	BIBO/Scene/BearRenderer.hpp
 	BIBO/Scene/BearRig.cpp
 	BIBO/Scene/BearRig.hpp
+	BIBO/Scene/Beaver.cpp
+	BIBO/Scene/Beaver.hpp
+	BIBO/Scene/BeaverModel.cpp
+	BIBO/Scene/BeaverModel.hpp
 	BIBO/Scene/Camera.cpp
 	BIBO/Scene/Camera.hpp
 	BIBO/Scene/CreatureMeshes.cpp
 	BIBO/Scene/CreatureMeshes.hpp
 	BIBO/Scene/CreatureRenderer.cpp
 	BIBO/Scene/CreatureRenderer.hpp
+	BIBO/Scene/Dialog.cpp
+	BIBO/Scene/Dialog.hpp
 	BIBO/Scene/Fur.cpp
 	BIBO/Scene/Fur.hpp
+	BIBO/Scene/FurryModel.cpp
+	BIBO/Scene/FurryModel.hpp
+	BIBO/Scene/FurryRenderer.cpp
+	BIBO/Scene/FurryRenderer.hpp
 	BIBO/Scene/GameRules.hpp
 	BIBO/Scene/Geometry.cpp
 	BIBO/Scene/Geometry.hpp
@@ -247,6 +259,8 @@ add_library(bibo_core STATIC
 	BIBO/Scene/HedgehogRenderer.hpp
 	BIBO/Scene/Light.cpp
 	BIBO/Scene/Light.hpp
+	BIBO/Scene/RaceQuest.cpp
+	BIBO/Scene/RaceQuest.hpp
 	BIBO/Scene/Salmon.cpp
 	BIBO/Scene/Salmon.hpp
 	BIBO/Scene/Scene.cpp

@@ -25,16 +25,6 @@ namespace
 	}
 }
 
-TEST_CASE("The bear has fallen off the track below the fall-off height", "[rules]")
-{
-	CHECK(rules::hasFallenOff(vec3(0.0f, -1.2f, 0.0f)));
-	CHECK(rules::hasFallenOff(vec3(50.0f, -5.0f, -20.0f)));
-
-	CHECK_FALSE(rules::hasFallenOff(vec3(0.0f, rules::FALL_OFF_HEIGHT, 0.0f)));
-	CHECK_FALSE(rules::hasFallenOff(vec3(0.0f, -1.0f, 0.0f)));
-	CHECK_FALSE(rules::hasFallenOff(vec3(88.0f, 5.5f, -7.8f)));
-}
-
 TEST_CASE("A checkpoint is passed within its radius, at any height", "[rules]")
 {
 	CHECK(rules::passCheckpoint(atCheckpoint(0), 0) == 1);

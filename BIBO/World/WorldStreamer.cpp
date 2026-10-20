@@ -94,12 +94,13 @@ int WorldStreamer::targetLod(const ChunkState& chunk, glm::vec3 viewer) const
 	return lod;
 }
 
-WorldStreamer::Result WorldStreamer::makeChunk(std::size_t index, int lod) const
+WorldStreamer::Result WorldStreamer::makeChunk(std::size_t index, int lod, std::uint64_t generation) const
 {
 	Result result;
 	result.kind = Result::CHUNK;
 	result.index = index;
 	result.lod = lod;
+	result.generation = generation;
 	result.mesh = std::make_shared<ChunkMesh>(meshChunk(world, chunks[index].key, lod));
 	if (lod == 0 && physicsWorld && !result.mesh->empty())
 	{
@@ -133,9 +134,10 @@ WorldStreamer::Result WorldStreamer::makeColumn(std::size_t index, Layer layer, 
 void WorldStreamer::requestChunk(std::size_t index, int lod, float priority)
 {
 	chunks[index].requested = lod;
+	std::uint64_t generation = chunks[index].generation;
 	++inFlight;
-	pool->submit([this, index, lod] {
-		Result result = makeChunk(index, lod);
+	pool->submit([this, index, lod, generation] {
+		Result result = makeChunk(index, lod, generation);
 		std::lock_guard<std::mutex> lock(resultMutex);
 		results.push_back(std::move(result));
 	}, priority);
@@ -159,6 +161,10 @@ void WorldStreamer::integrate(Result& result)
 	if (result.kind == Result::CHUNK)
 	{
 		ChunkState& chunk = chunks[result.index];
+		if (result.generation != chunk.generation)
+		{
+			return; //ensureCollision meshed the chunk while the job was running
+		}
 		chunk.lod = result.lod;
 		meshUpdates.push_back({ chunk.key, result.mesh->empty() ? nullptr : std::shared_ptr<const ChunkMesh>(result.mesh) });
 		if (result.lod == 0)
@@ -298,8 +304,9 @@ void WorldStreamer::ensureCollision(glm::vec3 focus, float radius)
 	{
 		if (chunks[i].lod != 0 && distanceToBox(focus, chunks[i].box) < radius)
 		{
-			Result result = makeChunk(i, 0);
-			integrate(result); //a job for the chunk that is still running delivers its result later, the newer one counts
+			//A job for the chunk that is still running delivers its result later, it is ignored then
+			Result result = makeChunk(i, 0, ++chunks[i].generation);
+			integrate(result);
 		}
 	}
 	for (std::size_t i = 0; i < columns.size(); ++i)

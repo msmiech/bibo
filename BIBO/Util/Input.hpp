@@ -68,6 +68,11 @@ namespace bibo
 			* @param freeCamera WASD moves the unlocked camera, not the bear
 			*/
 			PlayerInput playerInput(float timeDelta, const Settings& settings, bool freeCamera);
+			/**
+			* No jump until the jump buttons are released (e.g. A on the gamepad and SPACE also press the buttons of the menus,
+			* the button that resumes the game would make the bear jump right away)
+			*/
+			void blockJumpUntilReleased() { jumpBlocked = true; }
 
 			/**
 			* The mouse turns the camera (cursor hidden and unlimited) or is a normal cursor (menus)
@@ -107,6 +112,7 @@ namespace bibo
 			glm::vec2 mouseDelta = glm::vec2(0.0f); //pixels since the last playerInput
 			float scroll = 0.0f;
 			bool middleButtonWasPressed = false;
+			bool jumpBlocked = false;
 		};
 	}
 }

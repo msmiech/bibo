@@ -101,6 +101,7 @@ namespace bibo
 				int lod = -1; //of the current mesh (-1: none yet)
 				int requested = -1; //lod of the job in progress
 				int target = -1;
+				std::uint64_t generation = 0; //results of jobs started before ensureCollision meshed the chunk are ignored
 				bool needsCollision = false;
 				std::shared_ptr<physics::CollisionShape> shape; //of the lod 0 mesh
 				physics::BodyHandle body = physics::INVALID_BODY;
@@ -131,7 +132,7 @@ namespace bibo
 
 			void requestChunk(std::size_t index, int lod, float priority);
 			void requestColumn(std::size_t index, Layer layer, float priority);
-			Result makeChunk(std::size_t index, int lod) const;
+			Result makeChunk(std::size_t index, int lod, std::uint64_t generation) const;
 			Result makeColumn(std::size_t index, Layer layer, std::uint64_t generation) const;
 			void integrate(Result& result);
 			void updatePhysics(glm::vec3 focus);

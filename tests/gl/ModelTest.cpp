@@ -100,6 +100,32 @@ TEST_CASE("A geometry is placed where its node is in the track", "[gl][model]")
 	}
 }
 
+TEST_CASE("A geometry with a physics body keeps the scale and the rotation of its node", "[gl][model][physics]")
+{
+	GlContext gl;
+	Shader shader(assetPath("Shader/main_shader.vert").string(), assetPath("Shader/main_shader.frag").string());
+	auto texture = Texture::createCheckerboard(16, 2, 0);
+	bibo::physics::PhysicsWorld world;
+	Geometry rock(mat4(1.0f), &shader, gl.window(), &trackScene(), "Rock1", texture.get());
+	const mat4 nodeMatrix = rock.modelMatrix;
+
+	SECTION("A static body that is not turned (like the rocks)")
+	{
+		rock.setPhysicsBody(&world, world.createStaticSphere(rock.getPosition() + vec3(0.1f, 0.2f, 0.0f), 0.7f));
+		rock.update(1.0f / 60.0f);
+		CHECK_THAT(rock.modelMatrix, IsNear(nodeMatrix, 1e-4f));
+	}
+
+	SECTION("A dynamic body follows the body")
+	{
+		bibo::physics::BodyHandle body = world.createDynamicBox(rock.getPosition(), vec3(0.5f), 1.0f);
+		rock.setPhysicsBody(&world, body);
+		world.resetBody(body, rock.getPosition() + vec3(0.0f, 3.0f, 0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
+		rock.update(1.0f / 60.0f);
+		CHECK_THAT(rock.modelMatrix, IsNear(glm::translate(mat4(1.0f), vec3(0.0f, 3.0f, 0.0f)) * nodeMatrix, 1e-4f));
+	}
+}
+
 TEST_CASE("The bounding sphere of a model contains all of its vertices", "[gl][model][frustum]")
 {
 	GlContext gl;

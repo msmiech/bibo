@@ -42,7 +42,7 @@ namespace
 			world.createStaticBox(vec3(0.0f, -1.0f, 0.0f), vec3(200.0f, 1.0f, 200.0f));
 			if (withRock)
 			{
-				rock = world.createStaticSphere(vec3(0.0f, 0.7f, 9.0f), 0.7f); //like the rocks of the track
+				rock = world.createStaticSphere(vec3(0.0f, 0.7f, 9.0f), 0.7f); //a small rock (the rocks of the track are about 1 m)
 			}
 			world.optimizeBroadPhase();
 			bear = std::make_unique<BearCharacter>(world, bearModel(), vec3(0.0f, 1.4f, 0.0f), vec3(0.0f, 0.0f, 1.0f),

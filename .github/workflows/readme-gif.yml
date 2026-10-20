@@ -63,6 +63,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Update the gameplay GIF of the README"
-          # Commits pushed to the branch while the GIF was recorded come first
+          # Commits pushed to the branch while the GIF was recorded come first.
+          # Pushes with the GITHUB_TOKEN start no workflows, so the Build workflow does not run for this commit (it only
+          # changes files that Build ignores anyway). If Build ever becomes a required check of main, its checks of this
+          # commit would stay pending: push with a GitHub App or deploy key token then, or run Build with workflow_dispatch.
           git pull --rebase origin "$BRANCH"
           git push origin "HEAD:$BRANCH"

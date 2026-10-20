@@ -86,8 +86,14 @@ namespace bibo
 			rules::FinishLine finishLineTrigger;
 
 			vector<physics::BodyHandle> bodiesRock;
-			//Dynamic bodies and their start positions, which they are moved back to by restart()
-			vector<pair<physics::BodyHandle, vec3>> dynamicBodies;
+			//Dynamic bodies and their start poses, which they are moved back to by restart()
+			struct DynamicBody
+			{
+				physics::BodyHandle body;
+				vec3 position;
+				quat rotation;
+			};
+			vector<DynamicBody> dynamicBodies;
 
 			float accumulatedVideoTime = 0;
 			int monitorFrame = 0;

@@ -606,6 +606,8 @@ void resumeGame()
 {
 	gameState = PLAYING;
 	menu->hide();
+	//The button that pressed Start or Resume in the menu may be the jump button
+	controls->blockJumpUntilReleased();
 }
 
 //Without menus the game shows GAME OVER or YOU WON and R restarts as in earlier versions
@@ -731,9 +733,9 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		}
 		return;
 	}
-	if (gameState == GAME_OVER && key == GLFW_KEY_R && action == GLFW_PRESS)
+	if ((gameState == PLAYING || gameState == GAME_OVER) && key == GLFW_KEY_R && action == GLFW_PRESS)
 	{
-		restartGame(); //like during the game
+		restartGame(); //once per press, also from the game over menu
 		return;
 	}
 
@@ -933,6 +935,16 @@ void cleanup() {
 	menu.reset(nullptr);
 	gameScene.reset(nullptr);
 	renderer.reset(nullptr);
+	//The glyphs and the quad of the text
+	for (const auto& glyph : Characters)
+	{
+		glDeleteTextures(1, &glyph.second.textureID);
+	}
+	Characters.clear();
+	glDeleteBuffers(1, &textVBO);
+	glDeleteVertexArrays(1, &textVAO);
+	textShader.reset(nullptr);
+	mainShader.reset(nullptr);
 	//The scene (and the character controller of the bear) must be released before the physics world
 	physicsWorld.reset(nullptr);
 }
@@ -1033,7 +1045,12 @@ void renderText(Shader* shader, string text, GLfloat x, GLfloat y, GLfloat scale
 	string::const_iterator c;
 	for (c = text.begin(); c != text.end(); ++c)
 	{
-		Character ch = Characters[*c];
+		auto glyph = Characters.find(*c);
+		if (glyph == Characters.end())
+		{
+			continue; //e.g. non-ASCII characters in the name of a gamepad
+		}
+		const Character& ch = glyph->second;
 
 		GLfloat xpos = x + ch.bearing.x * scale;
 		GLfloat ypos = y - (ch.size.y - ch.bearing.y) * scale;
@@ -1230,7 +1247,7 @@ void fKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if (settings.hdr && key == GLFW_KEY_F11 && action == GLFW_PRESS)
 	{
 		settings.bloom = !settings.bloom;
-		lastMessage = "Bloom (requries HDR) enabled: " + to_string(settings.bloom);
+		lastMessage = "Bloom (requires HDR) enabled: " + to_string(settings.bloom);
 		messageTimeLeft = 3;
 	}
 }

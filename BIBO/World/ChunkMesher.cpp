@@ -71,8 +71,8 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world, const ChunkKey& ke
 	};
 
 	//1. A vertex in every voxel with corners inside and outside: the mean of the points where its edges cross the surface,
-	//moved onto the surface (one Newton step) and kept inside of its voxel
-	const int C = S - 1; //voxels per axis
+	//moved onto the surface (one Newton step) and kept inside of its voxel. The quads (2.) only use the voxels 0 to n.
+	const int C = n + 1; //voxels per axis
 	std::vector<int> voxelVertex(static_cast<std::size_t>(C) * C * C, -1);
 	auto voxel = [&](int i, int j, int k) -> int& { return voxelVertex[(static_cast<std::size_t>(k) * C + j) * C + i]; };
 	for (int k = 0; k < C; ++k)
@@ -209,7 +209,6 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world, const ChunkKey& ke
 		glm::vec3 normal = world.normal(vertex.position);
 		vertex.normal = normal;
 		SurfaceMaterial material = world.material(vertex.position, normal);
-		vertex.material[0] = toByte(material.trail);
 		vertex.material[1] = toByte(material.sand);
 		//In a cave the walls and the roof are rock, the floor is the trail
 		float floor = glm::smoothstep(0.55f, 0.8f, normal.y);

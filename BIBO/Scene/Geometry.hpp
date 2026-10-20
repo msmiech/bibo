@@ -22,6 +22,8 @@ namespace bibo
 			unique_ptr<Model> model;
 			physics::PhysicsWorld* physicsWorld = nullptr;
 			physics::BodyHandle physicsBody = physics::INVALID_BODY;
+			//From the body to the model: what the pose of the body does not have (e.g. the scale of the model)
+			mat4 bodyToModel = mat4(1.0f);
 			//The game uses the meshes (e.g. for the physics and the materials), it cannot run without them
 			void requireMeshes(const char* nodeName);
 		public:
@@ -47,7 +49,8 @@ namespace bibo
 
 			Model* getModel();
 			/**
-			* The geometry follows the position and rotation of the physics body from now on
+			* The geometry follows the position and rotation of the physics body from now on. Its current model matrix
+			* relative to the body (e.g. its scale) is kept, so the body may be anywhere in or around the model.
 			*/
 			void setPhysicsBody(physics::PhysicsWorld* physicsWorld, physics::BodyHandle body);
 			Texture* normalMap;

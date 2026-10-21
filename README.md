@@ -1,10 +1,10 @@
 # <img src="Icon/bibo.png" width="48" height="48" alt=""> Bear-In Bear-Out
 [![Build](https://github.com/msmiech/bibo/actions/workflows/build.yml/badge.svg)](https://github.com/msmiech/bibo/actions/workflows/build.yml)
 
-Bear-In Bear-Out (BIBO) is a simple 3D game about a bear cub on an island: roam the forest, swim, catch salmon for bonus points and take on the beaver's race around the track,
+Bear-In Bear-Out (BIBO) is a simple 3D game about a bear cub on an island: roam the forest, swim, catch salmon for bonus points and take on the race around the track of Bober the beaver,
 a lap against the clock past the hedgehogs on the way
 
-![Main menu, graphics settings and gameplay](Screenshots/bibo_gameplay.gif)
+![Main menu, the conversation with Bober the beaver and the start of the race](Screenshots/bibo_gameplay.gif)
 
 The GIF is recorded by the [README GIF workflow](.github/workflows/readme-gif.yml) when a pull request is opened:
 the game plays the input of [tools/readme_demo.txt](tools/readme_demo.txt) (`BIBO --demo <script> --record <file>`)
@@ -18,7 +18,7 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
   * Physically based materials (generated when the game starts): forest floor, the dirt trail, granite, snow, sand, bark, needles and leaves
   * A bright polar day: low sun, clouds and polar lights (aurora) in the sky, cascaded shadow maps, fog, falling snow and simple water
 * The race is a quest (see [The race quest](#the-race-quest) below)
-  * A beaver sits next to the starting line with a glowing exclamation mark above its head. Talk to it (E, or Square / X on a gamepad) and it asks whether the bear would like to give the race track a shot
+  * Bober, a beaver, sits next to the starting line with a glowing exclamation mark above its head. Talk to it (E, or Square / X on a gamepad) and it asks whether the bear would like to give the race track a shot
   * The conversation appears letter by letter on the screen while the beaver chatters, squeaks and gestures (it makes beaver sounds, it does not speak); answer yes or no at the end.
     The bear and the beaver turn their heads and eyes to each other
   * Yes: a short cutscene, the bear walks up to the starting line, a countdown 3, 2, 1 and the timer starts. The lap is complete at the finish line after all checkpoints along the track in their order
@@ -318,7 +318,7 @@ go on page by page and choose an answer at the end. Animals do not talk like peo
 its mouth opens and closes with every sound and it nods. A line can also be said in passing (it goes away on its own), e.g. "Off to the starting line!".
 The text is on the screen in a box of the HUD (`UI/hud.rml`).
 
-**The beaver** (`BIBO/Scene/Beaver.cpp`, `BIBO/Scene/BeaverModel.cpp`): generated and drawn like the hedgehogs (the skin and fur shaders of the bear, `BIBO/Scene/FurryRenderer.cpp`).
+**Bober, the beaver** (`BIBO/Scene/Beaver.cpp`, `BIBO/Scene/BeaverModel.cpp`): generated and drawn like the hedgehogs (the skin and fur shaders of the bear, `BIBO/Scene/FurryRenderer.cpp`).
 It sits upright: a pear shaped body with thick brown fur and round haunches, a round head with a blunt muzzle, big orange front teeth (beaver teeth are orange), a black nose, small dark eyes and round ears,
 a lower jaw that fills a hollow under the muzzle (it hinges open to show the mouth, the tongue and the lower teeth), short arms with five clawed fingers,
 large webbed hind feet under the haunches and the flat, scaly tail lying behind it. The parts reach into the body, so they stay attached when they move.

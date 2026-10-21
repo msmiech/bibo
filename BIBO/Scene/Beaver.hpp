@@ -10,7 +10,7 @@ namespace bibo
 	namespace scene
 	{
 		/**
-		* The beaver at the start of the race track, who offers the race to the bear (RaceQuest). It sits upright at the side of
+		* Bober, the beaver at the start of the race track, who offers the race to the bear (RaceQuest). It sits upright at the side of
 		* the track, turns to the bear when it comes close and looks at it. While it talks its mouth moves with every sound
 		* it makes, it nods and gestures with its arms; between the conversations it nibbles at something and slaps its tail
 		* on the ground every now and then. Only the behavior, the scene draws it (FurryRenderer with the BeaverModel).

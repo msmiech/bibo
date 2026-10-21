@@ -103,7 +103,7 @@ void RaceQuest::startConversation()
 	}
 	else
 	{
-		pages.push_back("Oh, hello there, young bear! Lovely day for a run, isn't it?");
+		pages.push_back("Oh, hello there, young bear! I'm Bober. Lovely day for a run, isn't it?");
 		pages.push_back("This is the race track around the island. One lap: through all the checkpoints, then back across this line.");
 		pages.push_back("You have five minutes. Stay on the track, keep out of the water, and mind the hedgehogs!");
 		pages.push_back("So... would you like to give the race track a shot?");

@@ -40,7 +40,8 @@ namespace bibo
 			*/
 			enum class Event { BEAVER_SOUND, ACCEPTED, DECLINED, COUNTDOWN_TICK, START, CHECKPOINT, COMPLETED, FAILED };
 
-			static constexpr const char* SPEAKER = "Beaver";
+			//The name of the beaver
+			static constexpr const char* SPEAKER = "Bober";
 			//The lap must be done within this time (seconds)
 			static constexpr float TIME_LIMIT = 300.0f;
 			static constexpr int COUNTDOWN_SECONDS = 3;

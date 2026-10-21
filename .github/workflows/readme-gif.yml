@@ -1,6 +1,6 @@
 name: README GIF
 
-# Records the gameplay GIF of the README (menus, graphics settings, gameplay) when a pull request is opened
+# Records the gameplay GIF of the README (the main menu, a conversation and the start of a race) when a pull request is opened
 # and commits it to the branch of the pull request (see tools/record_gameplay.sh and tools/readme_demo.txt).
 on:
   pull_request:

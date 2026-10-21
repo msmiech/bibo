@@ -918,7 +918,7 @@ void updateHud()
 	bool gamepad = controls->hasGamepad();
 	if (quest.canTalk())
 	{
-		hud.prompt = "Talk to the beaver";
+		hud.prompt = string("Talk to ") + RaceQuest::SPEAKER;
 		hud.promptKey = gamepad ? "X" : "E";
 	}
 	if (dialog.isOpen())
@@ -948,7 +948,7 @@ void updateHud()
 	const float BANNER_TIME = 6.0f;
 	if (quest.getStage() == RaceQuest::Stage::IDLE && quest.getOutcomeAge() < BANNER_TIME)
 	{
-		const string again = "Talk to the beaver to try again.";
+		const string again = string("Talk to ") + RaceQuest::SPEAKER + " to try again.";
 		switch (quest.getOutcome())
 		{
 		case RaceQuest::Outcome::COMPLETED:
@@ -1221,7 +1221,7 @@ void textRendering()
 		renderText(textShader.get(), "Mouse / right stick to look around, wheel to zoom", windowWidth / 10.f, windowHeight - 3.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "SPACE / Cross or A to jump (hold to jump higher)", windowWidth / 10.f, windowHeight - 4.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "E / Square or X to talk, R to restart", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
-		renderText(textShader.get(), "The beaver at the start has a race for you!", windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "Bober the beaver at the start has a race for you!", windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Mind the hedgehogs, catch salmon for bonus points", windowWidth / 10.f, windowHeight - 7.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 	}
 	if (settings.showFrameTime)
@@ -1275,7 +1275,7 @@ void textRendering()
 		}
 		else if (quest.canTalk())
 		{
-			renderText(textShader.get(), "E: Talk to the beaver", windowWidth / 10.f, 3.f * windowHeight / 10.f, 0.45f, color);
+			renderText(textShader.get(), string("E: Talk to ") + RaceQuest::SPEAKER, windowWidth / 10.f, 3.f * windowHeight / 10.f, 0.45f, color);
 		}
 		int countdown = quest.getCountdownNumber();
 		if (countdown >= 0)

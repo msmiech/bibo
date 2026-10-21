@@ -261,8 +261,12 @@ add_library(bibo_core STATIC
 	BIBO/Scene/Light.hpp
 	BIBO/Scene/RaceQuest.cpp
 	BIBO/Scene/RaceQuest.hpp
+	BIBO/Scene/RestingBear.cpp
+	BIBO/Scene/RestingBear.hpp
 	BIBO/Scene/Salmon.cpp
 	BIBO/Scene/Salmon.hpp
+	BIBO/Scene/SalmonQuest.cpp
+	BIBO/Scene/SalmonQuest.hpp
 	BIBO/Scene/Scene.cpp
 	BIBO/Scene/Scene.hpp
 	BIBO/Scene/SceneObject.cpp

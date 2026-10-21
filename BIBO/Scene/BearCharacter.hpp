@@ -148,6 +148,10 @@ namespace bibo
 			bool catchFish();
 			Fish getFish() const { return fish; }
 			/**
+			* @return How many fish the bear ate up since the last call (it took the last bite; a fish it dropped does not count)
+			*/
+			int takeEatenFish();
+			/**
 			* @return false if the bear holds no fish
 			*/
 			bool getHeldFish(HeldFish& held) const;
@@ -264,6 +268,8 @@ namespace bibo
 			int nextIdle = BearRig::IDLE_STRETCH;
 			glm::vec3 positionOffset = glm::vec3(0.0f); //smooths getPosition when the state changes
 			Fish fish = Fish::NONE;
+			bool lastBiteTaken = false;
+			int eatenFish = 0;
 			int tongueRoot, tongueTip, leftPaw, rightPaw; //bones that hold the fish
 
 			//Skinning and fur

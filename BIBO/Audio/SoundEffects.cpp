@@ -9,6 +9,7 @@ namespace
 {
 	const float TAU = 6.28318531f;
 	const int BEAVER_VARIANTS = 8;
+	const int BEAR_VARIANTS = 6;
 
 	float smooth(float t)
 	{
@@ -141,6 +142,51 @@ namespace
 	}
 
 	/**
+	* A bear grumbles with its mouth almost closed: a low voice ("mhm", "hrrm") with dark formants, a slow rasp in the
+	* throat and a breathy start
+	*/
+	std::vector<float> bear(int sampleRate, int variant)
+	{
+		Random random(static_cast<std::uint32_t>(variant) * 4099u + 29u);
+		float duration = 0.16f + 0.1f * random.next();
+		float base = 105.0f + 50.0f * random.next();
+		float vowel = 520.0f + 260.0f * random.next(); //"oh" to "ah"
+		float raspRate = 26.0f + 10.0f * random.next();
+		int contour = variant % 3;
+		std::size_t count = static_cast<std::size_t>(duration * static_cast<float>(sampleRate));
+		std::vector<float> samples(count, 0.0f);
+
+		auto pitch = [&](float t) {
+			float u = t / duration;
+			float shape;
+			switch (contour)
+			{
+			case 0: shape = 1.0f + 0.12f * std::sin(3.14159265f * u); break; //"mhm"
+			case 1: shape = 1.1f - 0.2f * u; break; //down, content
+			default: shape = 0.92f + 0.22f * u * u; break; //up, asking
+			}
+			return base * shape;
+		};
+		addHarmonics(samples, sampleRate, 0, count, 30, pitch, [&](float frequency, float, int k) {
+			float formants = 0.15f + peak(frequency, 280.0f, 140.0f) + 0.7f * peak(frequency, vowel, 220.0f) + 0.2f * peak(frequency, 2300.0f, 400.0f);
+			return formants / std::pow(static_cast<float>(k), 0.9f);
+		});
+		Random breath(static_cast<std::uint32_t>(variant) + 211u);
+		float low = 0.0f;
+		for (std::size_t i = 0; i < count; ++i)
+		{
+			float t = static_cast<float>(i) / static_cast<float>(sampleRate);
+			float envelope = smooth(t / 0.025f) * (1.0f - smooth((t - 0.5f * duration) / (0.5f * duration)));
+			float rasp = 1.0f - 0.3f * (0.5f + 0.5f * std::sin(TAU * raspRate * t));
+			float noise = breath.noise();
+			low += (noise - low) * 0.1f; //only the low rumble of the breath
+			samples[i] = std::tanh(samples[i] * 0.3f) * envelope * rasp + 0.08f * low * envelope;
+		}
+		normalize(samples, 0.6f);
+		return samples;
+	}
+
+	/**
 	* A short tone with a few harmonics that fades out
 	*/
 	void addBeep(std::vector<float>& samples, int sampleRate, float start, float frequency, float decay, float gain)
@@ -265,7 +311,15 @@ namespace
 
 int bibo::audio::soundEffectVariants(SoundEffect effect)
 {
-	return effect == SoundEffect::BEAVER ? BEAVER_VARIANTS : 1;
+	switch (effect)
+	{
+	case SoundEffect::BEAVER:
+		return BEAVER_VARIANTS;
+	case SoundEffect::BEAR:
+		return BEAR_VARIANTS;
+	default:
+		return 1;
+	}
 }
 
 std::vector<float> bibo::audio::synthesizeSoundEffect(SoundEffect effect, int variant, int sampleRate)
@@ -274,6 +328,8 @@ std::vector<float> bibo::audio::synthesizeSoundEffect(SoundEffect effect, int va
 	{
 	case SoundEffect::BEAVER:
 		return beaver(sampleRate, std::clamp(variant, 0, BEAVER_VARIANTS - 1));
+	case SoundEffect::BEAR:
+		return bear(sampleRate, std::clamp(variant, 0, BEAR_VARIANTS - 1));
 	case SoundEffect::COUNTDOWN:
 	{
 		std::vector<float> samples(static_cast<std::size_t>(0.35f * static_cast<float>(sampleRate)), 0.0f);

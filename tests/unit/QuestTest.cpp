@@ -253,6 +253,20 @@ TEST_CASE("After the last page the player chooses an answer", "[quest][dialog]")
 	CHECK_FALSE(dialog.isOpen());
 }
 
+TEST_CASE("Cancel can answer with another choice than the last one", "[quest][dialog]")
+{
+	Dialog dialog;
+	dialog.open("Bear", { "Keep on fishing?" }, { "Keep fishing", "Stop fishing" }, 0);
+	finishPage(dialog);
+	REQUIRE(dialog.isChoosing());
+	DialogInput cancel;
+	cancel.cancel = true;
+	dialog.update(FRAME, cancel);
+	int choice = -1;
+	REQUIRE(dialog.takeEnded(choice));
+	CHECK(choice == 0);
+}
+
 TEST_CASE("A line said in passing goes away on its own", "[quest][dialog]")
 {
 	Dialog dialog;
@@ -475,4 +489,30 @@ TEST_CASE("Swimming before the race does not matter", "[quest][rules]")
 	q.update(10.0f);
 	CHECK(q.quest.getOutcome() == RaceQuest::Outcome::NONE);
 	CHECK(q.count(RaceQuest::Event::FAILED) == 0);
+}
+
+TEST_CASE("The race takes at most two minutes", "[quest][rules]")
+{
+	CHECK(RaceQuest::TIME_LIMIT == 120.0f);
+}
+
+TEST_CASE("While the bear is on another quest the beaver does not offer the race", "[quest][rules]")
+{
+	Quest q;
+	RaceQuest& quest = q.quest;
+	q.situation.busy = true;
+	q.update();
+	CHECK_FALSE(quest.isOffered());
+	CHECK(quest.canTalk()); //it still answers
+	q.talk();
+	CHECK(quest.getStage() == RaceQuest::Stage::IDLE);
+	CHECK(quest.getDialog().isPassing()); //only a line in passing
+	q.update(5.0f);
+	CHECK_FALSE(quest.getDialog().isOpen());
+
+	q.situation.busy = false;
+	q.update();
+	CHECK(quest.isOffered());
+	q.talk();
+	CHECK(quest.getStage() == RaceQuest::Stage::TALKING);
 }

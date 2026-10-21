@@ -11,10 +11,16 @@
 		<div class="details">Checkpoints {{ checkpoints }}<span class="separator">|</span>Limit {{ time_limit }}</div>
 	</div>
 
+	<!-- Fishing for Mishka: time, salmon and points at the top -->
+	<div class="race" data-if="fishing">
+		<div class="time">{{ fishing_time }}</div>
+		<div class="details">Salmon {{ salmon }}<span class="separator">|</span>Score {{ score }}</div>
+	</div>
+
 	<!-- 3, 2, 1, GO! -->
 	<div class="countdown" data-if="countdown != ''" data-class-go="countdown == 'GO!'">{{ countdown }}</div>
 
-	<!-- The result of the race -->
+	<!-- The result of the race or of fishing -->
 	<div class="banner" data-if="banner != ''" data-class-success="banner_success">
 		<div class="title">{{ banner }}</div>
 		<div class="detail">{{ banner_detail }}</div>

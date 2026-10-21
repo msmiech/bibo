@@ -45,6 +45,70 @@ TEST_CASE("There are pools of water on the track that are deep enough for salmon
 	}
 }
 
+TEST_CASE("Mishka lies on dry ground next to the largest pool, beside the trail", "[assets][world][animals]")
+{
+	const bibo::world::WorldGenerator& generator = worldGenerator();
+	const float sea = generator.getSeaLevel();
+	std::vector<WaterPool> pools = bibo::scene::findWaterPools(generator);
+	CHECK(pools.size() == 6);
+	int largest = bibo::scene::largestPool(pools);
+	REQUIRE(largest >= 0);
+	const WaterPool& pool = pools[largest];
+	for (const WaterPool& other : pools)
+	{
+		CHECK(other.area > 0.0f);
+		CHECK(other.area <= pool.area);
+	}
+
+	vec3 spot, look;
+	REQUIRE(bibo::scene::findShoreSpot(generator, pool, spot, look));
+	CAPTURE(spot, look, pool.center);
+	CHECK(spot.y > sea + 0.1f); //dry
+	CHECK(std::abs(generator.height(vec2(spot.x, spot.z)) - spot.y) < 1e-4f); //on the ground
+	bibo::world::TrackPath::Nearest nearest = generator.getPath().nearest(vec2(spot.x, spot.z));
+	REQUIRE(nearest.found);
+	CHECK(std::abs(nearest.lateral) <= nearest.floorHalfWidth + 4.0f); //on the floor of the track or at the foot of its walls
+	CHECK(glm::distance(vec2(spot.x, spot.z), vec2(pool.center.x, pool.center.z)) < pool.radius + 8.0f); //it can see the salmon
+	CHECK(glm::dot(look, glm::normalize(vec3(pool.center.x - spot.x, 0.0f, pool.center.z - spot.z))) > 0.99f);
+
+	//Not in the way of the race: far from the route past the pool (also from the line between its points)
+	std::vector<vec2> route = bibo::scene::runningRoute(generator, pool.trackDistance - 40.0f, pool.trackDistance + 40.0f);
+	REQUIRE(route.size() > 60);
+	float clearance = 1e9f;
+	for (std::size_t i = 0; i + 1 < route.size(); ++i)
+	{
+		vec2 segment = route[i + 1] - route[i];
+		float along = glm::clamp(glm::dot(vec2(spot.x, spot.z) - route[i], segment) / glm::dot(segment, segment), 0.0f, 1.0f);
+		clearance = std::min(clearance, glm::distance(vec2(spot.x, spot.z), route[i] + segment * along));
+	}
+	CAPTURE(clearance);
+	CHECK(clearance > 4.0f);
+}
+
+TEST_CASE("The route of runners goes along the trail and around the water", "[assets][world][animals]")
+{
+	const bibo::world::WorldGenerator& generator = worldGenerator();
+	const float sea = generator.getSeaLevel();
+	std::vector<WaterPool> pools = bibo::scene::findWaterPools(generator);
+	for (const WaterPool& pool : pools)
+	{
+		std::vector<vec2> route = bibo::scene::runningRoute(generator, pool.trackDistance - 30.0f, pool.trackDistance + 30.0f);
+		REQUIRE(route.size() > 40);
+		int wet = 0;
+		for (vec2 point : route)
+		{
+			wet += generator.height(point) < sea ? 1 : 0;
+			CHECK(generator.getPath().nearest(point).found);
+		}
+		CAPTURE(pool.center, wet);
+		CHECK(wet <= static_cast<int>(route.size()) / 10); //only where it cuts a corner of the water
+		for (std::size_t i = 1; i < route.size(); ++i)
+		{
+			CHECK(glm::distance(route[i], route[i - 1]) < 2.0f); //no jumps
+		}
+	}
+}
+
 TEST_CASE("The hedgehogs live where the rocks of the track were and stay on the floor of the track", "[assets][world][animals]")
 {
 	const int index = GENERATE(range(0, 12));

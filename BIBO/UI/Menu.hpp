@@ -41,7 +41,10 @@ namespace bibo
 			//The race: its time, the checkpoints passed and the time limit
 			bool racing = false;
 			std::string raceTime, checkpoints, timeLimit;
-			//The result of the race for a while after it ended (empty: none)
+			//Fishing for Mishka: the time, the salmon eaten of all ("2/6") and the points
+			bool fishing = false;
+			std::string fishingTime, salmon, score;
+			//The result of the race or of fishing for a while after it ended (empty: none)
 			std::string banner, bannerDetail;
 			bool bannerSuccess = false;
 

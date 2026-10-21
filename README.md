@@ -1,8 +1,8 @@
 # <img src="Icon/bibo.png" width="48" height="48" alt=""> Bear-In Bear-Out
 [![Build](https://github.com/msmiech/bibo/actions/workflows/build.yml/badge.svg)](https://github.com/msmiech/bibo/actions/workflows/build.yml)
 
-Bear-In Bear-Out (BIBO) is a simple 3D game about a bear cub on an island: roam the forest, swim, catch salmon for bonus points and take on the race around the track of Bober the beaver,
-a lap against the clock past the hedgehogs on the way
+Bear-In Bear-Out (BIBO) is a simple 3D game about a bear cub on an island: roam the forest, swim and catch salmon, take on the race around the track of Bober the beaver,
+a lap against the clock past the hedgehogs on the way, and go fishing in every pool for Mishka, the bear who watches the salmon jump
 
 ![Main menu, the conversation with Bober the beaver and the start of the race](Screenshots/bibo_gameplay.gif)
 
@@ -22,14 +22,21 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
   * The conversation appears letter by letter on the screen while the beaver chatters, squeaks and gestures (it makes beaver sounds, it does not speak); answer yes or no at the end.
     The bear and the beaver turn their heads and eyes to each other
   * Yes: a short cutscene, the bear walks up to the starting line, a countdown 3, 2, 1 and the timer starts. The lap is complete at the finish line after all checkpoints along the track in their order
-  * The race fails after 5 minutes, when the bear leaves the track or falls into the water; the beaver offers it again. After a completed lap it offers to improve the best time (its exclamation mark turns blue)
+  * The race fails after 2 minutes, when the bear leaves the track or falls into the water; the beaver offers it again. After a completed lap it offers to improve the best time (its exclamation mark turns blue)
+  * No salmon jump during the race (no time for a snack)
   * Outside of the race there is no lap, no timer and no checkpoint display: the bear roams freely
+* Fishing is a quest too (see [The salmon quest](#the-salmon-quest) below)
+  * Mishka, an older, bigger bear with the coat of a moon bear (black, a cream crescent on the chest, a tan muzzle), lies on its belly at the largest pool of water on the track and watches the salmon jump (its head follows them), with an exclamation mark above it.
+    It lies out of the way of the race, and during the race it is no obstacle
+  * Talk to it and it asks whether the bear would like to go fishing. Yes: a salmon from every pool of the track that the bear eats up gives 100 points, a timer runs, the HUD shows the salmon and the score.
+    The quest is complete with a salmon from each of the six pools; Mishka tells how many are left, and the bear can stop fishing. Afterwards Mishka offers it again to be quicker
+  * One quest at a time: the beaver does not offer the race while the bear is fishing, Mishka does not offer fishing during the race
 * Animals on the track (see [The animals](#the-animals) below)
   * Large hedgehogs stroll around on the track, rendered like the bear (banded spines and fur as strands, the same eyes and skin): they walk with little steps, stop to sniff around and walk on. Running into one knocks the bear over (ouch, the spines) and its spines stand up
-  * Salmon jump out of the pools of water on the track when the bear comes close. The bear can catch one per pool (e.g. when it jumps over the water) for 100 bonus points:
+  * Salmon jump out of the pools of water on the track when the bear comes close. The bear can catch them (e.g. when it jumps over the water), points only on Mishka's quest:
     it carries the fish in its mouth and as soon as it is on the ground it sits down, holds it in its front paws, takes three big bites, chews happily with closed eyes and licks its lips
 * Music: a cheerful, looping calypso with steel drum, whistle, marimba, bass, percussion and slapstick effects, synthesized by the game (see [The music](#the-music) below)
-* Sound effects, also synthesized: the chatter of the beaver, the beeps of the countdown, a ding at every checkpoint, jingles for a completed or failed race and the splash when the bear falls into the water
+* Sound effects, also synthesized: the chatter of the beaver, the grumbling of Mishka, the beeps of the countdown, a ding at every checkpoint, jingles for a completed or failed race and the splash when the bear falls into the water
 * The player character is a young brown bear (see [The bear](#the-bear) below)
   * Skeleton with inverse kinematics: procedural walking and bounding with the paws planted on the terrain, the body follows slopes and leans into turns
   * Strand based fur that is generated on the GPU and reacts to movement, wind, the ground, obstacles and hits
@@ -197,9 +204,9 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests are in the `tests` folder:
-* `unit`: game rules (checkpoints in their order, the finish line), the race quest (the conversation letter by letter with sounds and answers, accepting and declining, the countdown, completing a lap and improving the best time, failing in the water, off the track or after the time limit), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions, a moving hedgehog touching the bear, ray casts, sphere casts, ragdolls falling and coming to rest with connected joints), animation (transforms, forward kinematics, two bone IK, springs), the fur (guide hairs lag behind, hang down, lie on the ground and on obstacles, hits ruffle them; strand placement), the view frustum (compared with the camera matrices for random cameras), math helpers, the generated textures, the input (stick dead zones, moving relative to the camera), the noise of the world, the worker threads, the shadow cascades (they cover their slice of the view and move in whole texels), the includes of the shader files, the animals (hedgehogs stroll around their home and stay on the ground they can walk on, salmon jump only near the bear, high enough to be caught, one per pool; the beaver turns to the bear, talks with its mouth and cheers; the generated models) and the music and the sound effects (the notation of the melodies, a loud enough loop without a click where it starts again, the same every time; the sounds are short, not silent and do not click)
-* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart; the world (the height field of the track matches its mesh, the path goes around the lap through the checkpoints on the floor of the canyon, the ground on the track is the track terrain, the island is surrounded by sea with beaches and cliffs, the caves leave room for the bear to run and jump, the pools of water on the track are deep enough for salmon, the hedgehogs stay on the floor of the track, neighboring chunks fit together without cracks, the levels of detail, trees grow next to the track but not on it, the streaming of the chunks, the vegetation and the physics); the bear model (its skeleton matches its skinning, it stands on the ground and fits its capsule, fur and bare skin, eyes, mouth, tongue, teeth and claws) and the bear in action (paws planted while it runs, knocked down by a rock it tumbles, gets up and runs again, rolling over from its back, idle animations and how moving interrupts them, carrying and eating a caught fish (and dropping it when it is knocked down), blinking and looking around, steering, jumping higher the longer the button is held, jumping after running over an edge and just before landing, the legs reaching for the ground and landing without jumping paws, swimming in deep water with its head above it and jumping out onto the shore); the race track counts as the track of the race quest, the forest and the sea do not
-* `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the generated materials and the sky, the camera (orbiting, following, going back behind the bear, keeping out of obstacles) and the whole scene (a frame of the renderer, culling never removes a visible pixel and leaves out the chunks and plants that are not in view, the camera never goes into the terrain of the track, the bear talks to the beaver and is brought to the starting line for the countdown). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
+* `unit`: game rules (checkpoints in their order, the finish line), the race quest (the conversation letter by letter with sounds and answers, accepting and declining, the countdown, completing a lap and improving the best time, failing in the water, off the track or after the time limit, not offered while fishing), the salmon quest (a salmon per pool counts, only on the quest, completing it and improving the best time, stopping, not offered during the race), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions, a moving hedgehog touching the bear, ray casts, sphere casts, ragdolls falling and coming to rest with connected joints), animation (transforms, forward kinematics, two bone IK, springs), the fur (guide hairs lag behind, hang down, lie on the ground and on obstacles, hits ruffle them; strand placement), the view frustum (compared with the camera matrices for random cameras), math helpers, the generated textures, the input (stick dead zones, moving relative to the camera), the noise of the world, the worker threads, the shadow cascades (they cover their slice of the view and move in whole texels), the includes of the shader files, the animals (hedgehogs stroll around their home and stay on the ground they can walk on, salmon jump only near the bear, high enough to be caught, not out of closed pools; the largest pool; the beaver turns to the bear, talks with its mouth and cheers; the generated models) and the music and the sound effects (the notation of the melodies, a loud enough loop without a click where it starts again, the same every time; the sounds are short, not silent and do not click)
+* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart; the world (the height field of the track matches its mesh, the path goes around the lap through the checkpoints on the floor of the canyon, the ground on the track is the track terrain, the island is surrounded by sea with beaches and cliffs, the caves leave room for the bear to run and jump, the pools of water on the track are deep enough for salmon, Mishka lies on dry ground next to the largest one, out of the way of the route of the race (which goes around the water), the hedgehogs stay on the floor of the track, neighboring chunks fit together without cracks, the levels of detail, trees grow next to the track but not on it, the streaming of the chunks, the vegetation and the physics); the bear model (its skeleton matches its skinning, it stands on the ground and fits its capsule, fur and bare skin, eyes, mouth, tongue, teeth and claws) and the bear in action (paws planted while it runs, knocked down by a rock it tumbles, gets up and runs again, rolling over from its back, idle animations and how moving interrupts them, carrying and eating a caught fish (and dropping it when it is knocked down, only an eaten one counts), Mishka lying on its belly, bigger than the cub, watching and talking, its moon bear coat, blinking and looking around, steering, jumping higher the longer the button is held, jumping after running over an edge and just before landing, the legs reaching for the ground and landing without jumping paws, swimming in deep water with its head above it and jumping out onto the shore); the race track counts as the track of the race quest, the forest and the sea do not
+* `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the generated materials and the sky, the camera (orbiting, following, going back behind the bear, keeping out of obstacles) and the whole scene (a frame of the renderer, culling never removes a visible pixel and leaves out the chunks and plants that are not in view, the camera never goes into the terrain of the track, the bear talks to the beaver and is brought to the starting line for the countdown, it goes fishing with Mishka at the largest pool, no salmon jump during the race and Mishka is no obstacle then). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
   On Linux servers without a graphics card they run on a virtual X server with Mesa's software renderer: `xvfb-run -a ctest --test-dir build --output-on-failure`
 
 Every test case is a separate CTest test and its Catch2 tags become CTest labels, e.g. only the physics tests: `ctest --test-dir build -L physics`.
@@ -291,7 +298,8 @@ Its collision sphere is a kinematic body in the physics world that the game move
 
 **Salmon** (`BIBO/Scene/Salmon.cpp`): the pools of water are found along the center line of the track (where the ground is below the sea level, `findWaterPools`).
 When the bear comes close to a pool, salmon jump out of its deeper spots every now and then, near the bear, 2 to 4 meters high in a ballistic arc with the nose following the flight, the tail wiggling, and a splash of droplets where they leave and enter the water.
-A salmon that comes close to the mouth or the body of the bear is caught (one per pool, 100 points).
+A salmon that comes close to the mouth or the body of the bear is caught. The scene closes pools: all of them during the race (no salmon jump then),
+on the salmon quest the ones the bear already ate a salmon from.
 
 **The look of the hedgehogs** (`BIBO/Scene/HedgehogModel.cpp`, `BIBO/Scene/HedgehogRenderer.cpp`): they are drawn like the bear, with its skin and fur shaders, so both look alike.
 The body is generated as a surface around its center: a low egg that tapers to a pointed snout, flat underneath. Its back and sides carry about 4500 spines: strands of the fur shader in a stiff mode
@@ -307,7 +315,7 @@ then it is held so that what is left of it is at the mouth whenever the bear bit
 
 ### The race quest
 **The quest** (`BIBO/Scene/RaceQuest.cpp`): the rules and the conversation of the race, independent of the graphics. It goes through the stages
-idle (the beaver offers the race), talking, walking to the start (a cutscene), countdown and racing. The race fails when the time runs out (5 minutes),
+idle (the beaver offers the race), talking, walking to the start (a cutscene), countdown and racing. The race fails when the time runs out (2 minutes),
 when the bear is far beside the floor of the track (`isOnTrack`, e.g. up the walls of the canyon into the forest) or when it is in the water.
 The best time is kept until the game is closed; what the beaver says depends on whether the race was completed or how it failed.
 The scene (`BIBO/Scene/Scene.cpp`) moves the bear during the cutscene (it walks to the line and turns along the track), points the camera
@@ -328,8 +336,24 @@ The exclamation mark above it is a glowing model of the vegetation shader (it bl
 
 **Sound effects** (`BIBO/Audio/SoundEffects.cpp`): synthesized like the music. The beaver's sounds are short whines with a pitch that goes up or down, made of harmonics
 that are shaped by nasal formants, with a fast flutter (the chatter of its teeth) and some breath; eight variants, so it does not repeat itself.
+Mishka grumbles: a low voice with dark formants and a slow rasp in the throat, six variants.
 The countdown beeps, the checkpoint ding and the jingles are tones and marimba notes, the failure a muted trombone going down, the splash filtered noise with a few bubbles.
 They are mixed into the music on the audio thread (`BIBO/Audio/MusicPlayer.cpp`).
+
+### The salmon quest
+**The quest** (`BIBO/Scene/SalmonQuest.cpp`): the rules and the conversation of fishing, independent of the graphics: idle (Mishka offers it), talking and fishing.
+A salmon counts when the bear has eaten it up (`BearCharacter::takeEatenFish`, not when it drops it after being knocked down), one per pool, 100 points each.
+The timer only runs while the bear is fishing, not while it talks to Mishka; the best time is kept until the game is closed. Outside of the quest salmon give no points.
+
+**Mishka** (`BIBO/Scene/RestingBear.cpp`): the bear cub model and its rig (`BearRig`), 1.3 times as big (the skinned vertices are scaled around the point on the ground under it,
+the rig probes the ground through the same scaling, so the paws stay on it) with longer fur, drawn with the bear's renderer. Its own copy of the model is painted like a moon bear
+(`paintCoat`): the fur is darkened to black with a brown shimmer, a V shaped cream crescent is painted on the front of the chest and the muzzle below the eyes is tan, placed with the bones of the bind pose.
+It lies at the largest pool (`largestPool`, by the area of its water) on a dry, flat spot next to the water (on the floor of the track or at the foot of its walls) that is
+out of the way of the race (`findShoreSpot`): as far as possible from the route of runners (`runningRoute`: the trail, around the water through the widest dry part of the floor,
+smoothed because runners cut corners), and looks at the middle of the pool. During the race its collision sphere is taken out of the physics world, so a racer that cuts close past it is never stopped. The lying animation (`IDLE_LIE`) loops: on its belly like a sphinx,
+the front paws stretched out, the hind legs folded under the body; now and then it rests its chin a while with sleepy eyes and sighs.
+Its head follows the highest salmon of its pool in the air, or the bear when it comes close; while it talks its mouth opens with every sound.
+Its paws and fur lie on the height field of the world (the physics of the terrain is only streamed around the player's bear), and a kinematic sphere keeps the bear out of it.
 
 ### The music
 The music (`BIBO/Audio/Music.cpp`) is composed in code and synthesized when the game starts (in a background thread, under a second), nothing of it is stored in files.

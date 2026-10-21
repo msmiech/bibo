@@ -316,3 +316,127 @@ TEST_CASE("The bear walks to the beaver, accepts the race and is brought to the 
 		CHECK(quest.isOffered());
 	}
 }
+
+TEST_CASE("Mishka lies at the largest pool and offers fishing, no salmon jump during the race", "[gl][scene][quest][salmon]")
+{
+	using bibo::scene::RaceQuest;
+	using bibo::scene::SalmonQuest;
+	GlContext gl;
+	AssetWorkingDirectory assets;
+	Shader mainShader("Shader/main_shader.vert", "Shader/main_shader.frag");
+	PhysicsWorld physicsWorld;
+	Scene scene(&gl.window(), &mainShader, &physicsWorld);
+	const float frame = 1.0f / 60.0f;
+	const SalmonQuest& fishing = scene.getSalmonQuest();
+	const RaceQuest& race = scene.getRaceQuest();
+	const bibo::scene::WaterPool& pool = scene.getSalmon().getPools()[scene.getMishkaPool()];
+	glm::vec3 mishka = scene.getMishka().getPosition();
+	CHECK(glm::distance(glm::vec2(mishka.x, mishka.z), glm::vec2(pool.center.x, pool.center.z)) < pool.radius + 8.0f);
+	CHECK(fishing.isOffered());
+	CHECK(fishing.getPoolCount() == static_cast<int>(scene.getSalmon().getPools().size()));
+
+	//The bear is put on dry ground on the floor of the track next to Mishka
+	const bibo::world::WorldGenerator& generator = scene.getWorld().getGenerator();
+	glm::vec3 place(0.0f);
+	bool found = false;
+	for (int i = 0; i < 32 && !found; ++i)
+	{
+		float angle = static_cast<float>(i) * glm::two_pi<float>() / 32.0f;
+		glm::vec2 point = glm::vec2(mishka.x, mishka.z) + 3.5f * glm::vec2(std::cos(angle), std::sin(angle));
+		bibo::world::TrackPath::Nearest nearest = generator.getPath().nearest(point);
+		float height = generator.height(point);
+		if (height > generator.getSeaLevel() + 0.3f && nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth - 1.0f)
+		{
+			place = glm::vec3(point.x, height + bibo::scene::BearCharacter::groundOffset() + 0.05f, point.y);
+			found = true;
+		}
+	}
+	REQUIRE(found);
+	auto putBear = [&]() {
+		scene.getWorld().ensureCollision(place, scene.getCamera().getPosition());
+		scene.getBear().getCharacter().placeAt(place, mishka - place);
+		for (int i = 0; i < 60; ++i)
+		{
+			scene.update(frame);
+		}
+	};
+
+	SECTION("Fishing: talk, accept; the beaver does not offer the race meanwhile")
+	{
+		putBear();
+		REQUIRE(fishing.canTalk());
+		bibo::input::PlayerInput input;
+		input.interact = input.confirm = true;
+		scene.update(frame, input);
+		REQUIRE(fishing.getStage() == SalmonQuest::Stage::TALKING);
+		CHECK(scene.getCamera().isInShot());
+		bibo::input::PlayerInput press;
+		press.confirm = true;
+		for (int i = 0; i < 40 * 60 && fishing.getStage() == SalmonQuest::Stage::TALKING; ++i)
+		{
+			scene.update(frame, i % 30 == 0 ? press : bibo::input::PlayerInput());
+		}
+		REQUIRE(fishing.getStage() == SalmonQuest::Stage::FISHING);
+		CHECK(fishing.isActive());
+		std::vector<SalmonQuest::Event> events = scene.takeSalmonEvents();
+		CHECK(std::count(events.begin(), events.end(), SalmonQuest::Event::BEAR_SOUND) > 3);
+		CHECK(std::count(events.begin(), events.end(), SalmonQuest::Event::ACCEPTED) == 1);
+		scene.update(frame);
+		CHECK_FALSE(race.isOffered());
+		CHECK(scene.getScore() == 0);
+
+		scene.restart();
+		scene.update(frame);
+		CHECK_FALSE(fishing.isActive());
+		CHECK(fishing.isOffered());
+		CHECK(race.isOffered());
+	}
+	SECTION("Salmon jump at the pool, but not during the race")
+	{
+		putBear();
+		//Outside of the race it is
+		bibo::physics::RayHit hit;
+		glm::vec3 collider = scene.getMishka().getColliderCenter();
+		glm::vec3 across = glm::vec3(scene.getMishka().getColliderRadius() + 0.5f, 0.0f, 0.0f);
+		CHECK(physicsWorld.castRay(collider + across, -2.0f * across, hit));
+		int jumps = 0;
+		for (int i = 0; i < 4 * 60; ++i)
+		{
+			scene.update(frame);
+			jumps += static_cast<int>(scene.getSalmon().getJumps().size());
+		}
+		CHECK(jumps > 0);
+
+		//The race: accepted at the beaver (the scene moves the bear to the start), then the bear is put back to the pool
+		scene.restart();
+		bibo::input::PlayerInput input;
+		for (int i = 0; i < 8 * 60 && !race.canTalk(); ++i)
+		{
+			glm::vec3 direction = glm::normalize(scene.getBeaver().getPosition() - scene.getBear().getPosition());
+			bibo::scene::Camera& camera = scene.getCamera();
+			input.move = 0.4f * glm::vec2(glm::dot(direction, camera.getRight()), glm::dot(direction, camera.getForward()));
+			scene.update(frame, input);
+		}
+		REQUIRE(race.canTalk());
+		input = bibo::input::PlayerInput();
+		input.interact = input.confirm = true;
+		scene.update(frame, input);
+		bibo::input::PlayerInput press;
+		press.confirm = true;
+		for (int i = 0; i < 60 * 60 && race.getStage() != RaceQuest::Stage::RACING; ++i)
+		{
+			scene.update(frame, i % 30 == 0 ? press : bibo::input::PlayerInput());
+		}
+		REQUIRE(race.getStage() == RaceQuest::Stage::RACING);
+		CHECK_FALSE(fishing.isOffered());
+		//Mishka is no obstacle during the race
+		CHECK_FALSE(physicsWorld.castRay(collider + across, -2.0f * across, hit));
+		putBear();
+		for (int i = 0; i < 4 * 60 && race.getStage() == RaceQuest::Stage::RACING; ++i)
+		{
+			scene.update(frame);
+			REQUIRE(scene.getSalmon().getJumps().empty());
+		}
+		CHECK(race.getStage() == RaceQuest::Stage::RACING);
+	}
+}

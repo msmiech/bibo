@@ -16,7 +16,8 @@ namespace bibo
 		* bear would like to give the race track a shot. Yes: the bear walks up to the starting line (a short cutscene, the scene
 		* moves it), a countdown 3, 2, 1 starts the timer. The lap is complete at the finish line after all checkpoints in their
 		* order. It fails when the lap takes too long, the bear leaves the track or falls into the water; the beaver offers the
-		* race again then. After a completed lap the beaver offers to improve the best time.
+		* race again then. After a completed lap the beaver offers to improve the best time. While the bear is on another quest
+		* (e.g. fishing, SalmonQuest) the beaver does not offer the race, it only says that the bear looks busy.
 		*
 		* Only the rules and the conversation, the scene tells it where the bear is and moves the bear and the camera.
 		*/
@@ -43,7 +44,7 @@ namespace bibo
 			//The name of the beaver
 			static constexpr const char* SPEAKER = "Bober";
 			//The lap must be done within this time (seconds)
-			static constexpr float TIME_LIMIT = 300.0f;
+			static constexpr float TIME_LIMIT = 120.0f;
 			static constexpr int COUNTDOWN_SECONDS = 3;
 			//The player can talk to the beaver within this distance (horizontally from the beaver to the center of the bear)
 			static constexpr float TALK_DISTANCE = 5.5f;
@@ -70,6 +71,7 @@ namespace bibo
 				bool onTrack = true;
 				bool atStart = false; //at the starting line, looking along the track (end of the cutscene)
 				bool interact = false; //the player wants to talk (pressed in this frame)
+				bool busy = false; //on another quest, the race is not offered
 				DialogInput dialog;
 			};
 
@@ -93,7 +95,7 @@ namespace bibo
 			/**
 			* @return true if the beaver offers the race (the exclamation mark above it)
 			*/
-			bool isOffered() const { return stage == Stage::IDLE; }
+			bool isOffered() const { return stage == Stage::IDLE && !busy; }
 			/**
 			* @return true if the player can start a conversation now (near the beaver, it may still say something in passing)
 			*/
@@ -164,6 +166,7 @@ namespace bibo
 			Stage stage = Stage::IDLE;
 			float stageTime = 0.0f;
 			bool nearBeaver = false;
+			bool busy = false;
 			float countdown = 0.0f;
 			float raceTime = 0.0f;
 			std::size_t nextCheckpoint = 0;

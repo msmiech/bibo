@@ -13,6 +13,7 @@
 #include "Physics/Physics.hpp"
 #include "Resources/SkinnedModel.hpp"
 #include "Scene/BearCharacter.hpp"
+#include "Scene/RestingBear.hpp"
 #include "TestSupport.hpp"
 
 using namespace bibo::physics;
@@ -625,8 +626,11 @@ TEST_CASE("A caught fish stays in the mouth in the air, on the ground the bear s
 		vec3 paws = 0.5f * (rig.getBonePosition(rig.getBone("hand.L")) + rig.getBonePosition(rig.getBone("hand.R")));
 		CHECK(glm::distance(paws, held.center) < 0.8f);
 	}
+	CHECK(scene.bear->takeEatenFish() == 0); //not eaten up yet
 	scene.run(BearRig::EAT_BITES[2] - BearRig::EAT_BITES[0], forward());
 	CHECK_FALSE(scene.bear->getHeldFish(held)); //all three bites taken
+	CHECK(scene.bear->takeEatenFish() == 1);
+	CHECK(scene.bear->takeEatenFish() == 0); //counted once
 
 	SECTION("After the last bite the player can run on")
 	{
@@ -642,6 +646,110 @@ TEST_CASE("A caught fish stays in the mouth in the air, on the ground the bear s
 		CHECK_FALSE(scene.bear->getRig().isIdling());
 		CHECK(scene.bear->getFish() == BearCharacter::Fish::NONE);
 	}
+}
+
+TEST_CASE("Mishka lies on its belly, watches what it is shown and talks with its mouth", "[assets][bear][animals]")
+{
+	const vec3 UP(0.0f, 1.0f, 0.0f);
+	//Flat ground at y = 0
+	bibo::scene::GroundProbe probe = [&](vec3 from, vec3 to, vec3& point, vec3& normal) {
+		if (from.y < 0.0f || to.y > 0.0f)
+		{
+			return false;
+		}
+		point = vec3(to.x, 0.0f, to.z);
+		normal = UP;
+		return true;
+	};
+	bibo::scene::RestingBear mishka(bearModel(), vec3(0.0f), vec3(0.0f, 0.0f, 1.0f), probe);
+	BearRig standing(bearModel().skeleton);
+	standing.reset(bibo::scene::LocomotionInput(), probe);
+
+	const BearRig& rig = mishka.getRig();
+	CHECK(rig.getIdle() == BearRig::IDLE_LIE);
+	auto checkLying = [&]() {
+		CHECK(rig.getCenter().y < standing.getCenter().y - 0.25f);
+		for (const char* paw : { "hand.L", "hand.R", "foot.L", "foot.R" })
+		{
+			CAPTURE(paw);
+			CHECK(rig.getBonePosition(rig.getBone(paw)).y < 0.3f); //on the ground
+		}
+		float lowest = std::numeric_limits<float>::max();
+		for (const vec3& position : mishka.getPositions())
+		{
+			lowest = std::min(lowest, position.y);
+		}
+		CHECK(lowest > -0.12f); //not into the ground
+		CHECK(lowest < 0.15f);
+	};
+	checkLying();
+	//It does not get up
+	for (int i = 0; i < 40 * 60; ++i)
+	{
+		mishka.update(FRAME, nullptr);
+	}
+	REQUIRE(rig.getIdle() == BearRig::IDLE_LIE);
+	checkLying();
+
+	//The head follows what it watches (to its left: +x)
+	auto watch = [&](vec3 target) {
+		for (int i = 0; i < 3 * 60; ++i)
+		{
+			mishka.update(FRAME, &target);
+		}
+		return mishka.getFacePosition();
+	};
+	vec3 left = watch(vec3(4.0f, 1.0f, 4.0f));
+	vec3 right = watch(vec3(-4.0f, 1.0f, 4.0f));
+	CHECK(left.x > right.x + 0.06f);
+	checkLying();
+
+	//Bigger than the cub: everything of the rig is scaled around the point on the ground under it
+	CHECK(mishka.getFacePosition() == mishka.scaled(rig.getHeadPosition()));
+	CHECK(mishka.getFacePosition().y > 1.2f * rig.getHeadPosition().y);
+	CHECK(mishka.getBoundsCenter() == mishka.scaled(rig.getCenter()));
+
+	mishka.speak();
+	mishka.update(0.1f, nullptr);
+	CHECK(mishka.getMouthOpen() > 0.2f);
+	mishka.update(0.15f, nullptr);
+	CHECK(mishka.getMouthOpen() == 0.0f);
+}
+
+TEST_CASE("Mishka has the coat of a moon bear: black, a cream crescent on the chest, a tan muzzle", "[assets][bear][animals]")
+{
+	const bibo::resources::SkinnedModel& cub = bearModel();
+	bibo::resources::SkinnedModel model = cub;
+	bibo::scene::RestingBear::paintCoat(model);
+	const BearRig rig(cub.skeleton);
+	vec3 eye = vec3(glm::inverse(cub.skeleton.bones[rig.getBone("eye.L")].inverseBind)[3]);
+	vec3 neck = vec3(glm::inverse(cub.skeleton.bones[rig.getBone("neck")].inverseBind)[3]);
+	auto brightness = [](glm::vec4 color) { return (color.r + color.g + color.b) / 3.0f; };
+	int fur = 0, darker = 0, crescent = 0, muzzle = 0;
+	for (std::size_t i = 0; i < model.colors.size(); ++i)
+	{
+		CHECK(model.colors[i].a == cub.colors[i].a); //the length of the fur
+		if (static_cast<int>(model.surfaces[i]) != bibo::resources::SkinnedModel::FUR)
+		{
+			CHECK(model.colors[i] == cub.colors[i]); //skin, eyes, nose, claws
+			continue;
+		}
+		++fur;
+		darker += brightness(model.colors[i]) < 0.5f * brightness(cub.colors[i]) ? 1 : 0;
+		vec3 point = model.positions[i];
+		if (brightness(model.colors[i]) > 0.4f)
+		{
+			++crescent;
+			//On the front of the chest, below the neck
+			CHECK(point.y < neck.y);
+			CHECK(point.z > 0.3f);
+		}
+		muzzle += point.z > eye.z && point.y < eye.y && model.colors[i].r > 0.2f ? 1 : 0;
+	}
+	CAPTURE(fur, darker, crescent, muzzle);
+	CHECK(darker > fur / 2); //black, not brown
+	CHECK(crescent > 50);
+	CHECK(muzzle > 20);
 }
 
 TEST_CASE("A knocked down bear drops its fish", "[assets][bear][ragdoll][animals]")
@@ -663,6 +771,8 @@ TEST_CASE("A knocked down bear drops its fish", "[assets][bear][ragdoll][animals
 	BearCharacter::HeldFish held;
 	CHECK_FALSE(scene.bear->getHeldFish(held));
 	CHECK_FALSE(scene.bear->canCatchFish()); //not while it tumbles
+	scene.run(5.0f);
+	CHECK(scene.bear->takeEatenFish() == 0); //it did not eat it
 }
 
 namespace

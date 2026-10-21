@@ -130,7 +130,7 @@ void BearRenderer::drawShaded(const BearRenderContext& context, glm::vec3 center
 
 	setCommonUniforms(furShader.get());
 	glUniform1i(furShader->getUniformLocation("segments"), STRAND_SEGMENTS);
-	glUniform1f(furShader->getUniformLocation("maxFurLength"), fur::MAX_LENGTH);
+	glUniform1f(furShader->getUniformLocation("maxFurLength"), maxFurLength);
 	glUniform1f(furShader->getUniformLocation("strandWidth"), STRAND_WIDTH / std::sqrt(detail)); //fewer strands are wider
 	glUniform1f(furShader->getUniformLocation("pixelSize"), pixelSize);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, skinBuffer);

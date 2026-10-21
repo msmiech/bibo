@@ -126,6 +126,7 @@ LocomotionInput BearCharacter::locomotionInput(bool jumped) const
 void BearCharacter::reset()
 {
 	fish = Fish::NONE;
+	eatenFish = 0;
 	splashes = 0;
 	jumpWasHeld = false;
 	placeAt(startPosition, startDirection);
@@ -173,6 +174,13 @@ float BearCharacter::capsuleWaterDepth() const
 float BearCharacter::getWaterDepth() const
 {
 	return waterLevel - (getPosition().y - rootOffset());
+}
+
+int BearCharacter::takeEatenFish()
+{
+	int result = eatenFish;
+	eatenFish = 0;
+	return result;
 }
 
 int BearCharacter::takeSplashes()
@@ -297,6 +305,11 @@ void BearCharacter::updateControl(float timeDelta, const BearInput& playerInput)
 		{
 			input = BearInput();
 			jumpWasHeld = playerInput.jump; //a jump needs a new press afterwards
+		}
+		else if (!lastBiteTaken)
+		{
+			lastBiteTaken = true;
+			++eatenFish;
 		}
 	}
 
@@ -446,6 +459,7 @@ bool BearCharacter::catchFish()
 		return false;
 	}
 	fish = Fish::CARRIED;
+	lastBiteTaken = false;
 	rig.stopIdle(); //e.g. it was stretching at the edge of the water
 	return true;
 }

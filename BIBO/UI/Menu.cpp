@@ -217,6 +217,10 @@ void Menu::Impl::bindHudModel()
 	constructor.Bind("race_time", &hud.raceTime);
 	constructor.Bind("checkpoints", &hud.checkpoints);
 	constructor.Bind("time_limit", &hud.timeLimit);
+	constructor.Bind("fishing", &hud.fishing);
+	constructor.Bind("fishing_time", &hud.fishingTime);
+	constructor.Bind("salmon", &hud.salmon);
+	constructor.Bind("score", &hud.score);
 	constructor.Bind("banner", &hud.banner);
 	constructor.Bind("banner_detail", &hud.bannerDetail);
 	constructor.Bind("banner_success", &hud.bannerSuccess);
@@ -387,7 +391,8 @@ bool Hud::operator==(const Hud& other) const
 	return visible == other.visible && prompt == other.prompt && promptKey == other.promptKey && speaker == other.speaker && text == other.text
 		&& canContinue == other.canContinue && continueKey == other.continueKey && choices == other.choices && selectedChoice == other.selectedChoice
 		&& countdown == other.countdown && racing == other.racing && raceTime == other.raceTime && checkpoints == other.checkpoints
-		&& timeLimit == other.timeLimit && banner == other.banner && bannerDetail == other.bannerDetail && bannerSuccess == other.bannerSuccess;
+		&& timeLimit == other.timeLimit && fishing == other.fishing && fishingTime == other.fishingTime && salmon == other.salmon
+		&& score == other.score && banner == other.banner && bannerDetail == other.bannerDetail && bannerSuccess == other.bannerSuccess;
 }
 
 void Menu::setHud(const Hud& hud)

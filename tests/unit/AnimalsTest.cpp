@@ -129,34 +129,39 @@ TEST_CASE("Salmon only jump while the bear is close to their pool, out of the wa
 	CHECK(jumps >= 4); //every now and then
 	CHECK(highest > -0.5f + 2.0f); //high enough for the bear to catch it in a jump
 	CHECK_FALSE(salmon.getDroplets().empty()); //splashes
-	CHECK(salmon.getCaughtCount() == 0);
 }
 
-TEST_CASE("The bear can catch one salmon per pool", "[animals]")
+TEST_CASE("The bear catches salmon in the air, none jump out of closed pools", "[animals]")
 {
 	SalmonPools salmon({ pool(vec3(0.0f, -0.5f, 0.0f)), pool(vec3(0.0f, -0.5f, 40.0f)) }, 5u);
 	const vec3 near(0.0f, 1.0f, 8.0f);
 	//Waits for a salmon of the first pool, then puts its mouth where the salmon is
-	int caught = -1;
-	for (int i = 0; i < 10 * 60 && caught < 0; ++i)
-	{
-		vec3 mouth = near;
-		if (!salmon.getJumps().empty() && salmon.getJumps().front().time > 0.3f)
+	auto catchOne = [&](const std::vector<bool>& closed) {
+		int caught = -1;
+		for (int i = 0; i < 10 * 60 && caught < 0; ++i)
 		{
-			mouth = salmon.getJumps().front().position();
+			vec3 mouth = near;
+			if (!salmon.getJumps().empty() && salmon.getJumps().front().time > 0.3f)
+			{
+				mouth = salmon.getJumps().front().position();
+			}
+			caught = salmon.update(FRAME, near, mouth, true, closed);
 		}
-		caught = salmon.update(FRAME, near, mouth, true);
-	}
-	REQUIRE(caught == 0);
-	CHECK(salmon.isCaught(0));
-	CHECK_FALSE(salmon.isCaught(1));
-	CHECK(salmon.getCaughtCount() == 1);
+		return caught;
+	};
+	REQUIRE(catchOne({}) == 0);
 
-	SECTION("No more salmon jump out of that pool, and none can be caught there")
+	SECTION("Open pools stay open: the bear can catch another one there")
 	{
+		CHECK(catchOne({}) == 0);
+		CHECK(catchOne({ false, false }) == 0);
+	}
+	SECTION("No more salmon jump out of a closed pool, and none can be caught there")
+	{
+		const std::vector<bool> closed = { true, false };
 		for (int i = 0; i < 3 * 60; ++i)
 		{
-			salmon.update(FRAME, near, near, true);
+			salmon.update(FRAME, near, near, true, closed);
 		}
 		for (int i = 0; i < 5 * 60; ++i)
 		{
@@ -165,8 +170,17 @@ TEST_CASE("The bear can catch one salmon per pool", "[animals]")
 				REQUIRE(jump.pool != 0);
 			}
 			vec3 mouth = salmon.getJumps().empty() ? near : salmon.getJumps().front().position();
-			REQUIRE(salmon.update(FRAME, near, mouth, true) == -1);
+			REQUIRE(salmon.update(FRAME, near, mouth, true, closed) == -1);
 		}
+	}
+	SECTION("The salmon of a pool that is closed while they are in the air cannot be caught")
+	{
+		for (int i = 0; i < 10 * 60 && (salmon.getJumps().empty() || salmon.getJumps().front().time < 0.3f); ++i)
+		{
+			salmon.update(FRAME, near, near, false);
+		}
+		REQUIRE_FALSE(salmon.getJumps().empty());
+		CHECK(salmon.update(FRAME, near, salmon.getJumps().front().position(), true, { true, true }) == -1);
 	}
 	SECTION("Not while the bear cannot catch one (it holds one already)")
 	{
@@ -177,12 +191,22 @@ TEST_CASE("The bear can catch one salmon per pool", "[animals]")
 			REQUIRE(salmon.update(FRAME, second, mouth, false) == -1);
 		}
 	}
-	SECTION("Reset: none caught")
+	SECTION("Reset: no salmon in the air")
 	{
 		salmon.reset();
-		CHECK(salmon.getCaughtCount() == 0);
 		CHECK(salmon.getJumps().empty());
+		CHECK(salmon.getDroplets().empty());
 	}
+}
+
+TEST_CASE("The largest pool is the one with the most water", "[animals]")
+{
+	CHECK(largestPool({}) == -1);
+	std::vector<WaterPool> pools = { pool(vec3(0.0f)), pool(vec3(0.0f, 0.0f, 40.0f)), pool(vec3(0.0f, 0.0f, 80.0f)) };
+	pools[0].area = 30.0f;
+	pools[1].area = 75.0f;
+	pools[2].area = 50.0f;
+	CHECK(largestPool(pools) == 1);
 }
 
 TEST_CASE("The models of the animals are closed meshes of the right size", "[animals]")

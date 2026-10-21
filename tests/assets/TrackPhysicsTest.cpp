@@ -113,7 +113,7 @@ TEST_CASE("The bear starts standing on the terrain without touching a hedgehog",
 	vec3 position = run.end();
 	CAPTURE(track.bearStart, position);
 	CHECK(run.supported);
-	CHECK_FALSE(rules::hasFallenOff(position)); //did not fall through the terrain onto the ground box
+	CHECK(position.y > worldGenerator().getSeaLevel() + 1.0f); //did not fall through the terrain into the sea
 	CHECK(std::abs(position.y - track.bearStart.y) < 2.0f); //starts close to the surface
 	CHECK(glm::distance(vec3(position.x, 0.0f, position.z), vec3(track.bearStart.x, 0.0f, track.bearStart.z)) < 0.5f); //does not slide away
 	for (BodyHandle hedgehog : track.hedgehogs)
@@ -143,7 +143,7 @@ TEST_CASE("Going backwards from the start neither passes a checkpoint nor comple
 	CHECK(nextCheckpoint == 0);
 }
 
-TEST_CASE("In the sea next to the island the bear falls onto the ground box and the game is lost", "[assets][physics][bear][rules][world]")
+TEST_CASE("Far out in the sea there is ground under the water (the bear swims above it)", "[assets][physics][bear][world]")
 {
 	TrackPhysics track;
 	const vec3 sea(600.0f, 10.0f, 600.0f);
@@ -152,8 +152,8 @@ TEST_CASE("In the sea next to the island the bear falls onto the ground box and 
 	TrackPhysics::Run run = track.moveBear(sea, 5.0f, DOWN);
 
 	CAPTURE(run.end());
-	CHECK(run.supported);
-	CHECK(rules::hasFallenOff(run.end()));
+	CHECK(run.supported); //it does not fall forever
+	CHECK(run.end().y < worldGenerator().getSeaLevel() - 2.0f);
 }
 
 TEST_CASE("The ground of the physics world is the terrain of the track", "[assets][physics][world]")

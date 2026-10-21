@@ -10,19 +10,11 @@ namespace bibo
 	namespace scene
 	{
 		/**
-		* Win and lose conditions of the race: a lap is complete when the bear reaches the finish line after it passed
-		* all checkpoints along the track in their order. The bear starts on the finish line.
+		* Rules of the race around the track (RaceQuest): a lap is complete when the bear reaches the finish line after it
+		* passed all checkpoints along the track in their order. The race starts at the finish line.
 		*/
 		namespace rules
 		{
-			//The bear fell off the track (e.g. into the water) when it is below this height
-			const float FALL_OFF_HEIGHT = -1.1f;
-
-			inline bool hasFallenOff(glm::vec3 playerPosition)
-			{
-				return playerPosition.y < FALL_OFF_HEIGHT;
-			}
-
 			/**
 			* Checkpoints along the track in driving direction (x and z in world coordinates, where the salmon of the model are placed).
 			* Going backwards from the start reaches them in the wrong order, so the bear has to go around the whole track.

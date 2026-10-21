@@ -76,6 +76,16 @@ namespace bibo
 			*/
 			void snapBehind(const FollowTarget& target);
 			/**
+			* A shot of a cutscene or a conversation: the camera goes smoothly to the eye and looks at the target (it does not go
+			* into the terrain). Following the target again (follow) blends smoothly from the shot back to the camera behind it.
+			* @param cut Jumps there at once
+			*/
+			void shot(vec3 eye, vec3 target, float time_delta, bool cut = false);
+			/**
+			* @return true while the camera shows a shot (until it follows again)
+			*/
+			bool isInShot() const { return inShot; }
+			/**
 			* Turns the camera (mouse, right stick). Locked it moves around the target, unlocked it turns where it is.
 			* @param right Radians to the right
 			* @param down Radians down (the locked camera goes up)
@@ -163,6 +173,10 @@ namespace bibo
 			float timeSinceRotated = 0.0f;
 			bool recentering = false;
 			CollisionProbe collisionProbe;
+			//Shots of cutscenes and conversations
+			bool inShot = false;
+			float shotBlend = 0.0f; //1 right after a shot ended: blends from the shot to the following camera
+			vec3 shotPosition = vec3(0.0f), shotDirection = vec3(0.0f, 0.0f, 1.0f);
 
 			bool locked = true;
 			bool lockKeyWasPressed = false;

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Records the gameplay GIF of the README: the game plays tools/readme_demo.txt (menus, graphics settings, gameplay)
+# Records the gameplay GIF of the README: the game plays tools/readme_demo.txt (main menu, a conversation, the start of a race)
 # with a fixed time step, writes every frame to a file and FFmpeg converts the frames to a GIF.
 #
 #   tools/record_gameplay.sh <build folder> [<GIF file>]
 #
 # The GIF file defaults to Screenshots/bibo_gameplay.gif. Needs FFmpeg and a display with OpenGL 4.3; on a server without one:
 #   xvfb-run -a -s "-screen 0 1280x720x24" tools/record_gameplay.sh build
-# Environment variables: WIDTH and HEIGHT of the game window (default 960x540), GIF_WIDTH (default 640), FPS (default 12)
+# Environment variables: WIDTH and HEIGHT of the game window (default 960x540), GIF_WIDTH (default 480), FPS (default 10)
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
@@ -15,8 +15,8 @@ gif=${2:-$repo/Screenshots/bibo_gameplay.gif}
 demo=$repo/tools/readme_demo.txt
 width=${WIDTH:-960}
 height=${HEIGHT:-540}
-gif_width=${GIF_WIDTH:-640}
-fps=${FPS:-12}
+gif_width=${GIF_WIDTH:-480}
+fps=${FPS:-10}
 
 game=$build/BIBO
 if [ ! -x "$game" ]; then

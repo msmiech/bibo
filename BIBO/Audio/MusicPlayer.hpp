@@ -1,14 +1,15 @@
 #pragma once
 #include <memory>
+#include "SoundEffects.hpp"
 
 namespace bibo
 {
 	namespace audio
 	{
 		/**
-		* Plays the music of the race (composeIslandTune) in a loop on the default audio device (based on miniaudio).
-		* The music is synthesized by a background thread, it starts when it is ready. Without an audio device
-		* (e.g. on a server) the game runs silently.
+		* Plays the music of the island (composeIslandTune) in a loop and the sound effects on the default audio device (based on
+		* miniaudio). The music and the sounds are synthesized by a background thread, they start when they are ready. Without an
+		* audio device (e.g. on a server) the game runs silently.
 		*/
 		class MusicPlayer
 		{
@@ -26,6 +27,16 @@ namespace bibo
 			* @param volume 0 to 1
 			*/
 			void setVolume(float volume);
+			/**
+			* Plays a sound once, on top of the music (ignored while the sounds are not synthesized yet)
+			* @param variant See soundEffectVariants (wraps around)
+			* @param volume 0 to 1
+			*/
+			void play(SoundEffect effect, int variant = 0, float volume = 1.0f);
+			/**
+			* Switches the sound effects on or off (the music is switched with setEnabled)
+			*/
+			void setEffectsEnabled(bool enabled);
 			/**
 			* @return false if there is no audio device
 			*/

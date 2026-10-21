@@ -49,10 +49,12 @@ The game can play a demo script and record raw frames (fixed time step, default 
 
 ```bash
 cd build
-./BIBO --demo <script.txt> --record <frames.rgb> --fps 4 960 540 0
-ffmpeg -loglevel error -f rawvideo -pixel_format rgb24 -video_size 960x540 -i <frames.rgb> -vf "vflip,select='not(mod(n\,4))'" -fps_mode passthrough frame_%02d.png
+./BIBO --demo <script.txt> --record <frames.rgb> --fps 10 960 540 0
+ffmpeg -loglevel error -f rawvideo -pixel_format rgb24 -video_size 960x540 -i <frames.rgb> -vf "vflip,select='not(mod(n\,10))'" -fps_mode passthrough frame_%02d.png
 ```
 
+Record with `--fps 10` or more: the game advances at most 0.1 s per frame, so at fewer frames per second it runs in slow motion
+compared with the times of the script (presses land later in the game than planned).
 Script commands: `wait <s>`, `press <key>`, `hold <key> <s>`, `quit` (see `BIBO/Util/DemoScript.hpp`, example `tools/readme_demo.txt`).
 The first focused main menu button can follow the mouse, so press `Up` before `Enter` to start the game.
 Keep scratch scripts, recordings and frames outside of the repository.

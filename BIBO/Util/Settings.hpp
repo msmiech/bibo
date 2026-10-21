@@ -43,6 +43,7 @@ namespace bibo
 
 		//Sound
 		bool music = true;
+		bool soundEffects = true;
 
 		/**
 		* Reads the settings written by save(). Missing entries keep their current value, invalid ones are ignored.

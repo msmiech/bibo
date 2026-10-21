@@ -1,4 +1,5 @@
 #pragma once
+#include <limits>
 #include <memory>
 #include <vector>
 #include <glm/glm.hpp>
@@ -32,6 +33,8 @@ namespace bibo
 		* then it gets up and the player controls it again.
 		* A fish that the bear catches stays in its mouth until it stands on the ground, then the bear sits down and eats it
 		* (the player can only move it again after the last bite).
+		* In deep water the bear swims: it floats with its head and back out of the water and paddles (slower than it runs),
+		* a jump at the surface helps it out onto the shore.
 		*/
 		class BearCharacter
 		{
@@ -80,6 +83,11 @@ namespace bibo
 			//Jump: how high the bear gets when the button is held until the highest point, and how long it rises (a shorter press jumps lower)
 			static constexpr float JUMP_HEIGHT = 3.0f;
 			static constexpr float JUMP_RISE_TIME = 0.4f;
+			//Swimming speed (m/s)
+			static constexpr float SWIM_SPEED = 4.0f;
+			//The bear swims when the ground under it is this deep under the water surface (it stops in shallower water),
+			//it floats with its paws this deep in the water
+			static constexpr float SWIM_DEPTH = 0.75f, WADE_DEPTH = 0.55f, FLOAT_DEPTH = 0.85f;
 
 			/**
 			* Call after the physics world was updated
@@ -94,6 +102,37 @@ namespace bibo
 			* Back to the start, standing (e.g. when the game is restarted)
 			*/
 			void reset();
+			/**
+			* Where reset puts the bear
+			* @param position Center of the character capsule
+			*/
+			void setStart(glm::vec3 position, glm::vec3 direction);
+			glm::vec3 getStartPosition() const { return startPosition; }
+			/**
+			* From the center of the character capsule down to the ground it stands on
+			*/
+			static float groundOffset();
+			/**
+			* Puts the bear somewhere else, standing and looking in a direction (e.g. at the start of a race)
+			* @param position Center of the character capsule
+			*/
+			void placeAt(glm::vec3 position, glm::vec3 direction);
+			/**
+			* Height of the water surface (the sea and the pools of the island), the bear swims where it is deep enough.
+			* Without water (the default) it never swims.
+			*/
+			void setWaterLevel(float level) { waterLevel = level; }
+			float getWaterLevel() const { return waterLevel; }
+			/**
+			* The bear looks at a point with its head and eyes (e.g. the face of the animal it talks to); it does not start
+			* idle animations meanwhile (it stops stretching or yawning)
+			*/
+			void lookAt(glm::vec3 target) { rig.lookAt(target); }
+			void stopLooking() { rig.stopLooking(); }
+			/**
+			* Between the eyes (world space)
+			*/
+			glm::vec3 getHeadPosition() const { return rig.getHeadPosition(); }
 			/**
 			* Plays an idle animation now (they also start on their own when the player does not move the bear for a while)
 			*/
@@ -130,7 +169,19 @@ namespace bibo
 			/**
 			* @return true while the bear is in the air (jumping or falling)
 			*/
-			bool isAirborne() const { return state == State::CONTROL && !standingOnGround; }
+			bool isAirborne() const { return state == State::CONTROL && !standingOnGround && !swimming; }
+			/**
+			* @return true while the bear swims (floats in deep water)
+			*/
+			bool isSwimming() const { return state == State::CONTROL && swimming; }
+			/**
+			* @return How deep the paws are in the water (negative: above the water surface), also while the bear tumbles
+			*/
+			float getWaterDepth() const;
+			/**
+			* @return How often the bear went into deep water since the last call (e.g. for a splash)
+			*/
+			int takeSplashes();
 			/**
 			* @return true for a moment after getting up, when hits do not knock the bear down
 			*/
@@ -162,6 +213,10 @@ namespace bibo
 			void setState(State newState);
 			void updateControl(float timeDelta, const BearInput& input);
 			/**
+			* @return How deep the paws of the character capsule are in the water (negative: above the water surface)
+			*/
+			float capsuleWaterDepth() const;
+			/**
 			* Turns the bear and changes its speed (on the ground)
 			* @return The speed the bear should run at (m/s)
 			*/
@@ -176,8 +231,8 @@ namespace bibo
 
 			physics::PhysicsWorld& world;
 			const resources::SkinnedModel& model;
-			const glm::vec3 startPosition;
-			const glm::vec3 startDirection;
+			glm::vec3 startPosition;
+			glm::vec3 startDirection;
 			physics::CharacterController::HitCallback onHit;
 			std::unique_ptr<physics::CharacterController> controller;
 			BearRig rig;
@@ -198,6 +253,10 @@ namespace bibo
 			bool jumpWasHeld = false;
 			float fallingTime = 0.0f; //getting up
 			bool standingOnGround = false;
+			//Swimming
+			float waterLevel = std::numeric_limits<float>::lowest();
+			bool swimming = false;
+			int splashes = 0;
 			bool knockDownPending = false;
 			physics::CharacterController::Hit pendingHit;
 			float stateTime = 0.0f, restTime = 0.0f, protectedTime = 0.0f;

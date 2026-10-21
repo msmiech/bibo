@@ -25,6 +25,8 @@ namespace
 	const float RETURN_HALF_LIFE = 0.2f;
 	//The field of view widens a bit at full speed
 	const float BASE_APERTURE = 60.0f, SPEED_APERTURE = 6.0f;
+	//Shots: how fast the camera moves to the eye and turns to the target, how long it blends back to following
+	const float SHOT_MOVE_HALF_LIFE = 0.3f, SHOT_TURN_HALF_LIFE = 0.12f, SHOT_BLEND_TIME = 0.8f;
 
 	float wrapAngle(float angle)
 	{
@@ -140,8 +142,35 @@ void Camera::snapBehind(const FollowTarget& target)
 	timeSinceRotated = 0.0f;
 	recentering = false;
 	aperture = BASE_APERTURE;
+	inShot = false;
+	shotBlend = 0.0f;
 	applyAngles();
 	placeAroundPivot(0.0f);
+}
+
+void Camera::shot(vec3 eye, vec3 target, float time_delta, bool cut)
+{
+	if (collisionProbe)
+	{
+		eye = target + (eye - target) * std::clamp(collisionProbe(target, eye, COLLISION_RADIUS), 0.0f, 1.0f);
+	}
+	if (cut || (!inShot && shotBlend <= 0.0f))
+	{
+		position = eye;
+		setDirection(target - eye);
+	}
+	else
+	{
+		position += (eye - position) * smoothingFactor(SHOT_MOVE_HALF_LIFE, time_delta);
+		vec3 wanted = target - position;
+		if (length(wanted) > 1e-4f)
+		{
+			setDirection(mix(direction, normalize(wanted), smoothingFactor(SHOT_TURN_HALF_LIFE, time_delta)));
+		}
+	}
+	aperture += (BASE_APERTURE - aperture) * smoothingFactor(0.3f, time_delta);
+	inShot = true;
+	shotBlend = 0.0f;
 }
 
 void Camera::follow(const FollowTarget& target, float time_delta)
@@ -154,6 +183,17 @@ void Camera::follow(const FollowTarget& target, float time_delta)
 	if (time_delta <= 0.0f)
 	{
 		return;
+	}
+	if (inShot)
+	{
+		//Back from a shot: the camera orbits from where the shot looked and blends over from where it was
+		inShot = false;
+		shotBlend = 1.0f;
+		shotPosition = position;
+		shotDirection = direction;
+		setDirection(direction);
+		pitch = std::clamp(pitch, MIN_PITCH, MAX_PITCH);
+		timeSinceRotated = 0.0f;
 	}
 
 	vec3 goal = pivotOf(target);
@@ -190,6 +230,13 @@ void Camera::follow(const FollowTarget& target, float time_delta)
 	aperture += (targetAperture - aperture) * smoothingFactor(0.3f, time_delta);
 
 	placeAroundPivot(time_delta);
+	if (shotBlend > 0.0f)
+	{
+		float weight = shotBlend * shotBlend * (3.0f - 2.0f * shotBlend);
+		position = mix(position, shotPosition, weight);
+		direction = normalize(mix(direction, shotDirection, weight));
+		shotBlend = std::max(0.0f, shotBlend - time_delta / SHOT_BLEND_TIME);
+	}
 }
 
 void Camera::placeAroundPivot(float time_delta)

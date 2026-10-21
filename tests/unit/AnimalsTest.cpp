@@ -9,6 +9,8 @@
 #include "Resources/SkinnedModel.hpp"
 #include "Scene/Hedgehog.hpp"
 #include "Scene/HedgehogModel.hpp"
+#include "Scene/Beaver.hpp"
+#include "Scene/BeaverModel.hpp"
 #include "Scene/Salmon.hpp"
 #include "TestSupport.hpp"
 
@@ -255,4 +257,155 @@ TEST_CASE("The hedgehog has spines on its back, fur on its face and belly, eyes,
 		}
 	}
 	CHECK(front > 0.5f);
+}
+
+TEST_CASE("The beaver sits upright: fur, orange front teeth, eyes, a nose, a mouth, claws and a flat tail", "[animals][beaver]")
+{
+	using bibo::resources::SkinnedModel;
+	BeaverModel model = BeaverModel::build();
+	const std::size_t vertices = model.positions.size();
+	REQUIRE(vertices > 0);
+	REQUIRE(model.normals.size() == vertices);
+	REQUIRE(model.colors.size() == vertices);
+	REQUIRE(model.surfaces.size() == vertices);
+	REQUIRE(model.parts.size() == vertices);
+	REQUIRE(model.combs.size() == vertices);
+	REQUIRE(model.indices.size() % 3 == 0);
+	for (unsigned int index : model.indices)
+	{
+		REQUIRE(index < vertices);
+	}
+	CHECK(model.spineTriangles.empty()); //no spines
+	CHECK(model.furTriangles.size() > model.indices.size() / 3); //fur on most of it
+
+	int surfaces[7] = {};
+	int parts[BeaverModel::PART_COUNT] = {};
+	for (std::size_t v = 0; v < vertices; ++v)
+	{
+		surfaces[static_cast<int>(model.surfaces[v])]++;
+		REQUIRE(model.parts[v] >= 0);
+		REQUIRE(model.parts[v] < BeaverModel::PART_COUNT);
+		parts[model.parts[v]]++;
+		REQUIRE(std::abs(glm::length(model.normals[v]) - 1.0f) < 1e-3f);
+		REQUIRE(std::abs(glm::length(model.combs[v]) - 1.0f) < 1e-3f);
+	}
+	CHECK(surfaces[SkinnedModel::EYE] > 0);
+	CHECK(surfaces[SkinnedModel::NOSE] > 0);
+	CHECK(surfaces[SkinnedModel::TEETH] > 0);
+	CHECK(surfaces[SkinnedModel::MOUTH] > 0);
+	CHECK(surfaces[SkinnedModel::TONGUE] > 0);
+	CHECK(surfaces[SkinnedModel::CLAW] > 0);
+	for (int part = 0; part < BeaverModel::PART_COUNT; ++part)
+	{
+		CAPTURE(part);
+		CHECK(parts[part] > 0);
+	}
+	//The teeth are orange
+	for (std::size_t v = 0; v < vertices; ++v)
+	{
+		if (model.surfaces[v] == SkinnedModel::TEETH)
+		{
+			REQUIRE(model.colors[v].r > 2.0f * model.colors[v].g);
+			REQUIRE(model.colors[v].g > model.colors[v].b);
+		}
+	}
+	//The body sits on the ground and is about 1 high with its head (the head is in the space of the neck)
+	float bottom = 1e9f, top = -1e9f;
+	for (std::size_t v = 0; v < vertices; ++v)
+	{
+		if (model.parts[v] == BeaverModel::BODY)
+		{
+			bottom = std::min(bottom, model.positions[v].y);
+		}
+		if (model.parts[v] == BeaverModel::HEAD)
+		{
+			top = std::max(top, model.positions[v].y + BEAVER_NECK.y);
+		}
+	}
+	CHECK(bottom >= -0.01f);
+	CHECK(bottom < 0.05f);
+	CHECK(top > 0.9f * BEAVER_HEIGHT);
+	CHECK(top < 1.1f * BEAVER_HEIGHT);
+}
+
+TEST_CASE("The beaver turns to the bear when it comes close, talks with its mouth and cheers", "[animals][beaver]")
+{
+	const vec3 home(10.0f, 2.0f, -5.0f);
+	Beaver beaver(home, vec3(1.0f, 0.0f, 0.0f));
+	std::vector<glm::mat4> pose = beaver.getPose();
+	REQUIRE(pose.size() == static_cast<std::size_t>(BeaverModel::PART_COUNT));
+	auto forward = [&]() {
+		glm::mat4 body = beaver.getPose()[BeaverModel::BODY];
+		return glm::normalize(vec3(body[2].x, 0.0f, body[2].z));
+	};
+	CHECK(glm::dot(forward(), vec3(1.0f, 0.0f, 0.0f)) > 0.99f);
+	//Sitting on the ground, the marker above its head
+	CHECK(std::abs(vec3(pose[BeaverModel::BODY][3]).y - home.y) < 0.05f);
+	CHECK(beaver.getMarkerPosition().y > home.y + BEAVER_HEIGHT * Beaver::SCALE);
+	CHECK(beaver.getColliderRadius() > 0.5f);
+
+	SECTION("A bear far away is not noticed")
+	{
+		for (int i = 0; i < 120; ++i)
+		{
+			beaver.update(FRAME, home + vec3(0.0f, 1.0f, -40.0f));
+		}
+		CHECK(glm::dot(forward(), vec3(1.0f, 0.0f, 0.0f)) > 0.99f);
+	}
+	SECTION("A bear close by: it turns to it")
+	{
+		for (int i = 0; i < 120; ++i)
+		{
+			beaver.update(FRAME, home + vec3(0.0f, 1.0f, -6.0f));
+		}
+		CHECK(glm::dot(forward(), vec3(0.0f, 0.0f, -1.0f)) > 0.95f);
+	}
+	SECTION("Its eyes look at the bear: up when the bear is above its face")
+	{
+		auto gazeY = [&](vec3 bear) {
+			for (int i = 0; i < 120; ++i)
+			{
+				beaver.update(FRAME, bear);
+			}
+			glm::mat3 eye(beaver.getPose()[BeaverModel::EYE_LEFT]);
+			return glm::normalize(eye * BeaverModel::eyeGaze(true)).y;
+		};
+		vec3 face = beaver.getFacePosition();
+		float level = gazeY(face + vec3(4.0f, 0.0f, 0.0f));
+		float above = gazeY(face + vec3(3.0f, 3.0f, 0.0f));
+		CHECK(above > level + 0.2f);
+		CHECK(beaver.getFacePosition().y > face.y - 0.5f);
+	}
+	SECTION("Every sound opens and closes the mouth")
+	{
+		beaver.setTalking(true);
+		CHECK(beaver.isTalking());
+		beaver.update(FRAME, home);
+		CHECK(beaver.getMouthOpen() < 0.05f);
+		beaver.speak();
+		float widest = 0.0f;
+		for (int i = 0; i < 12; ++i)
+		{
+			beaver.update(FRAME, home);
+			widest = std::max(widest, beaver.getMouthOpen());
+		}
+		CHECK(widest > 0.8f);
+		CHECK(beaver.getMouthOpen() < 0.1f);
+	}
+	SECTION("Cheering: it hops")
+	{
+		beaver.cheer();
+		float highest = home.y;
+		for (int i = 0; i < 60; ++i)
+		{
+			beaver.update(FRAME, home + vec3(0.0f, 1.0f, -6.0f));
+			highest = std::max(highest, vec3(beaver.getPose()[BeaverModel::BODY][3]).y);
+		}
+		CHECK(highest > home.y + 0.1f);
+		CHECK(std::abs(vec3(beaver.getPose()[BeaverModel::BODY][3]).y - home.y) < 0.05f); //back on the ground
+	}
+	for (const glm::mat4& part : beaver.getPose())
+	{
+		REQUIRE(std::isfinite(part[3].x + part[3].y + part[3].z));
+	}
 }

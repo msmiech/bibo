@@ -1,9 +1,10 @@
 # <img src="Icon/bibo.png" width="48" height="48" alt=""> Bear-In Bear-Out
 [![Build](https://github.com/msmiech/bibo/actions/workflows/build.yml/badge.svg)](https://github.com/msmiech/bibo/actions/workflows/build.yml)
 
-Bear-In Bear-Out (BIBO) is a simple 3D game in which the objective is to complete a lap as fast as possible, avoid the hedgehogs on the way and catch salmon for bonus points
+Bear-In Bear-Out (BIBO) is a simple 3D game about a bear cub on an island: roam the forest, swim, catch salmon for bonus points and take on the race around the track of Bober the beaver,
+a lap against the clock past the hedgehogs on the way
 
-![Main menu, graphics settings and gameplay](Screenshots/bibo_gameplay.gif)
+![Main menu, the conversation with Bober the beaver and the start of the race](Screenshots/bibo_gameplay.gif)
 
 The GIF is recorded by the [README GIF workflow](.github/workflows/readme-gif.yml) when a pull request is opened:
 the game plays the input of [tools/readme_demo.txt](tools/readme_demo.txt) (`BIBO --demo <script> --record <file>`)
@@ -16,11 +17,19 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
   * World partitioning, streaming and level of detail: the island is split into chunks that worker threads mesh in the level of detail their distance needs, the vegetation is drawn instanced with levels of detail and fades out in the distance; the physics world only contains the terrain and the trees around the bear
   * Physically based materials (generated when the game starts): forest floor, the dirt trail, granite, snow, sand, bark, needles and leaves
   * A bright polar day: low sun, clouds and polar lights (aurora) in the sky, cascaded shadow maps, fog, falling snow and simple water
+* The race is a quest (see [The race quest](#the-race-quest) below)
+  * Bober, a beaver, sits next to the starting line with a glowing exclamation mark above its head. Talk to it (E, or Square / X on a gamepad) and it asks whether the bear would like to give the race track a shot
+  * The conversation appears letter by letter on the screen while the beaver chatters, squeaks and gestures (it makes beaver sounds, it does not speak); answer yes or no at the end.
+    The bear and the beaver turn their heads and eyes to each other
+  * Yes: a short cutscene, the bear walks up to the starting line, a countdown 3, 2, 1 and the timer starts. The lap is complete at the finish line after all checkpoints along the track in their order
+  * The race fails after 5 minutes, when the bear leaves the track or falls into the water; the beaver offers it again. After a completed lap it offers to improve the best time (its exclamation mark turns blue)
+  * Outside of the race there is no lap, no timer and no checkpoint display: the bear roams freely
 * Animals on the track (see [The animals](#the-animals) below)
   * Large hedgehogs stroll around on the track, rendered like the bear (banded spines and fur as strands, the same eyes and skin): they walk with little steps, stop to sniff around and walk on. Running into one knocks the bear over (ouch, the spines) and its spines stand up
   * Salmon jump out of the pools of water on the track when the bear comes close. The bear can catch one per pool (e.g. when it jumps over the water) for 100 bonus points:
     it carries the fish in its mouth and as soon as it is on the ground it sits down, holds it in its front paws, takes three big bites, chews happily with closed eyes and licks its lips
 * Music: a cheerful, looping calypso with steel drum, whistle, marimba, bass, percussion and slapstick effects, synthesized by the game (see [The music](#the-music) below)
+* Sound effects, also synthesized: the chatter of the beaver, the beeps of the countdown, a ding at every checkpoint, jingles for a completed or failed race and the splash when the bear falls into the water
 * The player character is a young brown bear (see [The bear](#the-bear) below)
   * Skeleton with inverse kinematics: procedural walking and bounding with the paws planted on the terrain, the body follows slopes and leans into turns
   * Strand based fur that is generated on the GPU and reacts to movement, wind, the ground, obstacles and hits
@@ -29,6 +38,7 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
   * Idle animations when it stands still for a while: it sits down and stretches (and sticks its tongue out), or sits down and yawns
   * Jumps in a natural arc: holding the button jumps higher, it can still jump right after running over an edge and a jump pressed shortly before landing happens on landing; in the air the bear keeps its momentum
   * Jump animation: the hind legs push off, the legs tuck in, before landing they reach for the ground and the landing is absorbed (the harder, the deeper)
+  * Swims in deep water (the pools on the track and the sea): it floats with its head and back out of the water and paddles (dog paddle), a jump at the surface helps it out onto the shore
 * Third person camera
   * Orbits around the bear with the mouse or the right stick, the mouse wheel zooms, it goes back behind the running bear on its own
   * Does not go into the terrain or through the trees (sphere cast into the physics world)
@@ -36,21 +46,23 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
 * Movable objects with physics (based on Jolt Physics, originally Nvidia PhysX)
 * Texture Mapping (including normal maps)
 * Lighting and Materials
-* A lap around the track: the finish line only counts after all checkpoints along the track were passed in order
 * Keyboard and mouse controls
   * WASD or arrow keys to run (relative to the camera)
   * Mouse to look around, mouse wheel to zoom, middle mouse button to put the camera behind the bear
   * Space bar to jump (hold to jump higher)
+  * E to talk (Enter, Space or E go on in a conversation, the arrow keys choose the answer)
   * R to restart
   * ESC for the pause menu
   * F-Keys for settings and debug features (F1 for help)
 * Gamepad controls (e.g. Sony DualSense, Xbox Series controller)
   * Left stick to run, right stick to look around (press it to put the camera behind the bear)
   * Cross / A to jump (hold to jump higher)
+  * Square / X to talk, Cross / A to go on in a conversation, the D-pad or the left stick to choose the answer
   * Options / Start for the pause menu, D-pad, Cross / A and Circle / B in the menus
   * Other controllers work if GLFW knows them; newer mappings can be added in a `gamecontrollerdb.txt` ([SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB)) in the game folder
-* Settings for the camera sensitivity and inverting the camera up/down, and for the music (on or off)
-* Main menu, pause menu, game over menu (restart the run or back to the main menu) and settings menu (based on RmlUi, usable with mouse, keyboard or gamepad)
+* Settings for the camera sensitivity and inverting the camera up/down, for the music and the sound effects (on or off)
+* Main menu, pause menu (resume, restart, settings, back to the main menu) and settings menu (based on RmlUi, usable with mouse, keyboard or gamepad);
+  the conversations, the countdown and the time of the race are shown with RmlUi too
   * Graphics settings (VSync, HDR, bloom, shadows, normal mapping, transparency, texture filtering, mipmapping, wireframe)
   * Resolution and window mode (windowed, fullscreen or borderless)
 * Supports complex models (Collada scenes and skinned glTF models)
@@ -185,9 +197,9 @@ ctest --test-dir build --output-on-failure
 ```
 
 The tests are in the `tests` folder:
-* `unit`: game rules (falling off the track, checkpoints in their order, the finish line), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions, a moving hedgehog touching the bear, ray casts, sphere casts, ragdolls falling and coming to rest with connected joints), animation (transforms, forward kinematics, two bone IK, springs), the fur (guide hairs lag behind, hang down, lie on the ground and on obstacles, hits ruffle them; strand placement), the view frustum (compared with the camera matrices for random cameras), math helpers, the generated textures, the input (stick dead zones, moving relative to the camera), the noise of the world, the worker threads, the shadow cascades (they cover their slice of the view and move in whole texels), the includes of the shader files, the animals (hedgehogs stroll around their home and stay on the ground they can walk on, salmon jump only near the bear, high enough to be caught, one per pool; the generated models) and the music (the notation of the melodies, a loud enough loop without a click where it starts again, the same every time)
-* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart; the world (the height field of the track matches its mesh, the path goes around the lap through the checkpoints on the floor of the canyon, the ground on the track is the track terrain, the island is surrounded by sea with beaches and cliffs, the caves leave room for the bear to run and jump, the pools of water on the track are deep enough for salmon, the hedgehogs stay on the floor of the track, neighboring chunks fit together without cracks, the levels of detail, trees grow next to the track but not on it, the streaming of the chunks, the vegetation and the physics); the bear model (its skeleton matches its skinning, it stands on the ground and fits its capsule, fur and bare skin, eyes, mouth, tongue, teeth and claws) and the bear in action (paws planted while it runs, knocked down by a rock it tumbles, gets up and runs again, rolling over from its back, idle animations and how moving interrupts them, carrying and eating a caught fish (and dropping it when it is knocked down), blinking and looking around, steering, jumping higher the longer the button is held, jumping after running over an edge and just before landing, the legs reaching for the ground and landing without jumping paws)
-* `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the generated materials and the sky, the camera (orbiting, following, going back behind the bear, keeping out of obstacles) and the whole scene (a frame of the renderer, culling never removes a visible pixel and leaves out the chunks and plants that are not in view, the camera never goes into the terrain of the track). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
+* `unit`: game rules (checkpoints in their order, the finish line), the race quest (the conversation letter by letter with sounds and answers, accepting and declining, the countdown, completing a lap and improving the best time, failing in the water, off the track or after the time limit), physics (gravity, ground, walls, the bear walking, climbing, sliding and jumping, rock collisions, a moving hedgehog touching the bear, ray casts, sphere casts, ragdolls falling and coming to rest with connected joints), animation (transforms, forward kinematics, two bone IK, springs), the fur (guide hairs lag behind, hang down, lie on the ground and on obstacles, hits ruffle them; strand placement), the view frustum (compared with the camera matrices for random cameras), math helpers, the generated textures, the input (stick dead zones, moving relative to the camera), the noise of the world, the worker threads, the shadow cascades (they cover their slice of the view and move in whole texels), the includes of the shader files, the animals (hedgehogs stroll around their home and stay on the ground they can walk on, salmon jump only near the bear, high enough to be caught, one per pool; the beaver turns to the bear, talks with its mouth and cheers; the generated models) and the music and the sound effects (the notation of the melodies, a loud enough loop without a click where it starts again, the same every time; the sounds are short, not silent and do not click)
+* `assets`: the content of the asset files, e.g. every node the game loads exists in the track, the bear starts on the terrain and on the finish line, going backwards from the start does not count, the checkpoints are apart; the world (the height field of the track matches its mesh, the path goes around the lap through the checkpoints on the floor of the canyon, the ground on the track is the track terrain, the island is surrounded by sea with beaches and cliffs, the caves leave room for the bear to run and jump, the pools of water on the track are deep enough for salmon, the hedgehogs stay on the floor of the track, neighboring chunks fit together without cracks, the levels of detail, trees grow next to the track but not on it, the streaming of the chunks, the vegetation and the physics); the bear model (its skeleton matches its skinning, it stands on the ground and fits its capsule, fur and bare skin, eyes, mouth, tongue, teeth and claws) and the bear in action (paws planted while it runs, knocked down by a rock it tumbles, gets up and runs again, rolling over from its back, idle animations and how moving interrupts them, carrying and eating a caught fish (and dropping it when it is knocked down), blinking and looking around, steering, jumping higher the longer the button is held, jumping after running over an edge and just before landing, the legs reaching for the ground and landing without jumping paws, swimming in deep water with its head above it and jumping out onto the shore); the race track counts as the track of the race quest, the forest and the sea do not
+* `gl`: everything that needs an OpenGL 4.3 context: shaders, textures, models and their bounding spheres, the generated materials and the sky, the camera (orbiting, following, going back behind the bear, keeping out of obstacles) and the whole scene (a frame of the renderer, culling never removes a visible pixel and leaves out the chunks and plants that are not in view, the camera never goes into the terrain of the track, the bear talks to the beaver and is brought to the starting line for the countdown). These tests are reported as *skipped* if no context can be created (no display, no OpenGL 4.3).
   On Linux servers without a graphics card they run on a virtual X server with Mesa's software renderer: `xvfb-run -a ctest --test-dir build --output-on-failure`
 
 Every test case is a separate CTest test and its Catch2 tags become CTest labels, e.g. only the physics tests: `ctest --test-dir build -L physics`.
@@ -252,6 +264,8 @@ The script also saves `Model/BearCub/BearCub.blend` to look at the result, and `
 When walking and bounding, the paws are planted where they land (found with ray casts) and the legs reach them with two bone inverse kinematics;
 the body bobs with the steps, follows the ground and leans into turns. Ears and tail are springs, the eyes make saccades and blink with their lids.
 The idle animations (stretching, yawning) and getting up are key poses of the body, the paws and the face, also solved with IK.
+The head and the eyes can look at a point (`lookAt`): the eyes get there first, the head follows, and the eyes keep what the head cannot turn;
+the bear looks at the beaver's face while they talk and does not start an idle animation meanwhile.
 In a jump the hind paws push off from where they left the ground, the legs tuck in, and when a ray cast finds that the ground is close (by the falling speed)
 the legs reach for it; on landing the paws are put down where they are, springs dip the body and the nose and the steps blend in.
 
@@ -263,6 +277,12 @@ Further away fewer, wider strands are drawn.
 
 **Ragdoll** (`BIBO/Scene/BearCharacter.cpp`): running into a hedgehog starts a Jolt ragdoll (capsules with swing-twist and hinge joints) from the current pose and
 velocities. When it lies still, the bear rolls over if it is on its back, pushes itself up, shakes its fur and gets back the control.
+
+**Swimming** (`BIBO/Scene/BearCharacter.cpp`, `BIBO/Scene/BearRig.cpp`): the water of the island (the sea and the pools on the track) has one level, the sea level of the world.
+Where the ground is deep enough under it, the bear swims: buoyancy pulls the character capsule to its floating depth (it bobs a little, a fall into the water is slowed down),
+it paddles slower than it runs and turns slower, and it walks again where the water gets shallow. A jump at the surface lifts it out onto a shore that is too high to step on.
+The animation is a dog paddle: the paws go round in circles under the body, diagonal pairs of legs together, with wider and faster strokes when it swims fast;
+the head is held up, the ears are flat and the body rocks with the strokes.
 ### The animals
 **Hedgehogs** (`BIBO/Scene/Hedgehog.cpp`): twelve hedgehogs live where the rocks of the track are (the nodes `Rock1` to `Rock12`).
 Each one strolls around its home: it walks to a random spot nearby on the floor of the track (not too close to the walls, never into the water), sniffs around for a while and walks on.
@@ -284,6 +304,32 @@ It is made of three parts (head, body, tail) with pink flesh where they meet: th
 
 **Eating** (`BIBO/Scene/BearRig.cpp`, `IDLE_EAT`): an animation of key poses like the idle animations. The fish moves from the mouth into the front paws while the bear sits down,
 then it is held so that what is left of it is at the mouth whenever the bear bites. The player can move the bear again after the last bite.
+
+### The race quest
+**The quest** (`BIBO/Scene/RaceQuest.cpp`): the rules and the conversation of the race, independent of the graphics. It goes through the stages
+idle (the beaver offers the race), talking, walking to the start (a cutscene), countdown and racing. The race fails when the time runs out (5 minutes),
+when the bear is far beside the floor of the track (`isOnTrack`, e.g. up the walls of the canyon into the forest) or when it is in the water.
+The best time is kept until the game is closed; what the beaver says depends on whether the race was completed or how it failed.
+The scene (`BIBO/Scene/Scene.cpp`) moves the bear during the cutscene (it walks to the line and turns along the track), points the camera
+(both animals from the side while they talk, the bear from beyond the line while it walks up to it) and blends back to the camera that follows the bear.
+
+**Conversations** (`BIBO/Scene/Dialog.cpp`): the text appears letter by letter with short pauses after punctuation, the player can show the whole page at once,
+go on page by page and choose an answer at the end. Animals do not talk like people: while the text appears the beaver makes a sound every few letters,
+its mouth opens and closes with every sound and it nods. A line can also be said in passing (it goes away on its own), e.g. "Off to the starting line!".
+The text is on the screen in a box of the HUD (`UI/hud.rml`).
+
+**Bober, the beaver** (`BIBO/Scene/Beaver.cpp`, `BIBO/Scene/BeaverModel.cpp`): generated and drawn like the hedgehogs (the skin and fur shaders of the bear, `BIBO/Scene/FurryRenderer.cpp`).
+It sits upright: a pear shaped body with thick brown fur and round haunches, a round head with a blunt muzzle, big orange front teeth (beaver teeth are orange), a black nose, small dark eyes and round ears,
+a lower jaw that fills a hollow under the muzzle (it hinges open to show the mouth, the tongue and the lower teeth), short arms with five clawed fingers,
+large webbed hind feet under the haunches and the flat, scaly tail lying behind it. The parts reach into the body, so they stay attached when they move.
+It turns to the bear when it comes close and looks at its face (the head turns, the eyes turn in their sockets and take the rest of the turn), gestures with its arms while it talks, nibbles at something with its hands at its mouth between the conversations,
+slaps its tail on the ground now and then and hops with its arms up when the bear accepts the race or completes it.
+The exclamation mark above it is a glowing model of the vegetation shader (it blooms in the HDR image), golden while the race was not completed and blue afterwards.
+
+**Sound effects** (`BIBO/Audio/SoundEffects.cpp`): synthesized like the music. The beaver's sounds are short whines with a pitch that goes up or down, made of harmonics
+that are shaped by nasal formants, with a fast flutter (the chatter of its teeth) and some breath; eight variants, so it does not repeat itself.
+The countdown beeps, the checkpoint ding and the jingles are tones and marimba notes, the failure a muted trombone going down, the splash filtered noise with a few bubbles.
+They are mixed into the music on the audio thread (`BIBO/Audio/MusicPlayer.cpp`).
 
 ### The music
 The music (`BIBO/Audio/Music.cpp`) is composed in code and synthesized when the game starts (in a background thread, under a second), nothing of it is stored in files.

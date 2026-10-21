@@ -119,6 +119,10 @@
 				<span class="label">Music</span>
 				<input type="checkbox" data-checked="music"/>
 			</label>
+			<label class="row">
+				<span class="label">Sound effects</span>
+				<input type="checkbox" data-checked="sound_effects"/>
+			</label>
 		</div>
 
 		<div class="panel-footer">

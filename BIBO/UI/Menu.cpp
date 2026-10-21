@@ -19,7 +19,7 @@ namespace
 
 	//Settings that are applied to the game as soon as they are changed in the settings menu
 	const char* const GRAPHICS_VARIABLES[] = { "vsync", "hdr", "bloom", "shadows", "normal_mapping", "transparency",
-		"bilinear_filtering", "mipmapping", "wireframe", "world_detail", "show_frame_time", "show_help", "music" };
+		"bilinear_filtering", "mipmapping", "wireframe", "world_detail", "show_frame_time", "show_help", "music", "sound_effects" };
 
 	/**
 	* GLFW system interface of RmlUi that prints its messages (e.g. errors in the RML and RCSS files) to the console
@@ -57,6 +57,7 @@ struct Menu::Impl : public Rml::EventListener
 	~Impl();
 
 	void bindDataModel();
+	void bindHudModel();
 	Rml::ElementDocument* loadDocument(const string& path);
 	void show(Rml::ElementDocument* document, Rml::FocusFlag focus = Rml::FocusFlag::Auto);
 	void showSettings();
@@ -82,7 +83,6 @@ struct Menu::Impl : public Rml::EventListener
 
 	Rml::ElementDocument* mainMenu = nullptr;
 	Rml::ElementDocument* pauseMenu = nullptr;
-	Rml::ElementDocument* gameOverMenu = nullptr;
 	Rml::ElementDocument* settingsMenu = nullptr;
 	Rml::ElementDocument* visibleMenu = nullptr;
 	Rml::ElementDocument* settingsOpenedFrom = nullptr;
@@ -94,8 +94,10 @@ struct Menu::Impl : public Rml::EventListener
 	Rml::Vector<Rml::String> resolutionNames;
 	bool displayChanged = false;
 
-	bool gameWon = false; //title of the game over menu
-	int score = 0, salmonCaught = 0; //result of the run in the game over menu
+	//The HUD of the quests (data model "hud")
+	Rml::DataModelHandle hudModel;
+	Rml::ElementDocument* hudDocument = nullptr;
+	Hud hud;
 };
 
 Menu::Impl::Impl(GLFWwindow* window, Settings& settings, function<void(MenuAction)> onAction)
@@ -124,10 +126,12 @@ Menu::Impl::Impl(GLFWwindow* window, Settings& settings, function<void(MenuActio
 
 	//The data model has to exist before the documents that use it are loaded
 	bindDataModel();
+	bindHudModel();
 	mainMenu = loadDocument("UI/main_menu.rml");
 	pauseMenu = loadDocument("UI/pause_menu.rml");
-	gameOverMenu = loadDocument("UI/game_over.rml");
 	settingsMenu = loadDocument("UI/settings.rml");
+	//Not a menu: it gets no input and stays under the menus
+	hudDocument = context->LoadDocument("UI/hud.rml");
 }
 
 Menu::Impl::~Impl()
@@ -171,10 +175,8 @@ void Menu::Impl::bindDataModel()
 	constructor.Bind("resolution", &resolution);
 	constructor.Bind("resolutions", &resolutionNames);
 	constructor.Bind("display_changed", &displayChanged);
-	constructor.Bind("game_won", &gameWon);
-	constructor.Bind("score", &score);
-	constructor.Bind("salmon_caught", &salmonCaught);
 	constructor.Bind("music", &settings.music);
+	constructor.Bind("sound_effects", &settings.soundEffects);
 
 	auto action = [this](MenuAction menuAction) {
 		return [this, menuAction](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) { pendingActions.push_back(menuAction); };
@@ -189,6 +191,36 @@ void Menu::Impl::bindDataModel()
 	constructor.BindEventCallback("apply_display", [this](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) { applyDisplay(); });
 
 	model = constructor.GetModelHandle();
+}
+
+/**
+* Variables of the data model "hud", which the HUD of the quests (hud.rml) shows
+*/
+void Menu::Impl::bindHudModel()
+{
+	Rml::DataModelConstructor constructor = context->CreateDataModel("hud");
+	if (!constructor)
+	{
+		return;
+	}
+	//Arrays of strings were registered for the menus (the types are shared by the models of a context)
+	constructor.Bind("prompt", &hud.prompt);
+	constructor.Bind("prompt_key", &hud.promptKey);
+	constructor.Bind("speaker", &hud.speaker);
+	constructor.Bind("text", &hud.text);
+	constructor.Bind("can_continue", &hud.canContinue);
+	constructor.Bind("continue_key", &hud.continueKey);
+	constructor.Bind("choices", &hud.choices);
+	constructor.Bind("selected_choice", &hud.selectedChoice);
+	constructor.Bind("countdown", &hud.countdown);
+	constructor.Bind("racing", &hud.racing);
+	constructor.Bind("race_time", &hud.raceTime);
+	constructor.Bind("checkpoints", &hud.checkpoints);
+	constructor.Bind("time_limit", &hud.timeLimit);
+	constructor.Bind("banner", &hud.banner);
+	constructor.Bind("banner_detail", &hud.bannerDetail);
+	constructor.Bind("banner_success", &hud.bannerSuccess);
+	hudModel = constructor.GetModelHandle();
 }
 
 Rml::ElementDocument* Menu::Impl::loadDocument(const string& path)
@@ -224,7 +256,7 @@ void Menu::Impl::ProcessEvent(Rml::Event& event)
 
 void Menu::Impl::show(Rml::ElementDocument* document, Rml::FocusFlag focus)
 {
-	for (Rml::ElementDocument* menu : { mainMenu, pauseMenu, gameOverMenu, settingsMenu })
+	for (Rml::ElementDocument* menu : { mainMenu, pauseMenu, settingsMenu })
 	{
 		if (menu && menu != document)
 		{
@@ -235,6 +267,7 @@ void Menu::Impl::show(Rml::ElementDocument* document, Rml::FocusFlag focus)
 	{
 		//FocusFlag::Auto focuses the element with the autofocus attribute (the first button), Keep the last focused one
 		document->Show(Rml::ModalFlag::None, focus);
+		document->PullToFront(); //over the HUD
 	}
 	visibleMenu = document;
 }
@@ -349,18 +382,40 @@ void Menu::showPauseMenu()
 	impl->show(impl->pauseMenu);
 }
 
-void Menu::showGameOverMenu(bool won, int score, int salmon)
+bool Hud::operator==(const Hud& other) const
 {
-	impl->gameWon = won;
-	impl->score = score;
-	impl->salmonCaught = salmon;
-	if (impl->model)
+	return visible == other.visible && prompt == other.prompt && promptKey == other.promptKey && speaker == other.speaker && text == other.text
+		&& canContinue == other.canContinue && continueKey == other.continueKey && choices == other.choices && selectedChoice == other.selectedChoice
+		&& countdown == other.countdown && racing == other.racing && raceTime == other.raceTime && checkpoints == other.checkpoints
+		&& timeLimit == other.timeLimit && banner == other.banner && bannerDetail == other.bannerDetail && bannerSuccess == other.bannerSuccess;
+}
+
+void Menu::setHud(const Hud& hud)
+{
+	Impl& menu = *impl;
+	if (!menu.hudDocument || !menu.hudModel || hud == menu.hud)
 	{
-		impl->model.DirtyVariable("game_won");
-		impl->model.DirtyVariable("score");
-		impl->model.DirtyVariable("salmon_caught");
+		return;
 	}
-	impl->show(impl->gameOverMenu);
+	if (hud.visible != menu.hud.visible)
+	{
+		if (hud.visible)
+		{
+			menu.hudDocument->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
+			menu.hudDocument->PushToBack(); //under the menus
+		}
+		else
+		{
+			menu.hudDocument->Hide();
+		}
+	}
+	menu.hud = hud;
+	menu.hudModel.DirtyAllVariables();
+}
+
+bool Menu::hasHud() const
+{
+	return impl->hudDocument != nullptr && impl->hudModel;
 }
 
 void Menu::hide()
@@ -460,7 +515,7 @@ void Menu::update()
 
 void Menu::render()
 {
-	if (!impl->context || !impl->visibleMenu)
+	if (!impl->context || (!impl->visibleMenu && !impl->hud.visible))
 	{
 		return;
 	}

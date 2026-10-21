@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <vector>
 
 #include <GL/glew.h>
@@ -79,8 +80,10 @@ TEST_CASE("The bear waits at the start of the race without losing", "[gl][scene]
 		scene.update(1.0f / 60.0f);
 	}
 
-	CHECK_FALSE(scene.isGameOver());
-	CHECK_FALSE(scene.isGameWon());
+	//No race without talking to the beaver, the bear is not in the water
+	CHECK(scene.getRaceQuest().getStage() == bibo::scene::RaceQuest::Stage::IDLE);
+	CHECK(scene.getRaceQuest().getOutcome() == bibo::scene::RaceQuest::Outcome::NONE);
+	CHECK_FALSE(scene.isBearInWater());
 
 	SECTION("A frame is rendered without OpenGL errors")
 	{
@@ -204,7 +207,7 @@ TEST_CASE("The camera turns around the bear on the track without going into the 
 	}
 
 	int checked = 0;
-	for (int i = 0; i < 4 * 60 && !scene.isGameOver(); ++i)
+	for (int i = 0; i < 4 * 60; ++i)
 	{
 		//Round and round, low (looking up from the ground) and high
 		input.look = glm::vec2(0.04f, (i / 60) % 2 == 0 ? -0.05f : 0.05f);
@@ -227,4 +230,89 @@ TEST_CASE("The camera turns around the bear on the track without going into the 
 		++checked;
 	}
 	CHECK(checked > 60);
+}
+
+TEST_CASE("The bear walks to the beaver, accepts the race and is brought to the starting line for the countdown", "[gl][scene][quest]")
+{
+	using bibo::scene::RaceQuest;
+	GlContext gl;
+	AssetWorkingDirectory assets;
+	Shader mainShader("Shader/main_shader.vert", "Shader/main_shader.frag");
+	PhysicsWorld physicsWorld;
+	Scene scene(&gl.window(), &mainShader, &physicsWorld);
+	const float frame = 1.0f / 60.0f;
+	for (int i = 0; i < 60; ++i)
+	{
+		scene.update(frame);
+	}
+	const RaceQuest& quest = scene.getRaceQuest();
+	CHECK(quest.isOffered());
+	CHECK_FALSE(quest.canTalk()); //the bear starts a few steps away
+	//The beaver is in front of the bear, a bit to the side
+	glm::vec3 toBeaver = scene.getBeaver().getPosition() - scene.getBear().getPosition();
+	CAPTURE(toBeaver);
+	CHECK(toBeaver.z < -3.0f);
+	CHECK(glm::length(glm::vec2(toBeaver.x, toBeaver.z)) < 15.0f);
+
+	//Walks there (relative to the camera, like the player)
+	bibo::input::PlayerInput input;
+	for (int i = 0; i < 8 * 60 && !quest.canTalk(); ++i)
+	{
+		glm::vec3 direction = scene.getBeaver().getPosition() - scene.getBear().getPosition();
+		direction.y = 0.0f;
+		direction = glm::normalize(direction);
+		bibo::scene::Camera& camera = scene.getCamera();
+		input.move = 0.4f * glm::vec2(glm::dot(direction, camera.getRight()), glm::dot(direction, camera.getForward()));
+		scene.update(frame, input);
+	}
+	REQUIRE(quest.canTalk());
+
+	//Talks, goes through the pages and says yes
+	input = bibo::input::PlayerInput();
+	input.interact = input.confirm = true;
+	scene.update(frame, input);
+	REQUIRE(quest.getStage() == RaceQuest::Stage::TALKING);
+	bibo::input::PlayerInput press;
+	press.confirm = true;
+	for (int i = 0; i < 40 * 60 && quest.getStage() == RaceQuest::Stage::TALKING; ++i)
+	{
+		scene.update(frame, i % 30 == 0 ? press : bibo::input::PlayerInput());
+	}
+	REQUIRE(quest.getStage() == RaceQuest::Stage::WALKING_TO_START);
+	std::vector<RaceQuest::Event> events = scene.takeEvents();
+	CHECK(std::count(events.begin(), events.end(), RaceQuest::Event::BEAVER_SOUND) > 3); //it chatters while its words appear
+	CHECK(std::count(events.begin(), events.end(), RaceQuest::Event::ACCEPTED) == 1);
+	CHECK(scene.getCamera().isInShot()); //the cutscene
+
+	//The cutscene: the bear walks up to the line by itself and turns along the track (the player cannot move it)
+	bibo::input::PlayerInput away;
+	away.move = glm::vec2(1.0f, 0.0f);
+	for (int i = 0; i < 15 * 60 && quest.getStage() == RaceQuest::Stage::WALKING_TO_START; ++i)
+	{
+		scene.update(frame, away);
+	}
+	REQUIRE(quest.getStage() == RaceQuest::Stage::COUNTDOWN);
+	CHECK(quest.getStageTime() < 0.1f);
+	glm::vec3 bear = scene.getBear().getPosition();
+	glm::vec3 start = quest.getStartPosition();
+	CAPTURE(bear, start);
+	CHECK(glm::length(glm::vec2(bear.x - start.x, bear.z - start.z)) < 1.0f);
+	CHECK(glm::dot(scene.getBear().getDirection(), quest.getStartDirection()) > 0.99f);
+	CHECK_FALSE(scene.getCamera().isInShot());
+
+	//It stands still during the countdown, then the race starts
+	for (int i = 0; i < (RaceQuest::COUNTDOWN_SECONDS + 1) * 60 && quest.getStage() == RaceQuest::Stage::COUNTDOWN; ++i)
+	{
+		scene.update(frame, away);
+	}
+	CHECK(glm::length(glm::vec2(scene.getBear().getPosition().x - bear.x, scene.getBear().getPosition().z - bear.z)) < 0.3f);
+	REQUIRE(quest.getStage() == RaceQuest::Stage::RACING);
+	CHECK(quest.isPlayerInControl());
+
+	SECTION("Restarting the game ends the race")
+	{
+		scene.restart();
+		CHECK(quest.getStage() == RaceQuest::Stage::IDLE);
+		CHECK(quest.isOffered());
+	}
 }

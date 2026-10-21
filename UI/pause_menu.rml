@@ -8,9 +8,11 @@
 	<div class="dialog">
 		<h1>Paused</h1>
 		<button autofocus data-event-click="resume">Resume</button>
+		<button data-event-click="restart">Restart</button>
 		<button data-event-click="settings">Settings</button>
+		<button data-event-click="main_menu">Main menu</button>
 		<button data-event-click="quit">Quit game</button>
-		<p class="hints"><span class="key first">Esc</span>Resume</p>
+		<p class="hints"><span class="key first">Esc</span>Resume<span class="key">R</span>Restart</p>
 	</div>
 </body>
 </rml>

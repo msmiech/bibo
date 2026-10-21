@@ -30,7 +30,7 @@ namespace bibo
 			Beaver(glm::vec3 position, glm::vec3 direction, std::uint32_t seed = 4242u);
 
 			/**
-			* @param bear Where the head of the bear is (it turns and looks there when the bear is close)
+			* @param bear Where the head of the bear is (it turns to it when the bear is close, its head and eyes look there)
 			*/
 			void update(float timeDelta, glm::vec3 bear);
 			/**
@@ -69,6 +69,10 @@ namespace bibo
 			*/
 			glm::vec3 getHeadPosition() const;
 			/**
+			* Between its eyes (world space), e.g. for the bear to look at
+			*/
+			glm::vec3 getFacePosition() const;
+			/**
 			* @return 0 (closed) to 1 (wide open)
 			*/
 			float getMouthOpen() const { return mouth; }
@@ -90,6 +94,7 @@ namespace bibo
 			glm::vec3 position;
 			float yaw = 0.0f;
 			float headYaw = 0.0f, headPitch = 0.0f;
+			float eyeYaw = 0.0f, eyePitch = 0.0f; //relative to the head
 			float time = 0.0f;
 			bool talking = false;
 			float talkBlend = 0.0f; //0 to 1: blends the gestures in and out

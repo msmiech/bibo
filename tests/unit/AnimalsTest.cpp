@@ -360,6 +360,22 @@ TEST_CASE("The beaver turns to the bear when it comes close, talks with its mout
 		}
 		CHECK(glm::dot(forward(), vec3(0.0f, 0.0f, -1.0f)) > 0.95f);
 	}
+	SECTION("Its eyes look at the bear: up when the bear is above its face")
+	{
+		auto gazeY = [&](vec3 bear) {
+			for (int i = 0; i < 120; ++i)
+			{
+				beaver.update(FRAME, bear);
+			}
+			glm::mat3 eye(beaver.getPose()[BeaverModel::EYE_LEFT]);
+			return glm::normalize(eye * BeaverModel::eyeGaze(true)).y;
+		};
+		vec3 face = beaver.getFacePosition();
+		float level = gazeY(face + vec3(4.0f, 0.0f, 0.0f));
+		float above = gazeY(face + vec3(3.0f, 3.0f, 0.0f));
+		CHECK(above > level + 0.2f);
+		CHECK(beaver.getFacePosition().y > face.y - 0.5f);
+	}
 	SECTION("Every sound opens and closes the mouth")
 	{
 		beaver.setTalking(true);

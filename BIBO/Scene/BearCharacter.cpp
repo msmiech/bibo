@@ -406,7 +406,12 @@ void BearCharacter::updateControl(float timeDelta, const BearInput& playerInput)
 		idleWaitTime = 0.0f;
 		rig.stopIdle();
 	}
-	else if (!rig.isIdling() && standingOnGround && !swimming && std::abs(speed) < 0.05f)
+	else if (rig.isLooking() && rig.isIdling() && rig.getIdle() < BearRig::RESTING_IDLE_COUNT)
+	{
+		rig.stopIdle(); //paying attention
+		idleWaitTime = 0.0f;
+	}
+	else if (!rig.isIdling() && !rig.isLooking() && standingOnGround && !swimming && std::abs(speed) < 0.05f)
 	{
 		idleWaitTime += timeDelta;
 		if (idleWaitTime > IDLE_DELAY)

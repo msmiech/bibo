@@ -658,11 +658,27 @@ float BearRig::blinkAmount() const
 	return blinkProgress < 0.35f ? smooth(blinkProgress / 0.35f) : 1.0f - smooth((blinkProgress - 0.35f) / 0.65f);
 }
 
+void BearRig::lookAt(glm::vec3 target)
+{
+	looking = true;
+	lookTarget = target;
+}
+
 void BearRig::updateSecondary(float timeDelta, bool moving)
 {
-	//The head looks around when the bear stands, and ahead when it moves
+	//The head looks around when the bear stands, and ahead when it moves; at a point it looks there
 	lookTimer -= timeDelta;
-	if (moving)
+	float targetYaw = 0.0f, targetPitch = 0.0f;
+	if (looking)
+	{
+		glm::vec3 toTarget = lookTarget - getBonePosition(head);
+		targetYaw = std::remainder(std::atan2(toTarget.x, toTarget.z) - controls.yaw, 2.0f * PI);
+		targetPitch = std::atan2(toTarget.y, glm::length(glm::vec2(toTarget.x, toTarget.z)));
+		lookTargetYaw = std::clamp(targetYaw, -0.9f, 0.9f);
+		lookTargetPitch = std::clamp(targetPitch, -0.35f, 0.45f);
+		lookTimer = 1.0f;
+	}
+	else if (moving)
 	{
 		lookTargetYaw = 0.0f;
 		lookTargetPitch = 0.05f;
@@ -678,9 +694,21 @@ void BearRig::updateSecondary(float timeDelta, bool moving)
 	lookYaw += (lookTargetYaw - lookYaw) * smoothingFactor(0.15f, timeDelta);
 	lookPitch += (lookTargetPitch - lookPitch) * smoothingFactor(0.15f, timeDelta);
 
-	//Saccades: the eyes jump quickly from one point to the next
+	//Saccades: the eyes jump quickly from one point to the next. Looking at a point they take the rest of the turn the head
+	//has not made yet and stay on it (only tiny jumps)
 	saccadeTimer -= timeDelta;
-	if (saccadeTimer <= 0.0f)
+	if (looking)
+	{
+		if (saccadeTimer <= 0.0f)
+		{
+			fixationYaw = uniform(random, -0.02f, 0.02f);
+			fixationPitch = uniform(random, -0.015f, 0.015f);
+			saccadeTimer = uniform(random, 0.5f, 1.5f);
+		}
+		gazeTargetYaw = targetYaw - lookYaw + fixationYaw;
+		gazeTargetPitch = targetPitch - lookPitch + fixationPitch;
+	}
+	else if (saccadeTimer <= 0.0f)
 	{
 		gazeTargetYaw = 0.6f * (lookTargetYaw - lookYaw) + uniform(random, -0.12f, 0.12f);
 		gazeTargetPitch = 0.6f * (lookTargetPitch - lookPitch) + uniform(random, -0.07f, 0.07f);

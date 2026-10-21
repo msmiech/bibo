@@ -21,15 +21,23 @@ namespace bibo
 		* round ears, a lower jaw under the muzzle that opens when it talks, short arms with clawed hands in front of the belly,
 		* large webbed hind feet under the haunches and the flat, scaly tail lying on the ground behind it.
 		* Every part is in its own space with the origin at its joint (see the constants above). The parts reach into the body
-		* (or the head), so they stay connected when they move. Model space: +Z forward, +Y up,
+		* (or the head), so they stay connected when they move. The eyes are parts of their own, so that they can look somewhere. Model space: +Z forward, +Y up,
 		* +X left, the origin on the ground under the body, about 1 high (scaled up in the world, Beaver::SCALE).
 		* Generated, the same every time.
 		*/
 		struct BeaverModel : FurryModel
 		{
-			enum Part { BODY = 0, HEAD, JAW, TAIL, ARM_LEFT, ARM_RIGHT, FOOT_LEFT, FOOT_RIGHT, PART_COUNT };
+			enum Part { BODY = 0, HEAD, JAW, TAIL, ARM_LEFT, ARM_RIGHT, FOOT_LEFT, FOOT_RIGHT, EYE_LEFT, EYE_RIGHT, PART_COUNT };
 
 			static BeaverModel build();
+			/**
+			* Center of an eye in the space of the head (the eyes turn around it, their parts have the origin there)
+			*/
+			static glm::vec3 eyeCenter(bool left);
+			/**
+			* Where an eye looks when it is not turned (in the space of the head)
+			*/
+			static glm::vec3 eyeGaze(bool left);
 		};
 	}
 }

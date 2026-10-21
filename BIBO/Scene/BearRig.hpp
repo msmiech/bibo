@@ -134,6 +134,19 @@ namespace bibo
 			* Holding something in the mouth (e.g. a fish) while it walks, runs and jumps: the mouth stays a bit open
 			*/
 			void setCarrying(bool carrying) { this->carrying = carrying; }
+			/**
+			* The head turns to a point and the eyes look at it (e.g. the face of an animal it talks to) instead of looking around
+			*/
+			void lookAt(glm::vec3 target);
+			/**
+			* The head and the eyes look around again
+			*/
+			void stopLooking() { looking = false; }
+			bool isLooking() const { return looking; }
+			/**
+			* Position of the head bone (world space)
+			*/
+			glm::vec3 getHeadPosition() const { return getBonePosition(head); }
 
 			/**
 			* Bodies and joints of the ragdoll in the bind pose (model space)
@@ -349,6 +362,9 @@ namespace bibo
 			float blinkTimer = 3.0f, blinkProgress = -1.0f;
 			float earTwitchTimer = 4.0f;
 			bool carrying = false;
+			bool looking = false;
+			glm::vec3 lookTarget = glm::vec3(0.0f);
+			float fixationYaw = 0.0f, fixationPitch = 0.0f; //tiny jumps of the eyes around the point they look at
 
 			//Idle animations
 			std::array<std::vector<IdleKey>, IDLE_COUNT> idleAnimations;

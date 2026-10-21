@@ -88,6 +88,13 @@ namespace
 		return HEAD_CENTER + direction * headRadius(direction);
 	}
 
+	const float EYE_RADIUS = 0.024f;
+
+	glm::vec3 eyeDirection(bool left)
+	{
+		return glm::normalize(glm::vec3(0.6f * (left ? 1.0f : -1.0f), 0.38f, 0.7f));
+	}
+
 	/**
 	* Small dark eye, shaded like the eyes of the bear (the color is the direction in eye space, gaze along +z)
 	*/
@@ -139,6 +146,16 @@ namespace
 	}
 }
 
+glm::vec3 BeaverModel::eyeCenter(bool left)
+{
+	return headPoint(eyeDirection(left)) - eyeDirection(left) * 0.012f;
+}
+
+glm::vec3 BeaverModel::eyeGaze(bool left)
+{
+	return glm::normalize(glm::vec3(0.5f * (left ? 1.0f : -1.0f), 0.08f, 0.86f));
+}
+
 BeaverModel BeaverModel::build()
 {
 	BeaverModel model;
@@ -187,10 +204,9 @@ BeaverModel BeaverModel::build()
 
 	for (float side : { 1.0f, -1.0f })
 	{
-		//Small dark eyes high on the sides of the head
-		glm::vec3 eyeDirection = glm::normalize(glm::vec3(0.6f * side, 0.38f, 0.7f));
-		const float EYE_RADIUS = 0.024f;
-		addEye(builder, headPoint(eyeDirection) - eyeDirection * 0.012f, glm::normalize(glm::vec3(0.5f * side, 0.08f, 0.86f)), EYE_RADIUS, HEAD);
+		//Small dark eyes high on the sides of the head (in the space of the eye, the origin is its center)
+		bool left = side > 0.0f;
+		addEye(builder, glm::vec3(0.0f), eyeGaze(left), EYE_RADIUS, left ? EYE_LEFT : EYE_RIGHT);
 
 		//Small round ears
 		glm::vec3 earDirection = glm::normalize(glm::vec3(0.72f * side, 0.6f, -0.2f));

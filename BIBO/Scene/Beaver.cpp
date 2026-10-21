@@ -75,7 +75,7 @@ void Beaver::reset()
 	random.seed(seed);
 	position = home;
 	yaw = std::atan2(homeDirection.x, homeDirection.z);
-	headYaw = headPitch = 0.0f;
+	headYaw = headPitch = eyeYaw = eyePitch = 0.0f;
 	time = 0.0f;
 	talking = false;
 	talkBlend = mouth = nod = 0.0f;
@@ -123,17 +123,20 @@ void Beaver::update(float timeDelta, glm::vec3 bear)
 	float lookYaw, lookPitch;
 	if (attentive)
 	{
-		glm::vec3 fromHead = bear - getHeadPosition();
-		lookYaw = std::clamp(wrapAngle(std::atan2(fromHead.x, fromHead.z) - yaw), -0.9f, 0.9f);
-		lookPitch = std::clamp(std::atan2(fromHead.y, glm::length(glm::vec2(fromHead.x, fromHead.z))), -0.5f, 0.4f);
+		glm::vec3 fromHead = bear - getFacePosition();
+		lookYaw = wrapAngle(std::atan2(fromHead.x, fromHead.z) - yaw);
+		lookPitch = std::atan2(fromHead.y, glm::length(glm::vec2(fromHead.x, fromHead.z)));
 	}
 	else
 	{
 		lookYaw = 0.5f * std::sin(time * 0.37f) * std::sin(time * 0.11f + 1.0f);
 		lookPitch = 0.1f * std::sin(time * 0.23f);
 	}
-	headYaw = approach(headYaw, lookYaw, 0.15f, timeDelta);
-	headPitch = approach(headPitch, lookPitch, 0.15f, timeDelta);
+	headYaw = approach(headYaw, std::clamp(lookYaw, -0.9f, 0.9f), 0.15f, timeDelta);
+	headPitch = approach(headPitch, std::clamp(lookPitch, -0.5f, 0.4f), 0.15f, timeDelta);
+	//The eyes are quicker than the head: they look there first and take the rest of the turn the head cannot make
+	eyeYaw = approach(eyeYaw, std::clamp(lookYaw - headYaw, -0.4f, 0.4f), 0.03f, timeDelta);
+	eyePitch = approach(eyePitch, std::clamp(lookPitch - headPitch, -0.3f, 0.3f), 0.03f, timeDelta);
 	talkBlend = approach(talkBlend, talking ? 1.0f : 0.0f, 0.2f, timeDelta);
 
 	//The mouth opens and closes once per sound, the head nods with it
@@ -213,7 +216,13 @@ glm::vec3 Beaver::getColliderCenter() const
 
 float Beaver::getColliderRadius() const
 {
-	return 0.34f * SCALE;
+	return 0.42f * SCALE;
+}
+
+glm::vec3 Beaver::getFacePosition() const
+{
+	std::vector<glm::mat4> pose = getPose();
+	return 0.5f * (glm::vec3(pose[BeaverModel::EYE_LEFT][3]) + glm::vec3(pose[BeaverModel::EYE_RIGHT][3]));
 }
 
 glm::vec3 Beaver::getHeadPosition() const
@@ -249,6 +258,12 @@ std::vector<glm::mat4> Beaver::getPose() const
 		* glm::rotate(glm::mat4(1.0f), 0.08f * talkBlend * std::sin(time * 1.7f), FORWARD);
 	parts[BeaverModel::HEAD] = head * scale;
 	parts[BeaverModel::JAW] = head * glm::translate(glm::mat4(1.0f), BEAVER_JAW * SCALE) * rotationX(0.5f * mouth) * scale;
+	//The eyes turn in their sockets (yaw left, pitch up), blinking is not needed with such small eyes
+	for (bool left : { true, false })
+	{
+		parts[left ? BeaverModel::EYE_LEFT : BeaverModel::EYE_RIGHT] = head * glm::translate(glm::mat4(1.0f), BeaverModel::eyeCenter(left) * SCALE)
+			* glm::rotate(glm::mat4(1.0f), eyeYaw, UP) * rotationX(-eyePitch) * scale;
+	}
 
 	//Arms: gestures while talking (one after the other), at the mouth while nibbling, up in the air when cheering
 	for (int side = 0; side < 2; ++side)

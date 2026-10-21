@@ -27,6 +27,8 @@ namespace
 	//The bear starts behind the starting line (left of the crate), the beaver sits next to the line at the left side of the track
 	const float SPAWN_BEHIND_LINE = 7.0f, SPAWN_SIDE = -0.8f;
 	const float BEAVER_SIDE = -5.0f, BEAVER_BEHIND_LINE = 1.5f;
+	//In a conversation the bear keeps this distance to the beaver (center to center, so that their faces do not touch)
+	const float TALK_SPACING = 3.6f;
 	const std::size_t BEAVER_FUR_COUNT = 16000;
 	//Height of the exclamation mark above the beaver
 	const float MARKER_SCALE = 0.8f;
@@ -281,7 +283,13 @@ BearInput Scene::bearInput(const input::PlayerInput& player)
 	jumpBlocked = true;
 	if (stage == RaceQuest::Stage::TALKING)
 	{
-		turnTowards(beaver->getPosition() - bear->getPosition(), input); //it looks at the beaver
+		//It turns to the beaver and steps back a little if it came too close
+		vec3 toBeaver = beaver->getPosition() - bear->getPosition();
+		bool facing = turnTowards(toBeaver, input);
+		if (facing && length(vec2(toBeaver.x, toBeaver.z)) < TALK_SPACING - 0.2f)
+		{
+			input.forward = -0.35f;
+		}
 	}
 	else if (stage == RaceQuest::Stage::WALKING_TO_START)
 	{
@@ -385,6 +393,15 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 	}
 	lastStage = stage;
 	beaver->setTalking(raceQuest->getDialog().isOpen());
+	//The bear and the beaver look at each other while they talk (and when the bear comes to talk), the beaver whenever the bear is close
+	if (stage == RaceQuest::Stage::TALKING || raceQuest->canTalk())
+	{
+		bear->getCharacter().lookAt(beaver->getFacePosition());
+	}
+	else
+	{
+		bear->getCharacter().stopLooking();
+	}
 	bear->setInput(bearInput(player));
 
 	for (unsigned int i = 0; i < geometries.size(); ++i)
@@ -432,8 +449,8 @@ void Scene::updateAnimals(float time_delta)
 	}
 	bear->setObstacles(obstacles);
 
-	//The beaver at the start turns to the bear and looks at its head
-	beaver->update(time_delta, bear->getPosition() + UP * 0.4f);
+	//The beaver at the start turns to the bear and looks at its face
+	beaver->update(time_delta, bear->getCharacter().getHeadPosition());
 	physicsWorld->moveKinematic(beaverBody, beaver->getColliderCenter(), quat(1.0f, 0.0f, 0.0f, 0.0f), time_delta);
 
 	//Salmon jump out of the water when the bear comes close, one per pool can be caught for bonus points

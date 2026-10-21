@@ -124,6 +124,16 @@ namespace bibo
 			void setWaterLevel(float level) { waterLevel = level; }
 			float getWaterLevel() const { return waterLevel; }
 			/**
+			* The bear looks at a point with its head and eyes (e.g. the face of the animal it talks to); it does not start
+			* idle animations meanwhile (it stops stretching or yawning)
+			*/
+			void lookAt(glm::vec3 target) { rig.lookAt(target); }
+			void stopLooking() { rig.stopLooking(); }
+			/**
+			* Between the eyes (world space)
+			*/
+			glm::vec3 getHeadPosition() const { return rig.getHeadPosition(); }
+			/**
 			* Plays an idle animation now (they also start on their own when the player does not move the bear for a while)
 			*/
 			void startIdle(BearRig::Idle idle);

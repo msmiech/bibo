@@ -20,6 +20,7 @@ using namespace bibo::test;
 using bibo::scene::BearCharacter;
 using bibo::scene::BearInput;
 using bibo::scene::BearRig;
+using bibo::scene::FaceControls;
 using Catch::Matchers::WithinAbs;
 using glm::vec3;
 
@@ -792,5 +793,41 @@ TEST_CASE("The bear can be placed somewhere else, standing", "[assets][bear]")
 		scene.bear->reset();
 		CHECK(glm::distance(scene.bear->getPosition(), vec3(-3.0f, 1.4f, 2.0f)) < 1e-3f);
 		CHECK(glm::distance(scene.bear->getDirection(), vec3(0.0f, 0.0f, -1.0f)) < 1e-4f);
+	}
+}
+
+TEST_CASE("Looking at a point: the head and the eyes turn to it, the bear does not start an idle animation meanwhile", "[assets][bear][animation]")
+{
+	BearOnGround scene;
+	scene.run(1.0f);
+	const vec3 head = scene.bear->getHeadPosition();
+	//The bear looks along +z, its left is +x. The eyes are there first, the head follows.
+	FaceControls face;
+	auto lookAt = [&](vec3 offset) {
+		scene.bear->lookAt(head + offset);
+		scene.run(0.15f);
+		face = scene.bear->getRig().getFace();
+		scene.run(1.35f);
+		return scene.bear->getMouthPosition() - scene.bear->getHeadPosition();
+	};
+	vec3 left = lookAt(vec3(3.0f, 0.0f, 4.0f));
+	CHECK(face.gazeYaw > 0.1f);
+	vec3 right = lookAt(vec3(-3.0f, 0.0f, 4.0f));
+	CHECK(face.gazeYaw < -0.1f);
+	vec3 up = lookAt(vec3(0.0f, 3.0f, 3.0f));
+	CHECK(face.gazePitch > 0.1f);
+	vec3 down = lookAt(vec3(0.0f, -1.0f, 4.0f));
+	CAPTURE(left, right, up, down);
+	CHECK(left.x > right.x + 0.15f);
+	CHECK(up.y > down.y + 0.1f);
+
+	//Paying attention: no stretching or yawning
+	scene.run(10.0f);
+	CHECK_FALSE(scene.bear->getRig().isIdling());
+	SECTION("Afterwards it looks around and plays its idle animations again")
+	{
+		scene.bear->stopLooking();
+		scene.run(8.0f);
+		CHECK(scene.bear->getRig().isIdling());
 	}
 }

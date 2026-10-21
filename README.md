@@ -19,7 +19,8 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
   * A bright polar day: low sun, clouds and polar lights (aurora) in the sky, cascaded shadow maps, fog, falling snow and simple water
 * The race is a quest (see [The race quest](#the-race-quest) below)
   * A beaver sits next to the starting line with a glowing exclamation mark above its head. Talk to it (E, or Square / X on a gamepad) and it asks whether the bear would like to give the race track a shot
-  * The conversation appears letter by letter on the screen while the beaver chatters, squeaks and gestures (it makes beaver sounds, it does not speak); answer yes or no at the end
+  * The conversation appears letter by letter on the screen while the beaver chatters, squeaks and gestures (it makes beaver sounds, it does not speak); answer yes or no at the end.
+    The bear and the beaver turn their heads and eyes to each other
   * Yes: a short cutscene, the bear walks up to the starting line, a countdown 3, 2, 1 and the timer starts. The lap is complete at the finish line after all checkpoints along the track in their order
   * The race fails after 5 minutes, when the bear leaves the track or falls into the water; the beaver offers it again. After a completed lap it offers to improve the best time (its exclamation mark turns blue)
   * Outside of the race there is no lap, no timer and no checkpoint display: the bear roams freely
@@ -263,6 +264,8 @@ The script also saves `Model/BearCub/BearCub.blend` to look at the result, and `
 When walking and bounding, the paws are planted where they land (found with ray casts) and the legs reach them with two bone inverse kinematics;
 the body bobs with the steps, follows the ground and leans into turns. Ears and tail are springs, the eyes make saccades and blink with their lids.
 The idle animations (stretching, yawning) and getting up are key poses of the body, the paws and the face, also solved with IK.
+The head and the eyes can look at a point (`lookAt`): the eyes get there first, the head follows, and the eyes keep what the head cannot turn;
+the bear looks at the beaver's face while they talk and does not start an idle animation meanwhile.
 In a jump the hind paws push off from where they left the ground, the legs tuck in, and when a ray cast finds that the ground is close (by the falling speed)
 the legs reach for it; on landing the paws are put down where they are, springs dip the body and the nose and the steps blend in.
 
@@ -316,9 +319,10 @@ its mouth opens and closes with every sound and it nods. A line can also be said
 The text is on the screen in a box of the HUD (`UI/hud.rml`).
 
 **The beaver** (`BIBO/Scene/Beaver.cpp`, `BIBO/Scene/BeaverModel.cpp`): generated and drawn like the hedgehogs (the skin and fur shaders of the bear, `BIBO/Scene/FurryRenderer.cpp`).
-It sits upright: a pear shaped body with thick brown fur, a round head with a blunt muzzle, big orange front teeth (beaver teeth are orange), a black nose, small dark eyes and round ears,
-a lower jaw with the tongue and the lower teeth, short arms with clawed hands, large webbed hind feet and the flat, scaly tail lying behind it.
-It turns to the bear when it comes close and looks at it, gestures with its arms while it talks, nibbles at something with its hands at its mouth between the conversations,
+It sits upright: a pear shaped body with thick brown fur and round haunches, a round head with a blunt muzzle, big orange front teeth (beaver teeth are orange), a black nose, small dark eyes and round ears,
+a lower jaw that fills a hollow under the muzzle (it hinges open to show the mouth, the tongue and the lower teeth), short arms with five clawed fingers,
+large webbed hind feet under the haunches and the flat, scaly tail lying behind it. The parts reach into the body, so they stay attached when they move.
+It turns to the bear when it comes close and looks at its face (the head turns, the eyes turn in their sockets and take the rest of the turn), gestures with its arms while it talks, nibbles at something with its hands at its mouth between the conversations,
 slaps its tail on the ground now and then and hops with its arms up when the bear accepts the race or completes it.
 The exclamation mark above it is a glowing model of the vegetation shader (it blooms in the HDR image), golden while the race was not completed and blue afterwards.
 

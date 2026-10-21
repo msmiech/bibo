@@ -20,7 +20,7 @@ namespace
 	const float CHEER_DURATION = 1.0f;
 	const float SLAP_DURATION = 0.7f;
 	//The arms hang a bit forward, raised this far the hands are at the mouth (radians around the shoulder)
-	const float ARM_REST = 0.3f, ARM_AT_MOUTH = 1.95f;
+	const float ARM_REST = 0.45f, ARM_AT_MOUTH = 1.95f;
 	//Height of the marker above the head (world units)
 	const float MARKER_HEIGHT = 0.6f;
 
@@ -248,7 +248,7 @@ std::vector<glm::mat4> Beaver::getPose() const
 		* glm::rotate(glm::mat4(1.0f), headYaw, UP) * rotationX(-headPitch - pitch + nod + 0.1f * nibble) //the body leans, the head stays level
 		* glm::rotate(glm::mat4(1.0f), 0.08f * talkBlend * std::sin(time * 1.7f), FORWARD);
 	parts[BeaverModel::HEAD] = head * scale;
-	parts[BeaverModel::JAW] = head * glm::translate(glm::mat4(1.0f), BEAVER_JAW * SCALE) * rotationX(0.45f * mouth) * scale;
+	parts[BeaverModel::JAW] = head * glm::translate(glm::mat4(1.0f), BEAVER_JAW * SCALE) * rotationX(0.5f * mouth) * scale;
 
 	//Arms: gestures while talking (one after the other), at the mouth while nibbling, up in the air when cheering
 	for (int side = 0; side < 2; ++side)
@@ -278,7 +278,7 @@ std::vector<glm::mat4> Beaver::getPose() const
 	if (slapTime >= 0.0f)
 	{
 		float t = slapTime;
-		lift = t < 0.35f ? 0.9f * smooth(t / 0.35f) : 0.9f * (1.0f - smooth((t - 0.35f) / 0.08f)) + 0.08f * std::sin(PI * std::clamp((t - 0.43f) / 0.2f, 0.0f, 1.0f));
+		lift = t < 0.35f ? 0.7f * smooth(t / 0.35f) : 0.7f * (1.0f - smooth((t - 0.35f) / 0.08f)) + 0.08f * std::sin(PI * std::clamp((t - 0.43f) / 0.2f, 0.0f, 1.0f));
 	}
 	parts[BeaverModel::TAIL] = frame * glm::translate(glm::mat4(1.0f), BEAVER_TAIL * SCALE) * glm::rotate(glm::mat4(1.0f), 0.12f * std::sin(time * 0.9f), UP)
 		* rotationX(lift - pitch) * scale;

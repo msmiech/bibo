@@ -19,14 +19,18 @@ namespace
 	const glm::vec3 HEAD_CENTER(0.0f, 0.14f, 0.07f);
 	const glm::vec3 HEAD_RADII(0.16f, 0.15f, 0.17f);
 	const glm::vec3 MUZZLE = glm::normalize(glm::vec3(0.0f, -0.35f, 1.0f));
+	//Under the muzzle the head has a hollow for the lower jaw, which fills it when the mouth is closed
+	const glm::vec3 CHIN = glm::normalize(glm::vec3(0.0f, -0.8f, 0.6f));
+	//The haunches bulge out at the lower front of the body (left, the right one mirrored)
+	const glm::vec3 HAUNCH = glm::normalize(glm::vec3(0.75f, -0.55f, 0.4f));
 
 	//Colors (linear)
 	const glm::vec3 BACK_COLOR(0.12f, 0.062f, 0.03f);
 	const glm::vec3 BELLY_COLOR(0.19f, 0.11f, 0.055f);
 	const glm::vec3 HEAD_COLOR(0.14f, 0.075f, 0.036f);
 	const glm::vec3 MUZZLE_COLOR(0.09f, 0.05f, 0.028f);
-	const glm::vec3 SKIN_COLOR(0.045f, 0.032f, 0.028f); //hands and feet
-	const glm::vec3 TAIL_COLOR(0.05f, 0.042f, 0.038f);
+	const glm::vec3 SKIN_COLOR(0.055f, 0.034f, 0.024f); //palms and soles
+	const glm::vec3 TAIL_COLOR(0.12f, 0.085f, 0.062f);
 	const glm::vec3 NOSE_COLOR(0.015f, 0.012f, 0.011f);
 	const glm::vec3 TEETH_COLOR(0.62f, 0.2f, 0.035f); //the enamel of beaver teeth is orange
 	const glm::vec3 MOUTH_COLOR(0.1f, 0.018f, 0.015f);
@@ -54,6 +58,9 @@ namespace
 		float width = 1.0f + 0.16f * glm::smoothstep(0.1f, -0.8f, direction.y) - 0.3f * glm::smoothstep(0.25f, 0.95f, direction.y);
 		float radius = 1.0f / glm::length(direction / (BODY_RADII * glm::vec3(width, 1.0f, width)));
 		radius += 0.05f * std::max(direction.z, 0.0f) * glm::smoothstep(0.5f, -0.3f, direction.y);
+		//Haunches: the thighs of the hind legs it sits on
+		glm::vec3 haunch(HAUNCH.x * (direction.x < 0.0f ? -1.0f : 1.0f), HAUNCH.y, HAUNCH.z);
+		radius += 0.075f * glm::smoothstep(0.78f, 0.98f, glm::dot(direction, haunch));
 		if (direction.y < 0.0f)
 		{
 			radius = smoothMin(radius, (BODY_CENTER.y - SEAT_HEIGHT) / std::max(-direction.y, 1e-3f), 0.05f);
@@ -72,7 +79,8 @@ namespace
 		float taper = 1.0f - 0.3f * glm::smoothstep(0.3f, 0.95f, direction.z);
 		float radius = 1.0f / glm::length(direction / (HEAD_RADII * glm::vec3(taper, taper, 1.0f)));
 		float muzzle = glm::smoothstep(0.72f, 1.0f, glm::dot(direction, MUZZLE));
-		return radius + 0.085f * std::pow(muzzle, 1.2f);
+		float chin = glm::smoothstep(0.88f, 0.98f, glm::dot(direction, CHIN));
+		return radius + 0.085f * std::pow(muzzle, 1.2f) - 0.03f * chin;
 	}
 
 	glm::vec3 headPoint(glm::vec3 direction)
@@ -105,14 +113,28 @@ namespace
 		builder.growFur(first, builder.triangleCount());
 	}
 
-	void addClaws(FurryModelBuilder& builder, glm::vec3 center, float spacing, float length, glm::vec3 direction, int part)
+	/**
+	* Fingers or toes fanning out forward from a point, each with a claw at its tip
+	* @param spread Angle between the outermost ones (radians)
+	*/
+	void addDigits(FurryModelBuilder& builder, glm::vec3 base, int count, float spread, float length, float thickness, glm::vec3 color, int part)
 	{
-		glm::vec3 side = glm::normalize(glm::cross(UP, direction));
-		for (int claw = 0; claw < 4; ++claw)
+		for (int digit = 0; digit < count; ++digit)
 		{
-			glm::vec3 position = center + side * ((static_cast<float>(claw) - 1.5f) * spacing);
-			glm::vec3 radii = glm::abs(direction) * length + glm::vec3(0.006f);
-			builder.ellipsoid(position, radii, 6, 4, glm::vec4(CLAW_COLOR, 0.0f), SkinnedModel::CLAW, part);
+			float angle = spread * (static_cast<float>(digit) / static_cast<float>(count - 1) - 0.5f);
+			glm::vec3 direction(std::sin(angle), -0.12f, std::cos(angle));
+			direction = glm::normalize(direction);
+			glm::vec3 x = glm::normalize(glm::cross(UP, direction)), y = glm::cross(direction, x);
+			glm::vec3 center = base + direction * (0.5f * length);
+			builder.sphere(10, 6, [&](glm::vec3 d) {
+				glm::vec3 local = d * glm::vec3(thickness, 0.8f * thickness, 0.5f * length);
+				glm::vec3 normal = glm::normalize(d / glm::vec3(thickness, 0.8f * thickness, 0.5f * length));
+				return builder.add(center + x * local.x + y * local.y + direction * local.z, x * normal.x + y * normal.y + direction * normal.z,
+					glm::vec4(color, 0.0f), SkinnedModel::FUR, part);
+			});
+			glm::vec3 tip = base + direction * length;
+			builder.ellipsoid(tip + direction * 0.006f - y * 0.003f, glm::vec3(0.5f * thickness, 0.4f * thickness, 0.5f * thickness) + glm::abs(direction) * 0.006f,
+				6, 4, glm::vec4(CLAW_COLOR, 0.0f), SkinnedModel::CLAW, part);
 		}
 	}
 }
@@ -152,15 +174,15 @@ BeaverModel BeaverModel::build()
 	glm::vec3 noseDirection = glm::normalize(glm::vec3(0.0f, -0.12f, 1.0f));
 	builder.ellipsoid(headPoint(noseDirection) - noseDirection * 0.004f, glm::vec3(0.038f, 0.026f, 0.026f), 14, 10, glm::vec4(NOSE_COLOR, 0.0f), SkinnedModel::NOSE, HEAD);
 
-	//The mouth under the muzzle (covered by the lower jaw when it is closed)
-	glm::vec3 lip = headPoint(glm::normalize(glm::vec3(0.0f, -0.62f, 0.78f)));
-	builder.ellipsoid(glm::vec3(0.0f, lip.y + 0.005f, lip.z - 0.05f), glm::vec3(0.055f, 0.03f, 0.065f), 14, 10, glm::vec4(MOUTH_COLOR, 0.0f), SkinnedModel::MOUTH, HEAD);
+	//The mouth in the hollow under the muzzle: hidden by the lower jaw when it is closed, dark when it opens
+	glm::vec3 hollow = headPoint(CHIN);
+	builder.ellipsoid(hollow + glm::vec3(0.0f, 0.004f, 0.012f), glm::vec3(0.05f, 0.022f, 0.06f), 14, 10, glm::vec4(MOUTH_COLOR, 0.0f), SkinnedModel::MOUTH, HEAD);
 
-	//The famous orange front teeth, from under the nose down over the lower lip
-	glm::vec3 teeth = headPoint(glm::normalize(glm::vec3(0.0f, -0.5f, 0.86f)));
+	//The famous orange front teeth: they come out under the upper lip at the front of the muzzle and reach over the lower jaw
+	glm::vec3 lip = headPoint(glm::normalize(glm::vec3(0.0f, -0.45f, 0.89f)));
 	for (float side : { 1.0f, -1.0f })
 	{
-		builder.ellipsoid(glm::vec3(0.0165f * side, teeth.y - 0.03f, teeth.z - 0.006f), glm::vec3(0.0155f, 0.045f, 0.009f), 10, 8, glm::vec4(TEETH_COLOR, 0.0f), SkinnedModel::TEETH, HEAD);
+		builder.ellipsoid(glm::vec3(0.0155f * side, lip.y - 0.012f, lip.z - 0.012f), glm::vec3(0.0145f, 0.034f, 0.008f), 10, 8, glm::vec4(TEETH_COLOR, 0.0f), SkinnedModel::TEETH, HEAD);
 	}
 
 	for (float side : { 1.0f, -1.0f })
@@ -175,40 +197,50 @@ BeaverModel BeaverModel::build()
 		addFurryEllipsoid(builder, headPoint(earDirection), glm::vec3(0.022f, 0.036f, 0.032f), HEAD_COLOR * 0.8f, 0.15f, -UP, HEAD);
 	}
 
-	//Lower jaw: the chin with the lower teeth and the tongue (in the space of the jaw, the origin is its hinge)
-	glm::vec3 chinCenter = glm::vec3(lip.x, lip.y - 0.012f, lip.z - 0.035f) - BEAVER_JAW;
-	addFurryEllipsoid(builder, chinCenter, glm::vec3(0.06f, 0.03f, 0.065f), MUZZLE_COLOR, 0.15f, BACKWARDS - UP, JAW);
-	builder.ellipsoid(chinCenter + glm::vec3(0.0f, 0.02f, -0.01f), glm::vec3(0.04f, 0.014f, 0.05f), 12, 8, glm::vec4(TONGUE_COLOR, 0.0f), SkinnedModel::TONGUE, JAW);
+	//Lower jaw: fills the hollow under the muzzle, furred like the head so that it looks like one with it when the mouth is closed;
+	//the tongue and the lower teeth on top of it (in the space of the jaw, the origin is its hinge)
+	glm::vec3 chinCenter = hollow + glm::vec3(0.0f, -0.004f, -0.004f) - BEAVER_JAW;
+	addFurryEllipsoid(builder, chinCenter, glm::vec3(0.075f, 0.042f, 0.08f), glm::mix(HEAD_COLOR, MUZZLE_COLOR, 0.4f), 0.35f, BACKWARDS - UP, JAW);
+	builder.ellipsoid(chinCenter + glm::vec3(0.0f, 0.03f, 0.0f), glm::vec3(0.04f, 0.014f, 0.05f), 12, 8, glm::vec4(TONGUE_COLOR, 0.0f), SkinnedModel::TONGUE, JAW);
 	for (float side : { 1.0f, -1.0f })
 	{
-		builder.ellipsoid(chinCenter + glm::vec3(0.009f * side, 0.026f, 0.05f), glm::vec3(0.009f, 0.02f, 0.007f), 8, 6, glm::vec4(TEETH_COLOR, 0.0f), SkinnedModel::TEETH, JAW);
+		builder.ellipsoid(chinCenter + glm::vec3(0.009f * side, 0.034f, 0.058f), glm::vec3(0.009f, 0.016f, 0.006f), 8, 6, glm::vec4(TEETH_COLOR, 0.0f), SkinnedModel::TEETH, JAW);
 	}
 
-	//Arms: hanging down in front of the chest, the hands with bare palms and claws (in the space of the shoulder)
+	//Arms (in the space of the shoulder, which is inside the chest): the upper arm grows out of the body, the wrist and the hand
+	//with bare palm, five fingers and claws at its end
 	for (int part : { ARM_LEFT, ARM_RIGHT })
 	{
-		addFurryEllipsoid(builder, glm::vec3(0.0f, -0.09f, 0.045f), glm::vec3(0.06f, 0.12f, 0.065f), BACK_COLOR, 0.5f, -UP, part);
-		builder.ellipsoid(glm::vec3(0.0f, -0.2f, 0.095f), glm::vec3(0.048f, 0.032f, 0.052f), 12, 8, glm::vec4(SKIN_COLOR, 0.0f), SkinnedModel::FUR, part);
-		addClaws(builder, glm::vec3(0.0f, -0.212f, 0.14f), 0.022f, 0.018f, glm::vec3(0.0f, 0.0f, 1.0f), part);
+		addFurryEllipsoid(builder, glm::vec3(0.0f, -0.06f, 0.025f), glm::vec3(0.07f, 0.15f, 0.075f), glm::mix(BACK_COLOR, BELLY_COLOR, 0.4f), 0.55f, -UP, part);
+		addFurryEllipsoid(builder, glm::vec3(0.0f, -0.175f, 0.07f), glm::vec3(0.05f, 0.06f, 0.055f), glm::mix(BACK_COLOR, BELLY_COLOR, 0.5f), 0.35f, -UP, part);
+		builder.ellipsoid(glm::vec3(0.0f, -0.212f, 0.088f), glm::vec3(0.034f, 0.018f, 0.032f), 12, 8, glm::vec4(SKIN_COLOR, 0.0f), SkinnedModel::FUR, part);
+		addDigits(builder, glm::vec3(0.0f, -0.216f, 0.1f), 5, 1.0f, 0.04f, 0.008f, SKIN_COLOR, part);
 	}
 
-	//Large webbed hind feet in front of the body (in the space of the foot, the origin on the ground under the heel)
+	//Hind legs (in the space of the foot, the origin on the ground under the heel): the shin rises into the haunch,
+	//the large foot lies flat on the ground with five long toes webbed together and claws
 	for (int part : { FOOT_LEFT, FOOT_RIGHT })
 	{
-		builder.ellipsoid(glm::vec3(0.0f, 0.028f, 0.09f), glm::vec3(0.075f, 0.028f, 0.15f), 16, 8, glm::vec4(SKIN_COLOR, 0.0f), SkinnedModel::FUR, part);
-		addClaws(builder, glm::vec3(0.0f, 0.016f, 0.235f), 0.034f, 0.02f, glm::vec3(0.0f, 0.0f, 1.0f), part);
+		addFurryEllipsoid(builder, glm::vec3(0.0f, 0.085f, 0.0f), glm::vec3(0.075f, 0.1f, 0.085f), BACK_COLOR, 0.55f, -UP, part);
+		builder.ellipsoid(glm::vec3(0.0f, 0.022f, 0.08f), glm::vec3(0.065f, 0.022f, 0.12f), 16, 8, glm::vec4(SKIN_COLOR, 0.0f), SkinnedModel::FUR, part);
+		//The web between the toes: a flat fan
+		builder.ellipsoid(glm::vec3(0.0f, 0.012f, 0.19f), glm::vec3(0.1f, 0.01f, 0.085f), 16, 6, glm::vec4(SKIN_COLOR * 0.8f, 0.0f), SkinnedModel::FUR, part);
+		addDigits(builder, glm::vec3(0.0f, 0.025f, 0.15f), 5, 0.95f, 0.13f, 0.014f, SKIN_COLOR, part);
 	}
 
-	//Tail: a furry root and the flat paddle with scales lying on the ground behind (in the space of its root)
-	addFurryEllipsoid(builder, glm::vec3(0.0f, -0.035f, -0.07f), glm::vec3(0.1f, 0.065f, 0.12f), BACK_COLOR, 0.5f, BACKWARDS, TAIL);
-	const glm::vec3 PADDLE_CENTER(0.0f, -0.07f, -0.36f), PADDLE_RADII(0.155f, 0.024f, 0.27f);
+	//Tail: a furry root that grows out of the back of the body (part of the body) and the flat, oval paddle with scales lying on
+	//the ground behind it (in the space of the tail, which turns at the end of the root)
+	addFurryEllipsoid(builder, glm::vec3(0.0f, 0.045f, -0.34f), glm::vec3(0.085f, 0.048f, 0.17f), BACK_COLOR, 0.45f, BACKWARDS, BODY);
+	const glm::vec3 PADDLE_CENTER(0.0f, -0.008f, -0.18f), PADDLE_RADII(0.15f, 0.022f, 0.26f);
 	builder.sphere(32, 16, [&](glm::vec3 d) {
-		glm::vec3 position = PADDLE_CENTER + d * PADDLE_RADII;
+		//Narrower where it joins the root
+		float width = 0.5f + 0.5f * glm::smoothstep(0.95f, 0.2f, d.z);
+		glm::vec3 position = PADDLE_CENTER + d * PADDLE_RADII * glm::vec3(width, 1.0f, 1.0f);
 		//Rows of scales: darker grooves in a diamond pattern
-		float u = (position.x + position.z) * 55.0f, v = (position.x - position.z) * 55.0f;
+		float u = (position.x + position.z) * 150.0f, v = (position.x - position.z) * 150.0f;
 		float grooves = std::min(std::abs(std::sin(u)), std::abs(std::sin(v)));
 		glm::vec3 color = TAIL_COLOR * glm::mix(0.55f, 1.15f, glm::smoothstep(0.0f, 0.35f, grooves));
-		return builder.add(position, d / PADDLE_RADII, glm::vec4(color, 0.0f), SkinnedModel::FUR, TAIL);
+		return builder.add(position, d / (PADDLE_RADII * glm::vec3(width, 1.0f, 1.0f)), glm::vec4(color, 0.0f), SkinnedModel::FUR, TAIL);
 	});
 	return model;
 }

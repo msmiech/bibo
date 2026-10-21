@@ -54,6 +54,10 @@ namespace bibo
 			* @param center Center of the bear (for the level of detail)
 			*/
 			void drawShaded(const BearRenderContext& context, glm::vec3 center);
+			/**
+			* Length of the longest fur (world units), e.g. longer for a bigger bear (default: fur::MAX_LENGTH)
+			*/
+			void setMaxFurLength(float length) { maxFurLength = length; }
 
 			std::size_t getStrandCount() const { return strandCount; }
 			/**
@@ -75,6 +79,7 @@ namespace bibo
 			std::size_t vertexCount = 0;
 			std::size_t strandCount = 0;
 			std::size_t drawnStrandCount = 0;
+			float maxFurLength = fur::MAX_LENGTH;
 			std::vector<glm::vec4> staging;
 		};
 	}

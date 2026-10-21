@@ -761,7 +761,11 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		updateSecondary(timeDelta, false);
 		c = idleControls(input, probe);
 		idleTime += timeDelta;
-		if (idleTime >= getIdleDuration(static_cast<Idle>(idle)))
+		if (idle == IDLE_LIE)
+		{
+			idleTime = std::fmod(idleTime, getIdleDuration(IDLE_LIE)); //lies until stopIdle
+		}
+		else if (idleTime >= getIdleDuration(static_cast<Idle>(idle)))
 		{
 			//The animation ends standing: walking starts from where the feet are
 			idle = -1;
@@ -958,6 +962,7 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input, co
 		}
 	}
 
+	c.face.jawOpen = std::max(c.face.jawOpen, mouthOpen);
 	evaluate(bind, c, timeDelta);
 	//Blending from the previous animation (e.g. sitting when the player interrupts an idle animation)
 	if (blendTime > 0.0f && blendSnapshot.size() == pose.size())
@@ -1047,10 +1052,38 @@ BearRig::IdleKey BearRig::sittingKey() const
 	return key;
 }
 
+BearRig::IdleKey BearRig::lyingKey() const
+{
+	//On its belly like a sphinx, the front paws stretched out in front, the hind legs folded under the body, the head up
+	IdleKey key = standingKey();
+	key.pelvisHeight = -0.38f;
+	key.pelvisPitch = -0.03f;
+	key.spinePitch = 0.06f;
+	key.neckPitch = 0.3f;
+	key.headPitch = -0.08f;
+	key.face.lids = 0.2f; //relaxed
+	for (int leg = 0; leg < LEG_COUNT; ++leg)
+	{
+		float side = legs[leg].side;
+		if (legs[leg].front)
+		{
+			key.feet[leg] = legs[leg].neutral + glm::vec3(0.03f * side, 0.0f, 0.38f);
+			key.toePitch[leg] = 0.15f;
+		}
+		else
+		{
+			key.feet[leg] = legs[leg].neutral + glm::vec3(0.12f * side, 0.0f, -0.08f);
+			key.toePitch[leg] = -0.35f;
+		}
+	}
+	return key;
+}
+
 void BearRig::buildIdleAnimations()
 {
 	const IdleKey standing = standingKey();
 	const IdleKey sitting = sittingKey();
+	const IdleKey lying = lyingKey();
 	auto at = [](IdleKey key, float time) {
 		key.time = time;
 		return key;
@@ -1262,6 +1295,31 @@ void BearRig::buildIdleAnimations()
 		keys.push_back(at(sitting, lickStart + 1.6f));
 		keys.push_back(at(standing, lickStart + 2.3f));
 	}
+
+	//Lying (a loop): looks around with its head up, then rests its chin on the ground between its paws for a while with
+	//sleepy eyes and the ears relaxed, sighs and lifts its head again
+	{
+		std::vector<IdleKey>& keys = idleAnimations[IDLE_LIE];
+		keys.push_back(at(lying, 0.0f));
+		keys.push_back(at(lying, 5.0f));
+		IdleKey chin = lying;
+		chin.neckPitch = -0.1f;
+		chin.headPitch = -0.12f;
+		chin.spinePitch = 0.0f;
+		chin.face.lids = 0.6f;
+		chin.face.earsBack = 0.2f;
+		keys.push_back(at(chin, 6.2f));
+		chin.face.lids = 0.75f;
+		chin.sway = 0.02f;
+		keys.push_back(at(chin, 9.5f));
+		IdleKey sigh = chin;
+		sigh.spinePitch = 0.08f; //a deep breath
+		sigh.face.jawOpen = 0.08f;
+		sigh.face.lids = 0.5f;
+		keys.push_back(at(sigh, 10.3f));
+		keys.push_back(at(lying, 11.4f));
+		keys.push_back(at(lying, 14.0f));
+	}
 }
 
 BearRig::Controls BearRig::idleControls(const LocomotionInput& input, const GroundProbe& probe)
@@ -1275,6 +1333,12 @@ BearRig::Controls BearRig::idleControls(const LocomotionInput& input, const Grou
 	const IdleKey& from = keys[next - 1];
 	const IdleKey& to = keys[next];
 	IdleKey key = IdleKey::mix(from, to, smooth((idleTime - from.time) / std::max(to.time - from.time, 1e-3f)));
+	const bool lying = idle == IDLE_LIE;
+	if (lying)
+	{
+		alert += ((looking ? 1.0f : 0.0f) - alert) * smoothingFactor(0.25f, lastTimeDelta);
+		key = IdleKey::mix(key, keys.front(), alert);
+	}
 
 	Controls c;
 	c.rootPosition = input.rootPosition;
@@ -1291,6 +1355,12 @@ BearRig::Controls BearRig::idleControls(const LocomotionInput& input, const Grou
 	c.headPitch = key.headPitch;
 	c.headYaw = key.headYaw;
 	c.headRoll = key.headRoll - 0.4f * rocking;
+	if (lying)
+	{
+		c.neckYaw += 0.35f * lookYaw;
+		c.headYaw += 0.65f * lookYaw;
+		c.headPitch += lookPitch;
+	}
 	c.face = key.face;
 	c.face.lids = std::max(c.face.lids, blinkAmount());
 	c.face.gazeYaw += 0.5f * gazeYaw;

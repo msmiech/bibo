@@ -13,7 +13,7 @@ namespace bibo
 		{
 			bool confirm = false; //next page, or the selected answer (E, Enter, Space, A on a gamepad)
 			int navigate = 0; //-1: previous answer, 1: next answer
-			bool cancel = false; //ends the conversation (the last answer, e.g. "No")
+			bool cancel = false; //ends the conversation (the cancel answer, e.g. "No")
 		};
 
 		/**
@@ -37,8 +37,9 @@ namespace bibo
 			/**
 			* Starts a conversation
 			* @param choices Answers the player chooses from after the last page (none: confirm closes it)
+			* @param cancelChoice The answer that cancel chooses (-1: the last one)
 			*/
-			void open(const std::string& speaker, const std::vector<std::string>& pages, const std::vector<std::string>& choices = {});
+			void open(const std::string& speaker, const std::vector<std::string>& pages, const std::vector<std::string>& choices = {}, int cancelChoice = -1);
 			/**
 			* A line said in passing: it appears like a page and goes away on its own, the player cannot do anything
 			*/
@@ -102,6 +103,7 @@ namespace bibo
 			float soundTimer = 0.0f;
 			float holdTime = 0.0f; //of a line in passing after it appeared
 			int selected = 0;
+			int cancelChoice = -1;
 			int sounds = 0;
 			bool ended = false;
 			int endChoice = -1;

@@ -59,7 +59,7 @@ void applyGraphicsSettings();
 bool pauseGame();
 void resumeGame();
 void restartGame();
-void playSounds();
+void playSounds(const vector<SalmonQuest::Event>& salmonEvents);
 void updateHud();
 void onMenuAction(ui::MenuAction action);
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -106,7 +106,7 @@ unique_ptr<Scene> gameScene;
 //The music and the sounds (not while recording: the game runs faster or slower than real time then)
 unique_ptr<audio::MusicPlayer> music;
 unsigned int beaverSound = 0; //the beaver does not make the same sound twice in a row
-int lastSalmonCaught = 0;
+unsigned int bearSound = 0; //neither does Mishka
 //Shadow maps, HDR image, bloom, auto exposure and tone mapping
 unique_ptr<render::Renderer> renderer;
 
@@ -806,13 +806,17 @@ void gameLoop()
 		{
 			mainShader->enable();
 			update(std::min(time_delta, MAX_TIME_STEP));
-			if (gameScene->getSalmonCaught() > lastSalmonCaught)
+			vector<SalmonQuest::Event> salmonEvents = gameScene->takeSalmonEvents();
+			for (SalmonQuest::Event event : salmonEvents)
 			{
-				lastMessage = "Caught a salmon! +" + to_string(rules::SALMON_POINTS) + " points";
-				messageTimeLeft = 3;
+				if (event == SalmonQuest::Event::EATEN)
+				{
+					lastMessage = "A salmon for Mishka's quest! +" + to_string(SalmonQuest::SALMON_POINTS) + " points ("
+						+ to_string(gameScene->getSalmonEaten()) + "/" + to_string(gameScene->getPoolCount()) + ")";
+					messageTimeLeft = 3;
+				}
 			}
-			lastSalmonCaught = gameScene->getSalmonCaught();
-			playSounds();
+			playSounds(salmonEvents);
 		}
 		updateHud();
 		//Do drawing of game here
@@ -864,7 +868,7 @@ void update(float time_delta) {
 }
 
 //The sounds of what happened in the scene
-void playSounds()
+void playSounds(const vector<SalmonQuest::Event>& salmonEvents)
 {
 	vector<RaceQuest::Event> events = gameScene->takeEvents();
 	int splashes = gameScene->takeSplashes();
@@ -900,6 +904,25 @@ void playSounds()
 			break;
 		}
 	}
+	for (SalmonQuest::Event event : salmonEvents)
+	{
+		switch (event)
+		{
+		case SalmonQuest::Event::BEAR_SOUND:
+			//Mishka grumbles while its words appear, never the same sound twice in a row
+			bearSound += 1 + (bearSound * 5u + 1u) % 3u;
+			music->play(audio::SoundEffect::BEAR, static_cast<int>(bearSound % audio::soundEffectVariants(audio::SoundEffect::BEAR)), 0.9f);
+			break;
+		case SalmonQuest::Event::EATEN:
+			music->play(audio::SoundEffect::CHECKPOINT, 0, 0.7f);
+			break;
+		case SalmonQuest::Event::COMPLETED:
+			music->play(audio::SoundEffect::SUCCESS);
+			break;
+		default:
+			break;
+		}
+	}
 	if (splashes > 0)
 	{
 		music->play(audio::SoundEffect::SPLASH, 0, 0.8f);
@@ -907,18 +930,30 @@ void playSounds()
 }
 
 /**
-* The race quest on the HUD: what the player can do near the beaver, the conversation, the countdown, the race and its result
+* @return The conversation that is shown: with the beaver or with Mishka (a real conversation before a line in passing)
+*/
+const Dialog& shownDialog()
+{
+	const Dialog& race = gameScene->getRaceQuest().getDialog();
+	const Dialog& salmon = gameScene->getSalmonQuest().getDialog();
+	return salmon.isOpen() && (!race.isOpen() || (race.isPassing() && !salmon.isPassing())) ? salmon : race;
+}
+
+/**
+* The quests on the HUD: what the player can do near the beaver or Mishka, the conversation, the countdown, the race,
+* fishing and their results
 */
 void updateHud()
 {
 	ui::Hud hud;
 	hud.visible = gameState != MAIN_MENU;
 	const RaceQuest& quest = gameScene->getRaceQuest();
-	const Dialog& dialog = quest.getDialog();
+	const SalmonQuest& fishing = gameScene->getSalmonQuest();
+	const Dialog& dialog = shownDialog();
 	bool gamepad = controls->hasGamepad();
-	if (quest.canTalk())
+	if (quest.canTalk() || fishing.canTalk())
 	{
-		hud.prompt = string("Talk to ") + RaceQuest::SPEAKER;
+		hud.prompt = string("Talk to ") + (quest.canTalk() ? RaceQuest::SPEAKER : SalmonQuest::SPEAKER);
 		hud.promptKey = gamepad ? "X" : "E";
 	}
 	if (dialog.isOpen())
@@ -945,8 +980,33 @@ void updateHud()
 		hud.checkpoints = to_string(quest.getCheckpointsPassed()) + "/" + to_string(quest.getCheckpointCount());
 		hud.timeLimit = to_string(static_cast<int>(RaceQuest::TIME_LIMIT) / 60) + " min";
 	}
+	if (fishing.isActive())
+	{
+		hud.fishing = true;
+		hud.fishingTime = RaceQuest::formatTime(fishing.getTime());
+		hud.salmon = to_string(fishing.getEatenCount()) + "/" + to_string(fishing.getPoolCount());
+		hud.score = to_string(fishing.getScore());
+	}
 	const float BANNER_TIME = 6.0f;
-	if (quest.getStage() == RaceQuest::Stage::IDLE && quest.getOutcomeAge() < BANNER_TIME)
+	bool fishingResult = fishing.getStage() == SalmonQuest::Stage::IDLE && fishing.getOutcome() != SalmonQuest::Outcome::NONE
+		&& fishing.getOutcomeAge() < BANNER_TIME && (quest.getOutcome() == RaceQuest::Outcome::NONE || fishing.getOutcomeAge() < quest.getOutcomeAge());
+	if (fishingResult)
+	{
+		const string again = string("Talk to ") + SalmonQuest::SPEAKER + " to go fishing again.";
+		if (fishing.getOutcome() == SalmonQuest::Outcome::COMPLETED)
+		{
+			hud.banner = "Fishing complete!";
+			hud.bannerSuccess = true;
+			hud.bannerDetail = to_string(fishing.getScore()) + " points in " + RaceQuest::formatTime(fishing.getTime())
+				+ (fishing.isNewBest() ? (fishing.getCompletions() > 1 ? "  -  a new best time!" : "") : "  -  best: " + RaceQuest::formatTime(fishing.getBestTime()));
+		}
+		else
+		{
+			hud.banner = "Stopped fishing";
+			hud.bannerDetail = to_string(fishing.getScore()) + " points. " + again;
+		}
+	}
+	else if (quest.getStage() == RaceQuest::Stage::IDLE && quest.getOutcomeAge() < BANNER_TIME)
 	{
 		const string again = string("Talk to ") + RaceQuest::SPEAKER + " to try again.";
 		switch (quest.getOutcome())
@@ -1222,7 +1282,7 @@ void textRendering()
 		renderText(textShader.get(), "SPACE / Cross or A to jump (hold to jump higher)", windowWidth / 10.f, windowHeight - 4.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "E / Square or X to talk, R to restart", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Bober the beaver at the start has a race for you!", windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
-		renderText(textShader.get(), "Mind the hedgehogs, catch salmon for bonus points", windowWidth / 10.f, windowHeight - 7.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "Mishka at the largest pool wants you to go fishing", windowWidth / 10.f, windowHeight - 7.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 	}
 	if (settings.showFrameTime)
 	{
@@ -1242,25 +1302,22 @@ void textRendering()
 			+ "  Jobs: " + to_string(world.streaming.pendingJobs), windowWidth / 10.f, windowHeight - 1.45f * windowHeight / 10.f, 0.4f, vec3(0.9, 0.5f, 0.5f));
 	}
 
-	//Bonus: the salmon caught in the pools of water (not under the conversation box)
-	if (gameScene->getRaceQuest().getDialog().isOpen() && menu->hasHud())
+	//Not under the conversation box
+	if (shownDialog().isOpen() && menu->hasHud())
 	{
 		return;
 	}
-	string bonus = "Salmon: " + to_string(gameScene->getSalmonCaught()) + "/" + to_string(gameScene->getPoolCount())
-		+ "   Score: " + to_string(gameScene->getScore());
-	renderText(textShader.get(), bonus, windowWidth / 10.f, 1.5f * windowHeight / 10.f, 0.5f, vec3(0.95f, 0.6f, 0.45f));
-
 	if (messageTimeLeft > 0)
 	{
 		renderText(textShader.get(), lastMessage, windowWidth / 10.f, windowHeight / 10.f, 0.4f, vec3(0.7, 0.5f, 0.8f));
 	}
 
-	//Without the HUD document (e.g. missing UI folder) the quest is shown as plain text
+	//Without the HUD document (e.g. missing UI folder) the quests are shown as plain text
 	if (!menu->hasHud())
 	{
 		const RaceQuest& quest = gameScene->getRaceQuest();
-		const Dialog& dialog = quest.getDialog();
+		const SalmonQuest& fishing = gameScene->getSalmonQuest();
+		const Dialog& dialog = shownDialog();
 		vec3 color(0.95f, 0.85f, 0.4f);
 		if (dialog.isOpen())
 		{
@@ -1273,9 +1330,16 @@ void textRendering()
 			}
 			renderText(textShader.get(), choices, windowWidth / 10.f, 2.5f * windowHeight / 10.f, 0.45f, color);
 		}
-		else if (quest.canTalk())
+		else if (quest.canTalk() || fishing.canTalk())
 		{
-			renderText(textShader.get(), string("E: Talk to ") + RaceQuest::SPEAKER, windowWidth / 10.f, 3.f * windowHeight / 10.f, 0.45f, color);
+			string speaker = quest.canTalk() ? RaceQuest::SPEAKER : SalmonQuest::SPEAKER;
+			renderText(textShader.get(), "E: Talk to " + speaker, windowWidth / 10.f, 3.f * windowHeight / 10.f, 0.45f, color);
+		}
+		if (fishing.isActive())
+		{
+			string salmon = RaceQuest::formatTime(fishing.getTime()) + "   Salmon: " + to_string(fishing.getEatenCount()) + "/" + to_string(fishing.getPoolCount())
+				+ "   Score: " + to_string(fishing.getScore());
+			renderText(textShader.get(), salmon, windowWidth / 10.f, 2.f * windowHeight / 10.f, 0.5f, color);
 		}
 		int countdown = quest.getCountdownNumber();
 		if (countdown >= 0)

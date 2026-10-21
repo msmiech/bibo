@@ -86,9 +86,6 @@ namespace bibo
 			{
 				return checkpointsPassed == CHECKPOINT_COUNT && isOnFinishLine(playerPosition, line);
 			}
-
-			//Bonus points for a salmon that the bear catches (one per pool of water on the track)
-			const int SALMON_POINTS = 100;
 		}
 	}
 }

@@ -11,6 +11,7 @@ namespace bibo
 		enum class SoundEffect
 		{
 			BEAVER, //a short squeaky, nasal chatter of the beaver while it talks (several variants)
+			BEAR, //a low, warm grumble of the bear at the pool while it talks (several variants)
 			COUNTDOWN, //beep of 3, 2, 1
 			GO, //the higher, longer beep at the start
 			CHECKPOINT, //a bright ding

@@ -61,6 +61,8 @@ namespace bibo
 		*   chest and sticks its tongue out) and yawning (sits down and yawns). Key poses of the body, the feet and the face.
 		*   Eating a salmon works the same way: it sits down, holds the fish with its front paws, takes three big bites,
 		*   chews happily with closed eyes and licks its lips.
+		*   Lying on the belly like a sphinx (for a bear that rests and watches something): the head looks around or follows
+		*   lookAt, now and then it rests its chin a while.
 		* - Swimming: dog paddle, the paws go round in circles under the body (the front and the hind legs of opposite sides together),
 		*   the head stays up out of the water, the body rocks with the strokes.
 		* - Ragdoll: the bones follow the bodies of the ragdoll (ragdollParts), the bones in between are interpolated.
@@ -77,7 +79,7 @@ namespace bibo
 			*/
 			enum RagdollPartIndex { PART_PELVIS, PART_CHEST, PART_HEAD, PART_UPPERARM_L, PART_FOREARM_L, PART_UPPERARM_R, PART_FOREARM_R,
 				PART_THIGH_L, PART_SHIN_L, PART_THIGH_R, PART_SHIN_R, PART_COUNT };
-			enum Idle { IDLE_STRETCH, IDLE_YAWN, IDLE_EAT, IDLE_COUNT };
+			enum Idle { IDLE_STRETCH, IDLE_YAWN, IDLE_EAT, IDLE_LIE, IDLE_COUNT };
 			/**
 			* The idle animations the bear plays on its own when it stands still (the first ones of Idle)
 			*/
@@ -113,7 +115,8 @@ namespace bibo
 			void updateLocomotion(float timeDelta, const LocomotionInput& input, const GroundProbe& probe);
 
 			/**
-			* Starts an idle animation (the bear must stand still while it plays)
+			* Starts an idle animation (the bear must stand still while it plays). Lying (IDLE_LIE) starts lying on the belly
+			* and goes on until stopIdle, the head follows lookAt meanwhile.
 			*/
 			void startIdle(Idle idle);
 			/**
@@ -134,6 +137,10 @@ namespace bibo
 			* Holding something in the mouth (e.g. a fish) while it walks, runs and jumps: the mouth stays a bit open
 			*/
 			void setCarrying(bool carrying) { this->carrying = carrying; }
+			/**
+			* Opens the mouth at least this far (0 to 1), e.g. while it talks
+			*/
+			void setMouthOpen(float amount) { mouthOpen = amount; }
 			/**
 			* The head turns to a point and the eyes look at it (e.g. the face of an animal it talks to) instead of looking around
 			*/
@@ -312,6 +319,7 @@ namespace bibo
 			Controls idleControls(const LocomotionInput& input, const GroundProbe& probe);
 			IdleKey standingKey() const;
 			IdleKey sittingKey() const;
+			IdleKey lyingKey() const;
 			void buildIdleAnimations();
 
 			const animation::Skeleton& skeleton;
@@ -362,6 +370,8 @@ namespace bibo
 			float blinkTimer = 3.0f, blinkProgress = -1.0f;
 			float earTwitchTimer = 4.0f;
 			bool carrying = false;
+			float mouthOpen = 0.0f;
+			float alert = 0.0f; //lying: 0 the key poses (resting its chin), 1 the head up (looking at something)
 			bool looking = false;
 			glm::vec3 lookTarget = glm::vec3(0.0f);
 			float fixationYaw = 0.0f, fixationPitch = 0.0f; //tiny jumps of the eyes around the point they look at

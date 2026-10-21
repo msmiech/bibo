@@ -90,7 +90,7 @@ void RaceQuest::startConversation()
 		switch (outcome)
 		{
 		case Outcome::TOO_SLOW:
-			pages.push_back("Five minutes go by fast out there, don't they? Don't worry, nobody makes it on the first try.");
+			pages.push_back("Two minutes go by fast out there, don't they? Don't worry, nobody makes it on the first try.");
 			break;
 		case Outcome::LEFT_TRACK:
 			pages.push_back("Whoa, that was not the track! No shortcuts through the forest, the lap goes along the trail.");
@@ -105,7 +105,7 @@ void RaceQuest::startConversation()
 	{
 		pages.push_back("Oh, hello there, young bear! I'm Bober. Lovely day for a run, isn't it?");
 		pages.push_back("This is the race track around the island. One lap: through all the checkpoints, then back across this line.");
-		pages.push_back("You have five minutes. Stay on the track, keep out of the water, and mind the hedgehogs!");
+		pages.push_back("You have two minutes. Stay on the track, keep out of the water, and mind the hedgehogs!");
 		pages.push_back("So... would you like to give the race track a shot?");
 	}
 	dialog.open(SPEAKER, pages, { "Yes", "No" });
@@ -130,6 +130,7 @@ void RaceQuest::update(float timeDelta, const Situation& situation)
 	stageTime += timeDelta;
 	outcomeAge += timeDelta;
 	nearBeaver = situation.nearBeaver;
+	busy = situation.busy;
 	//The button that answered the beaver does not start the next conversation right away
 	const Stage before = stage;
 
@@ -161,7 +162,14 @@ void RaceQuest::update(float timeDelta, const Situation& situation)
 	case Stage::IDLE:
 		if (situation.interact && before == Stage::IDLE && canTalk())
 		{
-			startConversation();
+			if (busy)
+			{
+				dialog.say(SPEAKER, "You look busy! Come back for a race when you're done.");
+			}
+			else
+			{
+				startConversation();
+			}
 		}
 		break;
 	case Stage::TALKING:

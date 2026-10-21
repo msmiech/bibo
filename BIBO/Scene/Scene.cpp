@@ -34,6 +34,10 @@ namespace
 	const float MARKER_SCALE = 0.8f;
 	//The race is lost when the bear is this deep in the water (its paws)
 	const float IN_WATER_DEPTH = 0.35f;
+	//Mishka is only animated while the camera is this close (far away its fur and its head are too small to see)
+	const float MISHKA_UPDATE_DISTANCE = 90.0f;
+	//Mishka looks at the bear when it comes this close, otherwise at the salmon of its pool
+	const float MISHKA_ATTENTION_DISTANCE = 12.0f;
 
 	//The vertices of the meshes of a geometry in model space (the model matrix is not applied)
 	vector<vec3> modelVertices(Geometry* geometry)
@@ -117,6 +121,7 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	initWorld(*trackScene);
 	initAnimals();
 	initQuest();
+	initMishka();
 	camera->snapBehind(cameraTarget());
 	world->finishLoading(camera->getPosition(), bear->getPosition(), WORLD_LOADING_TIMEOUT);
 	placeAnimals();
@@ -216,6 +221,45 @@ void Scene::initQuest()
 	bear->reset();
 }
 
+void Scene::initMishka()
+{
+	const world::WorldGenerator& generator = world->getGenerator();
+	mishkaPool = largestPool(salmon->getPools());
+	vec3 spot, look;
+	if (mishkaPool < 0 || !findShoreSpot(generator, salmon->getPools()[mishkaPool], spot, look))
+	{
+		util::fatalError("There is no place for Mishka next to the pools of water on the track");
+	}
+	std::string error;
+	mishkaModel = resources::SkinnedModel::load(Bear::MODEL_FILE, error);
+	if (!mishkaModel)
+	{
+		util::fatalError(std::string("Could not load ") + Bear::MODEL_FILE + ": " + error);
+	}
+	RestingBear::paintCoat(*mishkaModel);
+	//Its paws and fur lie on the height field (the physics of the terrain is only streamed around the player's bear)
+	GroundProbe heightField = [&generator](vec3 from, vec3 to, vec3& point, vec3& normal) {
+		vec2 at(to.x, to.z);
+		float height = generator.height(at);
+		if (height > std::max(from.y, to.y) || height < std::min(from.y, to.y))
+		{
+			return false;
+		}
+		const float step = 0.3f;
+		float dx = generator.height(at + vec2(step, 0.0f)) - generator.height(at - vec2(step, 0.0f));
+		float dz = generator.height(at + vec2(0.0f, step)) - generator.height(at - vec2(0.0f, step));
+		point = vec3(to.x, height, to.z);
+		normal = normalize(vec3(-dx, 2.0f * step, -dz));
+		return true;
+	};
+	mishka = make_unique<RestingBear>(*mishkaModel, spot, look, heightField);
+	mishkaBody = physicsWorld->createKinematicSphere(mishka->getColliderCenter(), mishka->getColliderRadius());
+	mishkaRenderer = make_unique<BearRenderer>(*mishkaModel, RestingBear::STRAND_COUNT);
+	mishkaRenderer->setMaxFurLength(fur::MAX_LENGTH * RestingBear::FUR_LENGTH);
+	salmonQuest = make_unique<SalmonQuest>(static_cast<int>(salmon->getPools().size()));
+	cout << "Mishka lies at pool " << mishkaPool + 1 << " of " << salmon->getPools().size() << endl;
+}
+
 vec3 Scene::groundAt(vec3 position) const
 {
 	return vec3(position.x, world->getGenerator().height(vec2(position.x, position.z)), position.z);
@@ -226,18 +270,38 @@ bool Scene::isBearInWater()
 	return bear->getCharacter().getWaterDepth() > IN_WATER_DEPTH;
 }
 
+bool Scene::canTalkAt(vec3 position, float distance)
+{
+	//It can talk when it stands (not while it tumbles, swims or eats)
+	const BearCharacter& character = bear->getCharacter();
+	vec3 offset = position - bear->getPosition();
+	return length(vec2(offset.x, offset.z)) < distance && character.getState() == BearCharacter::State::CONTROL
+		&& !character.isSwimming() && character.getFish() == BearCharacter::Fish::NONE;
+}
+
 RaceQuest::Situation Scene::questSituation(const input::PlayerInput& player)
 {
 	RaceQuest::Situation situation;
-	const BearCharacter& character = bear->getCharacter();
 	situation.bear = bear->getPosition();
-	vec3 toBeaver = beaver->getPosition() - situation.bear;
-	//It can talk when it stands (not while it tumbles, swims or eats)
-	situation.nearBeaver = length(vec2(toBeaver.x, toBeaver.z)) < RaceQuest::TALK_DISTANCE && character.getState() == BearCharacter::State::CONTROL
-		&& !character.isSwimming() && character.getFish() == BearCharacter::Fish::NONE;
+	situation.nearBeaver = canTalkAt(beaver->getPosition(), RaceQuest::TALK_DISTANCE);
+	situation.busy = salmonQuest->isActive();
 	situation.swimming = isBearInWater();
 	situation.onTrack = RaceQuest::isOnTrack(world->getGenerator().getPath(), situation.bear);
 	situation.atStart = atStart;
+	situation.interact = player.interact;
+	situation.dialog.confirm = player.confirm;
+	situation.dialog.navigate = player.navigate;
+	situation.dialog.cancel = player.cancel;
+	return situation;
+}
+
+SalmonQuest::Situation Scene::salmonSituation(const input::PlayerInput& player)
+{
+	SalmonQuest::Situation situation;
+	situation.nearMishka = canTalkAt(mishka->getPosition(), SalmonQuest::TALK_DISTANCE);
+	situation.busy = raceQuest->getStage() != RaceQuest::Stage::IDLE;
+	situation.eatenPool = eatenPool;
+	eatenPool = -1;
 	situation.interact = player.interact;
 	situation.dialog.confirm = player.confirm;
 	situation.dialog.navigate = player.navigate;
@@ -272,7 +336,7 @@ BearInput Scene::bearInput(const input::PlayerInput& player)
 	{
 		atStart = false;
 	}
-	if (raceQuest->isPlayerInControl())
+	if (isPlayerInControl())
 	{
 		input.move = input::cameraRelative(player.move, camera->getForward(), camera->getRight());
 		//The button that answered the beaver must be released before the bear jumps
@@ -281,12 +345,13 @@ BearInput Scene::bearInput(const input::PlayerInput& player)
 		return input;
 	}
 	jumpBlocked = true;
-	if (stage == RaceQuest::Stage::TALKING)
+	if (stage == RaceQuest::Stage::TALKING || salmonQuest->getStage() == SalmonQuest::Stage::TALKING)
 	{
-		//It turns to the beaver and steps back a little if it came too close
-		vec3 toBeaver = beaver->getPosition() - bear->getPosition();
-		bool facing = turnTowards(toBeaver, input);
-		if (facing && length(vec2(toBeaver.x, toBeaver.z)) < TALK_SPACING - 0.2f)
+		//It turns to the animal it talks to and steps back a little if it came too close
+		vec3 partner = stage == RaceQuest::Stage::TALKING ? beaver->getPosition() : mishka->getPosition();
+		vec3 toPartner = partner - bear->getPosition();
+		bool facing = turnTowards(toPartner, input);
+		if (facing && length(vec2(toPartner.x, toPartner.z)) < TALK_SPACING - 0.2f)
 		{
 			input.forward = -0.35f;
 		}
@@ -312,15 +377,16 @@ BearInput Scene::bearInput(const input::PlayerInput& player)
 void Scene::updateCamera(float time_delta)
 {
 	RaceQuest::Stage stage = raceQuest->getStage();
-	if (camera->isLocked() && stage == RaceQuest::Stage::TALKING)
+	bool talkingToMishka = salmonQuest->getStage() == SalmonQuest::Stage::TALKING;
+	if (camera->isLocked() && (stage == RaceQuest::Stage::TALKING || talkingToMishka))
 	{
-		//Both from the side, a bit behind the bear (the beaver faces the camera), from the side with more room
+		//Both from the side, a bit behind the bear (the animal it talks to faces the camera), from the side with more room
 		vec3 bearHead = bear->getPosition() + UP * 0.4f;
-		vec3 beaverHead = beaver->getHeadPosition();
-		vec3 across = beaverHead - bearHead;
+		vec3 partnerHead = talkingToMishka ? mishka->getFacePosition() : beaver->getHeadPosition();
+		vec3 across = partnerHead - bearHead;
 		across.y = 0.0f;
 		across = length(across) > 1e-3f ? normalize(across) : START_DIRECTION;
-		vec3 middle = 0.5f * (bearHead + beaverHead);
+		vec3 middle = 0.5f * (bearHead + partnerHead);
 		vec3 best = middle;
 		float bestRoom = -1.0f;
 		for (float side : { 1.0f, -1.0f })
@@ -354,7 +420,7 @@ void Scene::updateCamera(float time_delta)
 void Scene::update(float time_delta, const input::PlayerInput& player) {
 	physicsWorld->update(time_delta);
 	//The camera turns first, the bear moves relative to where the camera looks then (not in a conversation or a cutscene)
-	if (raceQuest->isPlayerInControl() || !camera->isLocked())
+	if (isPlayerInControl() || !camera->isLocked())
 	{
 		camera->rotate(player.look.x, player.look.y);
 		camera->zoom(player.zoom);
@@ -393,10 +459,37 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 	}
 	lastStage = stage;
 	beaver->setTalking(raceQuest->getDialog().isOpen());
-	//The bear and the beaver look at each other while they talk (and when the bear comes to talk), the beaver whenever the bear is close
+	//During the race Mishka is no obstacle (it lies beside the route, but a racer may cut close past it)
+	bool racing = stage != RaceQuest::Stage::IDLE;
+	if (racing && mishkaBody != physics::INVALID_BODY)
+	{
+		physicsWorld->removeBody(mishkaBody);
+		mishkaBody = physics::INVALID_BODY;
+	}
+	else if (!racing && mishkaBody == physics::INVALID_BODY)
+	{
+		mishkaBody = physicsWorld->createKinematicSphere(mishka->getColliderCenter(), mishka->getColliderRadius());
+	}
+
+	//Fishing for Mishka: the conversation and the salmon the bear eats up
+	salmonQuest->update(time_delta, salmonSituation(player));
+	for (SalmonQuest::Event event : salmonQuest->takeEvents())
+	{
+		if (event == SalmonQuest::Event::BEAR_SOUND)
+		{
+			mishka->speak();
+		}
+		salmonEvents.push_back(event);
+	}
+
+	//The bear looks at the animal it talks to (and when it comes to talk), the beaver and Mishka look at the bear when it is close
 	if (stage == RaceQuest::Stage::TALKING || raceQuest->canTalk())
 	{
 		bear->getCharacter().lookAt(beaver->getFacePosition());
+	}
+	else if (salmonQuest->getStage() == SalmonQuest::Stage::TALKING || salmonQuest->canTalk())
+	{
+		bear->getCharacter().lookAt(mishka->getFacePosition());
 	}
 	else
 	{
@@ -430,6 +523,13 @@ vector<RaceQuest::Event> Scene::takeEvents()
 	return result;
 }
 
+vector<SalmonQuest::Event> Scene::takeSalmonEvents()
+{
+	vector<SalmonQuest::Event> result;
+	result.swap(salmonEvents);
+	return result;
+}
+
 int Scene::takeSplashes()
 {
 	int result = splashes;
@@ -453,12 +553,53 @@ void Scene::updateAnimals(float time_delta)
 	beaver->update(time_delta, bear->getCharacter().getHeadPosition());
 	physicsWorld->moveKinematic(beaverBody, beaver->getColliderCenter(), quat(1.0f, 0.0f, 0.0f, 0.0f), time_delta);
 
-	//Salmon jump out of the water when the bear comes close, one per pool can be caught for bonus points
+	//Salmon jump out of the water when the bear comes close and it catches them. Not during the race (the bear has no time
+	//to eat), on the salmon quest not out of the pools that are done.
 	BearCharacter& character = bear->getCharacter();
-	int pool = salmon->update(time_delta, character.getBoundsCenter(), character.getMouthPosition(), character.canCatchFish());
+	bool racing = raceQuest->getStage() != RaceQuest::Stage::IDLE;
+	vector<bool> closed = racing ? vector<bool>(salmon->getPools().size(), true) : salmonQuest->isActive() ? salmonQuest->getDonePools() : vector<bool>();
+	int pool = salmon->update(time_delta, character.getBoundsCenter(), character.getMouthPosition(), character.canCatchFish() && !racing, closed);
 	if (pool >= 0 && character.catchFish())
 	{
-		score += rules::SALMON_POINTS;
+		carriedPool = pool;
+	}
+	//It counts for the quest when the bear ate it up (not when it dropped it)
+	if (character.takeEatenFish() > 0 && carriedPool >= 0)
+	{
+		eatenPool = carriedPool;
+		carriedPool = -1;
+	}
+	if (character.getFish() == BearCharacter::Fish::NONE)
+	{
+		carriedPool = -1;
+	}
+
+	//Mishka watches the salmon of its pool, and the bear when it comes close
+	vec3 cameraPosition = camera->getPosition();
+	bool talkingToMishka = salmonQuest->getStage() == SalmonQuest::Stage::TALKING;
+	if (talkingToMishka || distance(cameraPosition, mishka->getPosition()) < MISHKA_UPDATE_DISTANCE)
+	{
+		vec3 bearHead = character.getHeadPosition();
+		const vec3* watch = nullptr;
+		vec3 salmonPosition;
+		if (talkingToMishka || distance(bearHead, mishka->getFacePosition()) < MISHKA_ATTENTION_DISTANCE)
+		{
+			watch = &bearHead;
+		}
+		else
+		{
+			float highest = -numeric_limits<float>::max();
+			for (const SalmonPools::Jump& jump : salmon->getJumps())
+			{
+				if (jump.pool == mishkaPool && jump.position().y > highest)
+				{
+					highest = jump.position().y;
+					salmonPosition = jump.position();
+					watch = &salmonPosition;
+				}
+			}
+		}
+		mishka->update(time_delta, watch);
 	}
 }
 
@@ -509,11 +650,16 @@ void Scene::placeAnimals()
 		creatures->add(CreatureModel::DROPLET, droplet.position, quat(1.0f, 0.0f, 0.0f, 0.0f), droplet.size);
 	}
 	beaverRenderer->setPose(0, beaver->getPose());
-	//The beaver offers the race: a golden exclamation mark above it, a blue one once the race was completed
+	//The beaver offers the race: a golden exclamation mark above it, a blue one once the race was completed (Mishka the same)
 	if (raceQuest->isOffered())
 	{
 		CreatureModel marker = raceQuest->hasCompleted() ? CreatureModel::QUEST_MARKER_REPEATABLE : CreatureModel::QUEST_MARKER;
 		creatures->add(marker, beaver->getMarkerPosition(), beaver->getMarkerRotation(), MARKER_SCALE);
+	}
+	if (salmonQuest->isOffered())
+	{
+		CreatureModel marker = salmonQuest->hasCompleted() ? CreatureModel::QUEST_MARKER_REPEATABLE : CreatureModel::QUEST_MARKER;
+		creatures->add(marker, mishka->getMarkerPosition(), mishka->getMarkerRotation(), MARKER_SCALE);
 	}
 }
 
@@ -544,7 +690,9 @@ void Scene::restart()
 		physicsWorld->moveKinematic(hedgehogBodies[i], hedgehogs[i].getColliderCenter(), quat(1.0f, 0.0f, 0.0f, 0.0f), 0.0f);
 	}
 	salmon->reset();
-	score = 0;
+	carriedPool = eatenPool = -1;
+	salmonQuest->abort();
+	salmonEvents.clear();
 	raceQuest->abort();
 	lastStage = raceQuest->getStage();
 	atStart = false;
@@ -578,6 +726,15 @@ void Scene::prepareFrame()
 	world->prepareFrame();
 }
 
+void Scene::uploadMishka()
+{
+	if (mishkaUploaded != mishka->getVersion())
+	{
+		mishkaRenderer->upload(mishka->getPositions(), mishka->getNormals(), mishka->getFurOffsets(), mishka->getCombDirections());
+		mishkaUploaded = mishka->getVersion();
+	}
+}
+
 void Scene::drawShadowCasters(const render::ShadowCascade& cascade)
 {
 	world->drawShadows(cascade, camera->getPosition());
@@ -586,6 +743,11 @@ void Scene::drawShadowCasters(const render::ShadowCascade& cascade)
 	glUniformMatrix4fv(depthShader->getUniformLocation("lightSpaceMatrix"), 1, GL_FALSE, value_ptr(cascade.lightSpace));
 	hedgehogRenderer->drawSurfaces(depthShader.get());
 	beaverRenderer->drawSurfaces(depthShader.get());
+	if (cascade.contains(mishka->getBoundsCenter(), mishka->getBoundsRadius()))
+	{
+		uploadMishka();
+		mishkaRenderer->drawSurface(depthShader.get());
+	}
 	for (const unique_ptr<Geometry>& geometry : geometries)
 	{
 		if (geometry.get() == bear)
@@ -629,7 +791,7 @@ void Scene::drawMain(const render::RenderSettings& settings)
 		world->drawSky();
 	}
 
-	//3. The bear and the hedgehogs: their fur and spines are blended with what is behind them
+	//3. The bears, the hedgehogs and the beaver: their fur and spines are blended with what is behind them
 	BearRenderContext context;
 	context.view = view;
 	context.projection = projection;
@@ -641,6 +803,11 @@ void Scene::drawMain(const render::RenderSettings& settings)
 	}
 	hedgehogRenderer->drawShaded(context, frustum);
 	beaverRenderer->drawShaded(context, frustum);
+	if (!viewFrustumCullingEnabled || frustum.sphereInFrustum(mishka->getBoundsCenter(), mishka->getBoundsRadius()) != ViewFrustum::OUTSIDE)
+	{
+		uploadMishka();
+		mishkaRenderer->drawShaded(context, mishka->getBoundsCenter());
+	}
 
 	//4. Transparent: the water, the falling snow
 	world->drawTransparent(settings.transparency);

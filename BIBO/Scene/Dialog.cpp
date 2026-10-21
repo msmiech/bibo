@@ -15,11 +15,12 @@ namespace
 	}
 }
 
-void Dialog::open(const std::string& speaker, const std::vector<std::string>& pages, const std::vector<std::string>& choices)
+void Dialog::open(const std::string& speaker, const std::vector<std::string>& pages, const std::vector<std::string>& choices, int cancelChoice)
 {
 	this->speaker = speaker;
 	this->pages = pages.empty() ? std::vector<std::string>{ "" } : pages;
 	this->choices = choices;
+	this->cancelChoice = cancelChoice >= 0 && cancelChoice < static_cast<int>(choices.size()) ? cancelChoice : static_cast<int>(choices.size()) - 1;
 	active = true;
 	passing = false;
 	selected = 0;
@@ -157,7 +158,7 @@ void Dialog::update(float timeDelta, const DialogInput& input)
 		}
 		if (input.cancel)
 		{
-			end(count - 1);
+			end(cancelChoice);
 		}
 		else if (input.confirm)
 		{

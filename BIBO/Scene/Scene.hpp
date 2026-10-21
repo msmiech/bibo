@@ -11,7 +11,9 @@
 #include "Hedgehog.hpp"
 #include "HedgehogRenderer.hpp"
 #include "RaceQuest.hpp"
+#include "RestingBear.hpp"
 #include "Salmon.hpp"
+#include "SalmonQuest.hpp"
 #include "../Render/Renderer.hpp"
 #include "../Util/Input.hpp"
 #include "../Util/Util.hpp"
@@ -28,9 +30,11 @@ namespace bibo
 	{
 		/**
 		* The island: the bear, the objects of the track (finish line, signs, ...), the animals (hedgehogs that stroll around
-		* on the track, salmon that jump out of the water, the beaver at the start who offers the race as a quest) and the world
-		* around it (World: the island with its forest, caves, sky, water and snow). The bear roams freely and swims in the water;
-		* the race around the track is a quest (RaceQuest), during its conversation and cutscene the scene moves the bear and the camera.
+		* on the track, salmon that jump out of the water, the beaver at the start who offers the race as a quest, Mishka the bear
+		* at the largest pool who offers the salmon as a quest) and the world around it (World: the island with its forest, caves,
+		* sky, water and snow). The bear roams freely, swims in the water and catches and eats salmon; the race around the track
+		* (RaceQuest) and fishing in all pools (SalmonQuest) are quests, one at a time. During their conversations and the
+		* cutscene of the race the scene moves the bear and the camera. No salmon jump during the race.
 		*/
 		class Scene : public render::RenderableScene
 		{
@@ -49,9 +53,22 @@ namespace bibo
 			*/
 			void initQuest();
 			/**
+			* Mishka at the largest pool of water, and the salmon quest
+			*/
+			void initMishka();
+			/**
 			* What the bear does for the quest in this frame (where it is, whether it talks to the beaver, ...)
 			*/
 			RaceQuest::Situation questSituation(const input::PlayerInput& player);
+			SalmonQuest::Situation salmonSituation(const input::PlayerInput& player);
+			/**
+			* @return true if the bear can talk now (standing, not swimming or eating) and is within the distance of a point
+			*/
+			bool canTalkAt(vec3 position, float distance);
+			/**
+			* @return true while the player moves the bear (not in a conversation or the cutscene)
+			*/
+			bool isPlayerInControl() const { return raceQuest->isPlayerInControl() && salmonQuest->isPlayerInControl(); }
 			/**
 			* The input of the bear: from the player, or from the cutscene and the conversation
 			*/
@@ -75,6 +92,8 @@ namespace bibo
 			//Puts the parts of the animals where they are drawn in this frame
 			void placeAnimals();
 			void placeSalmon(vec3 center, const quat& rotation, int bites, float wiggle);
+			//The skinned vertices of Mishka to its renderer (when they changed)
+			void uploadMishka();
 			//What the camera follows: the bear
 			Camera::FollowTarget cameraTarget();
 			/**
@@ -116,7 +135,15 @@ namespace bibo
 			unique_ptr<Beaver> beaver;
 			physics::BodyHandle beaverBody = physics::INVALID_BODY;
 			unique_ptr<FurryRenderer> beaverRenderer;
-			int score = 0;
+			//Mishka, who lies at the largest pool and watches the salmon (its model has darker fur than the bear's)
+			unique_ptr<resources::SkinnedModel> mishkaModel;
+			unique_ptr<RestingBear> mishka;
+			unique_ptr<BearRenderer> mishkaRenderer;
+			unsigned int mishkaUploaded = 0;
+			physics::BodyHandle mishkaBody = physics::INVALID_BODY;
+			int mishkaPool = -1;
+			int carriedPool = -1; //the salmon in the mouth of the bear is from this pool, -1 if none
+			int eatenPool = -1; //the bear ate up a salmon of this pool (for the next update of the salmon quest)
 
 			//Physics
 			physics::PhysicsWorld* physicsWorld;
@@ -132,6 +159,9 @@ namespace bibo
 			bool atStart = false; //the bear reached the starting line in the cutscene
 			bool jumpBlocked = false; //after a conversation until the jump button is released (it may have answered)
 			vector<RaceQuest::Event> events; //for takeEvents
+			//Fishing in all pools
+			unique_ptr<SalmonQuest> salmonQuest;
+			vector<SalmonQuest::Event> salmonEvents; //for takeSalmonEvents
 			int splashes = 0;
 
 			//Dynamic bodies and their start poses, which they are moved back to by restart()
@@ -168,6 +198,12 @@ namespace bibo
 
 			const RaceQuest& getRaceQuest() const { return *raceQuest; }
 			const Beaver& getBeaver() const { return *beaver; }
+			const SalmonQuest& getSalmonQuest() const { return *salmonQuest; }
+			const RestingBear& getMishka() const { return *mishka; }
+			/**
+			* @return The pool where Mishka lies (the largest one)
+			*/
+			int getMishkaPool() const { return mishkaPool; }
 			/**
 			* @return true if the bear is in the water (swimming or wading deep), the race is lost then
 			*/
@@ -176,6 +212,7 @@ namespace bibo
 			* @return What happened in the quest since the last call (e.g. for the sounds)
 			*/
 			vector<RaceQuest::Event> takeEvents();
+			vector<SalmonQuest::Event> takeSalmonEvents();
 			/**
 			* @return How often the bear fell into the water since the last call
 			*/
@@ -214,10 +251,10 @@ namespace bibo
 			*/
 			int getGeometryCount();
 			/**
-			* @return Bonus points of the run (the salmon the bear caught)
+			* @return Points of the salmon quest (the salmon the bear ate on it, none outside of the quest)
 			*/
-			int getScore() const { return score; }
-			int getSalmonCaught() const { return salmon->getCaughtCount(); }
+			int getScore() const { return salmonQuest->getScore(); }
+			int getSalmonEaten() const { return salmonQuest->getEatenCount(); }
 			int getPoolCount() const { return static_cast<int>(salmon->getPools().size()); }
 		};
 	}

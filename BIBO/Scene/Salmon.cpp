@@ -1,6 +1,7 @@
 #include "Salmon.hpp"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <glm/gtc/constants.hpp>
 #include "../World/WorldGenerator.hpp"
 
@@ -18,6 +19,22 @@ namespace
 	const float EMERGE_DEPTH = 0.3f;
 	//At most this many salmon of a pool are in the air at the same time
 	const int MAX_JUMPS_PER_POOL = 2;
+	//The points of the water along a sample of the track are this far apart (meters across the track)
+	const float WATER_STEP = 0.75f;
+	//A place on the shore: this high above the water, this flat (height difference within SHORE_RADIUS), this far from it
+	const float SHORE_MIN_HEIGHT = 0.15f, SHORE_MAX_HEIGHT = 4.0f, SHORE_FLATNESS = 0.35f, SHORE_RADIUS = 1.6f;
+	const float SHORE_MIN_WATER_DISTANCE = 1.6f, SHORE_MAX_WATER_DISTANCE = 8.0f;
+	//It may also lie a bit beyond the floor of the track (at the foot of the walls), and keeps this far from the route of runners
+	const float SHORE_BEYOND_FLOOR = 4.0f, SHORE_ROUTE_CLEARANCE = 6.0f;
+	//Steps across the floor when looking for a way around the water
+	const float ROUTE_STEP = 0.5f;
+	//The route is smoothed over this many points before and after (about meters), runners cut corners
+	const std::size_t ROUTE_SMOOTHING = 4;
+
+	bool isClosed(const std::vector<bool>& closed, std::size_t pool)
+	{
+		return pool < closed.size() && closed[pool];
+	}
 }
 
 std::vector<WaterPool> bibo::scene::findWaterPools(const world::WorldGenerator& generator)
@@ -44,6 +61,7 @@ std::vector<WaterPool> bibo::scene::findWaterPools(const world::WorldGenerator& 
 				pool.radius = std::max(pool.radius, glm::distance(point, center) + 0.5f);
 			}
 			pool.trackDistance = distanceSum / static_cast<float>(wetSamples);
+			pool.area = static_cast<float>(water.size()) * WATER_STEP * world::TrackPath::SAMPLE_SPACING;
 			pool.spots = deep.empty() ? water : deep;
 			pools.push_back(pool);
 		}
@@ -57,7 +75,7 @@ std::vector<WaterPool> bibo::scene::findWaterPools(const world::WorldGenerator& 
 		glm::vec2 center(sample.position.x, sample.position.z);
 		glm::vec2 right(-sample.tangent.y, sample.tangent.x);
 		bool wet = false;
-		for (float lateral = -sample.floorLeft - 1.0f; lateral <= sample.floorRight + 1.0f; lateral += 0.75f)
+		for (float lateral = -sample.floorLeft - 1.0f; lateral <= sample.floorRight + 1.0f; lateral += WATER_STEP)
 		{
 			glm::vec2 point = center + right * lateral;
 			float depth = sea - generator.height(point);
@@ -84,6 +102,160 @@ std::vector<WaterPool> bibo::scene::findWaterPools(const world::WorldGenerator& 
 	}
 	finish();
 	return pools;
+}
+
+int bibo::scene::largestPool(const std::vector<WaterPool>& pools)
+{
+	int largest = -1;
+	for (std::size_t i = 0; i < pools.size(); ++i)
+	{
+		if (largest < 0 || pools[i].area > pools[largest].area)
+		{
+			largest = static_cast<int>(i);
+		}
+	}
+	return largest;
+}
+
+std::vector<glm::vec2> bibo::scene::runningRoute(const world::WorldGenerator& generator, float from, float to)
+{
+	const float sea = generator.getSeaLevel();
+	std::vector<glm::vec2> route;
+	for (const world::TrackPath::Sample& sample : generator.getPath().getSamples())
+	{
+		if (sample.distance < from || sample.distance > to)
+		{
+			continue;
+		}
+		glm::vec2 middle(sample.position.x, sample.position.z);
+		glm::vec2 right(-sample.tangent.y, sample.tangent.x);
+		glm::vec2 trail = middle + right * sample.trailOffset;
+		if (generator.height(trail) >= sea)
+		{
+			route.push_back(trail);
+			continue;
+		}
+		//The trail is under water here: around it through the widest dry part of the floor
+		float bestWidth = 0.0f, bestMiddle = 0.0f, start = 0.0f;
+		bool dry = false;
+		for (float lateral = -sample.floorLeft; lateral <= sample.floorRight + ROUTE_STEP; lateral += ROUTE_STEP)
+		{
+			bool here = lateral <= sample.floorRight && generator.height(middle + right * lateral) >= sea;
+			if (here && !dry)
+			{
+				start = lateral;
+			}
+			else if (!here && dry && lateral - start > bestWidth)
+			{
+				bestWidth = lateral - start;
+				bestMiddle = 0.5f * (start + lateral - ROUTE_STEP);
+			}
+			dry = here;
+		}
+		if (bestWidth > 0.0f)
+		{
+			route.push_back(middle + right * bestMiddle);
+		}
+	}
+	//Runners cut the corners (e.g. from the trail towards the way around the water): the average of the points around
+	std::vector<glm::vec2> smooth(route.size());
+	for (std::size_t i = 0; i < route.size(); ++i)
+	{
+		std::size_t first = i > ROUTE_SMOOTHING ? i - ROUTE_SMOOTHING : 0, last = std::min(i + ROUTE_SMOOTHING, route.size() - 1);
+		glm::vec2 sum(0.0f);
+		for (std::size_t k = first; k <= last; ++k)
+		{
+			sum += route[k];
+		}
+		smooth[i] = sum / static_cast<float>(last - first + 1);
+	}
+	return smooth;
+}
+
+bool bibo::scene::findShoreSpot(const world::WorldGenerator& generator, const WaterPool& pool, glm::vec3& position, glm::vec3& direction)
+{
+	const float sea = generator.getSeaLevel();
+	const world::TrackPath& path = generator.getPath();
+	//The water around the pool (to measure how far a place is from it)
+	std::vector<glm::vec2> water;
+	const glm::vec2 center(pool.center.x, pool.center.z);
+	const float reach = pool.radius + SHORE_MAX_WATER_DISTANCE + 1.0f;
+	for (float x = -reach; x <= reach; x += 0.5f)
+	{
+		for (float z = -reach; z <= reach; z += 0.5f)
+		{
+			glm::vec2 point = center + glm::vec2(x, z);
+			if (generator.height(point) < sea)
+			{
+				water.push_back(point);
+			}
+		}
+	}
+	//Where runners go past the pool (e.g. in the race): the animal must not lie in their way
+	const float span = pool.radius + SHORE_MAX_WATER_DISTANCE + 10.0f;
+	std::vector<glm::vec2> route = runningRoute(generator, pool.trackDistance - span, pool.trackDistance + span);
+	auto distanceTo = [](const std::vector<glm::vec2>& points, glm::vec2 point) {
+		float nearest = std::numeric_limits<float>::max();
+		for (glm::vec2 other : points)
+		{
+			nearest = std::min(nearest, glm::distance(other, point));
+		}
+		return nearest;
+	};
+	//The route is a line (runners cut across from one point to the next, e.g. back onto the trail behind the water)
+	auto distanceToRoute = [&route](glm::vec2 point) {
+		float nearest = std::numeric_limits<float>::max();
+		for (std::size_t i = 0; i + 1 < route.size(); ++i)
+		{
+			glm::vec2 segment = route[i + 1] - route[i];
+			float along = glm::dot(point - route[i], segment) / std::max(glm::dot(segment, segment), 1e-6f);
+			nearest = std::min(nearest, glm::distance(point, route[i] + segment * std::clamp(along, 0.0f, 1.0f)));
+		}
+		return nearest;
+	};
+
+	//On the floor of the track (or at the foot of its walls) beside the water: as far from the route as needed,
+	//then close to the middle of the pool
+	float bestScore = -std::numeric_limits<float>::max();
+	for (const world::TrackPath::Sample& sample : path.getSamples())
+	{
+		if (std::abs(sample.distance - pool.trackDistance) > pool.radius + SHORE_MAX_WATER_DISTANCE)
+		{
+			continue;
+		}
+		glm::vec2 middle(sample.position.x, sample.position.z);
+		glm::vec2 right(-sample.tangent.y, sample.tangent.x);
+		for (float lateral = -sample.floorLeft - SHORE_BEYOND_FLOOR; lateral <= sample.floorRight + SHORE_BEYOND_FLOOR; lateral += 0.5f)
+		{
+			glm::vec2 point = middle + right * lateral;
+			float height = generator.height(point);
+			if (height < sea + SHORE_MIN_HEIGHT || height > sea + SHORE_MAX_HEIGHT)
+			{
+				continue;
+			}
+			bool flat = true;
+			for (int i = 0; i < 8 && flat; ++i)
+			{
+				float angle = static_cast<float>(i) * 0.25f * PI;
+				flat = std::abs(generator.height(point + SHORE_RADIUS * glm::vec2(std::cos(angle), std::sin(angle))) - height) < SHORE_FLATNESS;
+			}
+			float waterDistance = distanceTo(water, point);
+			if (!flat || waterDistance < SHORE_MIN_WATER_DISTANCE || waterDistance > SHORE_MAX_WATER_DISTANCE)
+			{
+				continue;
+			}
+			float clearance = std::min(distanceToRoute(point), SHORE_ROUTE_CLEARANCE);
+			float score = 10.0f * clearance - 0.3f * glm::distance(point, center);
+			if (score > bestScore)
+			{
+				bestScore = score;
+				position = glm::vec3(point.x, height, point.y);
+				glm::vec2 look = center - point;
+				direction = glm::normalize(glm::vec3(look.x, 0.0f, look.y));
+			}
+		}
+	}
+	return bestScore > -std::numeric_limits<float>::max();
 }
 
 glm::vec3 SalmonPools::Jump::position() const
@@ -114,15 +286,9 @@ float SalmonPools::uniform(float from, float to)
 void SalmonPools::reset()
 {
 	random.seed(seed);
-	caught.assign(pools.size(), false);
 	nextJump.assign(pools.size(), 0.0f);
 	jumps.clear();
 	droplets.clear();
-}
-
-int SalmonPools::getCaughtCount() const
-{
-	return static_cast<int>(std::count(caught.begin(), caught.end(), true));
 }
 
 void SalmonPools::splash(glm::vec3 position, float surface, int count)
@@ -172,7 +338,7 @@ void SalmonPools::startJump(int pool, glm::vec3 bearCenter)
 	splash(jump.start, water.center.y, 8);
 }
 
-int SalmonPools::update(float timeDelta, glm::vec3 bearCenter, glm::vec3 bearMouth, bool canCatch)
+int SalmonPools::update(float timeDelta, glm::vec3 bearCenter, glm::vec3 bearMouth, bool canCatch, const std::vector<bool>& closed)
 {
 	if (timeDelta <= 0.0f)
 	{
@@ -208,12 +374,12 @@ int SalmonPools::update(float timeDelta, glm::vec3 bearCenter, glm::vec3 bearMou
 		}
 	}
 
-	//New salmon jump while the bear is close to a pool whose salmon it has not caught yet
+	//New salmon jump while the bear is close to an open pool
 	for (std::size_t p = 0; p < pools.size(); ++p)
 	{
 		const WaterPool& pool = pools[p];
 		float distance = glm::distance(glm::vec2(bearCenter.x, bearCenter.z), glm::vec2(pool.center.x, pool.center.z));
-		if (caught[p] || distance > APPROACH_DISTANCE + pool.radius)
+		if (isClosed(closed, p) || distance > APPROACH_DISTANCE + pool.radius)
 		{
 			nextJump[p] = std::min(nextJump[p], 0.3f); //the first one soon after the bear came close
 			continue;
@@ -235,10 +401,9 @@ int SalmonPools::update(float timeDelta, glm::vec3 bearCenter, glm::vec3 bearMou
 	{
 		const Jump& jump = jumps[i];
 		glm::vec3 position = jump.position();
-		if (!caught[jump.pool] && (glm::distance(position, bearMouth) < MOUTH_REACH || glm::distance(position, bearCenter) < BODY_REACH))
+		if (!isClosed(closed, static_cast<std::size_t>(jump.pool)) && (glm::distance(position, bearMouth) < MOUTH_REACH || glm::distance(position, bearCenter) < BODY_REACH))
 		{
 			int pool = jump.pool;
-			caught[pool] = true;
 			jumps.erase(jumps.begin() + static_cast<std::ptrdiff_t>(i));
 			return pool;
 		}

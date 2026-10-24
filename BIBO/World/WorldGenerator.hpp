@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 #include <glm/glm.hpp>
+#include "Landmarks.hpp"
 #include "TrackPath.hpp"
 #include "TrackTerrain.hpp"
 
@@ -49,7 +50,7 @@ namespace bibo
 		*/
 		struct SurfaceMaterial
 		{
-			float trail = 0.0f; //the dirt trail of the race track
+			float trail = 0.0f; //the dirt trail of the race track and of the foot paths
 			float sand = 0.0f; //beach
 			float cave = 0.0f; //inside of a cave (bare rock, no snow)
 			float cliff = 0.0f; //rocky coast
@@ -97,9 +98,13 @@ namespace bibo
 			*/
 			glm::vec3 normal(glm::vec3 position) const;
 			/**
-			* Height of the ground without caves and overhangs (the height field the world is made of)
+			* Height of the ground without caves and overhangs (the height field the world is made of), with the foot paths
 			*/
 			float height(glm::vec2 position) const;
+			/**
+			* Height of the ground before the foot paths are cut into it and the clearings are leveled
+			*/
+			float naturalHeight(glm::vec2 position) const;
 			/**
 			* Finds the highest surface at a point of the ground plane (e.g. on the roof of a cave, not in it)
 			* @return false if there is no ground there
@@ -148,6 +153,14 @@ namespace bibo
 			const TrackPath& getPath() const { return *path; }
 			const std::vector<Cave>& getCaves() const { return caves; }
 			const std::vector<KeepClear>& getKeepClear() const { return keepClear; }
+			/**
+			* The points of interest and the foot paths to them
+			*/
+			const Landmarks& getLandmarks() const { return *landmarks; }
+			/**
+			* Where the mountains are highest (about)
+			*/
+			std::vector<glm::vec2> getMountainPeaks() const;
 
 		private:
 			/**
@@ -177,6 +190,7 @@ namespace bibo
 			std::unique_ptr<TrackTerrain> track;
 			std::unique_ptr<TrackPath> path;
 			std::vector<Cave> caves;
+			std::unique_ptr<Landmarks> landmarks; //null while they are made (the height is the natural height then)
 			std::vector<KeepClear> keepClear;
 			float seaLevel;
 			glm::vec2 center;

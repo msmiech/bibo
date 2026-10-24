@@ -13,6 +13,7 @@
 #include "Physics/Physics.hpp"
 #include "Scene/GameRules.hpp"
 #include "World/Chunk.hpp"
+#include "World/Landmarks.hpp"
 #include "World/TrackPath.hpp"
 #include "World/TrackTerrain.hpp"
 #include "World/Vegetation.hpp"
@@ -246,6 +247,229 @@ TEST_CASE("Caves cover parts of the track and leave room on the floor", "[assets
 	//Not under a roof outside of the caves
 	CHECK_FALSE(world.isInCave(startPosition()));
 	CHECK(world.caveRoofTop(ground(startPosition())) < -1000.0f);
+}
+
+TEST_CASE("The trail goes around the pools where the floor has room, through the ones that fill it", "[assets][world]")
+{
+	const WorldGenerator& world = worldGenerator();
+	const TrackTerrain& track = world.getTrack();
+	const float sea = world.getSeaLevel();
+	auto dry = [&](const TrackPath::Sample& sample, float offset) {
+		vec2 right(-sample.tangent.y, sample.tangent.x);
+		for (float lateral = offset - TrackPath::TRAIL_HALF_WIDTH; lateral <= offset + TrackPath::TRAIL_HALF_WIDTH; lateral += 0.25f)
+		{
+			if (track.height(ground(sample.position) + right * lateral) < sea + 0.05f)
+			{
+				return false;
+			}
+		}
+		return true;
+	};
+	int wet = 0, aroundPools = 0;
+	bool inPool = false, fillsFloor = false;
+	const std::vector<TrackPath::Sample>& samples = world.getPath().getSamples();
+	for (const TrackPath::Sample& sample : samples)
+	{
+		CAPTURE(sample.distance, sample.position, sample.trailOffset, sample.floorLeft, sample.floorRight);
+		//On the floor (it may reach a bit over its edge)
+		CHECK(sample.trailOffset - TrackPath::TRAIL_HALF_WIDTH > -sample.floorLeft - 1.6f);
+		CHECK(sample.trailOffset + TrackPath::TRAIL_HALF_WIDTH < sample.floorRight + 1.6f);
+		if (dry(sample, sample.trailOffset))
+		{
+			//A stretch of the trail in the water only crosses a pool that fills the floor somewhere
+			CHECK((!inPool || fillsFloor));
+			inPool = fillsFloor = false;
+			bool next = false;
+			for (float lateral = -1.0f; lateral <= 1.0f; lateral += 0.5f)
+			{
+				next = next || !dry(sample, lateral);
+			}
+			aroundPools += next ? 1 : 0; //the middle of the floor is wet
+			continue;
+		}
+		++wet;
+		inPool = true;
+		bool room = false;
+		for (float offset = -sample.floorLeft + TrackPath::TRAIL_HALF_WIDTH; offset <= sample.floorRight - TrackPath::TRAIL_HALF_WIDTH; offset += 0.25f)
+		{
+			room = room || dry(sample, offset);
+		}
+		fillsFloor = fillsFloor || !room;
+	}
+	CHECK(wet > 0); //the race jumps over pools
+	CHECK(aroundPools > 10);
+}
+
+TEST_CASE("Foot paths lead from the race track to the points of interest: beaches, a summit, a camp, standing stones, a cliff", "[assets][world]")
+{
+	const WorldGenerator& world = worldGenerator();
+	const Landmarks& landmarks = world.getLandmarks();
+	const std::vector<PointOfInterest>& points = landmarks.getPointsOfInterest();
+	const TrackPath& track = world.getPath();
+	const float sea = world.getSeaLevel();
+
+	SECTION("There are beaches on different sides of the island and one of each other kind")
+	{
+		std::vector<float> beaches;
+		int summits = 0, camps = 0, stones = 0, cliffs = 0;
+		for (const PointOfInterest& point : points)
+		{
+			CAPTURE(point.position, static_cast<int>(point.kind));
+			vec2 offset = ground(point.position) - world.getCenter();
+			float inland, cliff;
+			world.coast(ground(point.position), inland, cliff);
+			CHECK(point.position.y > sea + 0.3f);
+			CHECK(inland > 0.0f);
+			switch (point.kind)
+			{
+			case PointOfInterest::Kind::BEACH:
+				beaches.push_back(std::atan2(offset.y, offset.x));
+				CHECK(inland < 20.0f);
+				CHECK(world.material(point.position, vec3(0.0f, 1.0f, 0.0f)).sand > 0.5f);
+				break;
+			case PointOfInterest::Kind::SUMMIT:
+				++summits;
+				CHECK(point.position.y > 40.0f);
+				break;
+			case PointOfInterest::Kind::CAMP:
+				++camps;
+				break;
+			case PointOfInterest::Kind::STANDING_STONES:
+				++stones;
+				break;
+			case PointOfInterest::Kind::CLIFF_VIEW:
+				++cliffs;
+				CHECK(cliff > 0.8f);
+				CHECK(point.position.y > sea + 8.0f);
+				break;
+			}
+		}
+		CHECK(summits == 1);
+		CHECK(camps == 1);
+		CHECK(stones == 1);
+		CHECK(cliffs == 1);
+		REQUIRE(beaches.size() >= 3);
+		for (std::size_t i = 0; i < beaches.size(); ++i)
+		{
+			for (std::size_t j = i + 1; j < beaches.size(); ++j)
+			{
+				float apart = std::fmod(std::abs(beaches[i] - beaches[j]), 6.2831853f);
+				CHECK(std::min(apart, 6.2831853f - apart) > glm::radians(50.0f));
+			}
+		}
+	}
+
+	SECTION("Every point of interest has a path that starts at the race track or branches off from another path")
+	{
+		std::vector<int> pathsTo(points.size(), 0);
+		const std::vector<FootPath>& paths = landmarks.getPaths();
+		int fromTrack = 0;
+		for (std::size_t p = 0; p < paths.size(); ++p)
+		{
+			const FootPath& path = paths[p];
+			REQUIRE(path.points.size() > 20);
+			++pathsTo[path.pointOfInterest];
+			CHECK(glm::distance(ground(path.points.back()), ground(points[path.pointOfInterest].position)) < 0.5f);
+			vec2 start = ground(path.points.front());
+			if (path.fromTrack)
+			{
+				++fromTrack;
+				TrackPath::Nearest nearest = track.nearest(start);
+				REQUIRE(nearest.found);
+				CHECK(std::abs(nearest.lateral) < nearest.floorHalfWidth);
+				CHECK(world.caveRoofTop(start) < -1000.0f);
+			}
+			else
+			{
+				float closest = 1e9f;
+				for (std::size_t other = 0; other < p; ++other)
+				{
+					for (const vec3& point : paths[other].points)
+					{
+						closest = std::min(closest, glm::distance(ground(point), start));
+					}
+				}
+				CHECK(closest < 0.01f);
+			}
+		}
+		CHECK(fromTrack >= 2);
+		for (std::size_t i = 0; i < points.size(); ++i)
+		{
+			CAPTURE(i);
+			CHECK(pathsTo[i] == 1);
+		}
+	}
+
+	SECTION("The paths are cut into the ground: not steep along them, walkable across, out of the water, trodden earth")
+	{
+		for (const FootPath& path : landmarks.getPaths())
+		{
+			for (std::size_t i = 1; i < path.points.size(); ++i)
+			{
+				const vec3& point = path.points[i];
+				CAPTURE(point);
+				float step = glm::distance(ground(point), ground(path.points[i - 1]));
+				REQUIRE(step < 1.3f);
+				CHECK(std::abs(point.y - path.points[i - 1].y) <= Landmarks::MAX_GRADE * step + 0.05f);
+				TrackPath::Nearest nearest = track.nearest(ground(point));
+				if (nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth + 4.0f)
+				{
+					continue; //where it comes out of the canyon of the track, the floor is not changed
+				}
+				vec3 surface, normal;
+				REQUIRE(world.surface(ground(point), surface, normal));
+				CHECK(std::abs(surface.y - point.y) < 0.2f);
+				CHECK(surface.y > sea);
+				CHECK(normal.y > 0.75f);
+				SurfaceMaterial material = world.material(surface, normal);
+				CHECK(material.trail + material.sand > 0.5f);
+			}
+		}
+	}
+
+	SECTION("Nothing grows on the paths and in the places, the places have their stones and logs")
+	{
+		std::set<std::pair<int, int>> keys;
+		for (const FootPath& path : landmarks.getPaths())
+		{
+			for (std::size_t i = 0; i < path.points.size(); i += 6)
+			{
+				ChunkKey key = chunkAt(path.points[i]);
+				keys.insert({ key.x, key.z });
+			}
+			ChunkKey end = chunkAt(path.points.back());
+			keys.insert({ end.x, end.z });
+		}
+		std::vector<int> props(points.size(), 0);
+		for (const auto& key : keys)
+		{
+			std::vector<bibo::physics::ShapePart> collision;
+			std::vector<Instance> large = scatter(world, { key.first, key.second }, Layer::LARGE, &collision);
+			int solid = 0;
+			for (const Instance& instance : large)
+			{
+				vec3 position(instance.positionScale);
+				CAPTURE(position, static_cast<int>(instance.model()));
+				bool plant = instance.model() <= Model::JUNIPER;
+				solid += instance.model() <= Model::PINE || instance.model() >= Model::STONE_ROUND ? 1 : 0;
+				if (plant)
+				{
+					CHECK(landmarks.pathDistance(ground(position)) > Landmarks::PATH_HALF_WIDTH + 0.5f);
+					CHECK(landmarks.pointAt(ground(position)) < 0);
+				}
+				else if (landmarks.pointAt(ground(position)) >= 0)
+				{
+					++props[landmarks.pointAt(ground(position))];
+				}
+			}
+			CHECK(collision.size() == static_cast<std::size_t>(solid));
+		}
+		for (std::size_t i = 0; i < points.size(); ++i)
+		{
+			CAPTURE(i, static_cast<int>(points[i].kind));
+			CHECK(props[i] >= 3);
+		}
+	}
 }
 
 TEST_CASE("The chunks of the world fit together", "[assets][world]")

@@ -23,7 +23,7 @@ namespace bibo
 				float distance = 0.0f; //along the track from the start
 				float floorLeft = 0.0f, floorRight = 0.0f; //width of the flat floor to the left and right of the center
 				float wallLeft = 0.0f, wallRight = 0.0f; //height of the walls above the floor (highest point close to the track)
-				float trailOffset = 0.0f; //the trail winds a bit on the floor: offset of its middle to the right
+				float trailOffset = 0.0f; //the trail winds a bit on the floor (and around the pools): offset of its middle to the right
 			};
 
 			/**
@@ -48,8 +48,9 @@ namespace bibo
 			* @param start Start (and finish) of the lap
 			* @param startDirection Driving direction at the start
 			* @param waypoints Points on the track in driving direction (the checkpoints)
+			* @param waterLevel Below it the floor is under water (the pools on the track): the trail goes around them where it can
 			*/
-			TrackPath(const TrackTerrain& terrain, glm::vec2 start, glm::vec2 startDirection, const std::vector<glm::vec2>& waypoints);
+			TrackPath(const TrackTerrain& terrain, glm::vec2 start, glm::vec2 startDirection, const std::vector<glm::vec2>& waypoints, float waterLevel);
 
 			const std::vector<Sample>& getSamples() const { return samples; }
 			float getLength() const { return length; }
@@ -61,6 +62,11 @@ namespace bibo
 
 		private:
 			void measure(const TrackTerrain& terrain, Sample& sample) const;
+			/**
+			* @return true if the trail with the offset (and half width) is out of the water at the sample
+			*/
+			bool dryTrail(const TrackTerrain& terrain, float waterLevel, const Sample& sample, float offset, float halfWidth) const;
+			void avoidWater(const TrackTerrain& terrain, float waterLevel, std::vector<float>& offsets) const;
 			void buildBuckets();
 
 			std::vector<Sample> samples;

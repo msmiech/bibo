@@ -16,10 +16,12 @@ layout(std140, binding = 0) uniform Frame
 	vec4 skyAmbientSnow; //rgb: average light from the sky, w: how much snow lies on things (0 to 1)
 	vec4 groundAmbient; //rgb: average light from below, w: aurora intensity
 	vec4 fogDensity; //x: density, y: height falloff, z: height where the density is x, w: maximum opacity
-	vec4 wind; //xy: direction, z: strength, w: unused
+	vec4 wind; //xy: direction, z: strength, w: number of foliage interactors
 	vec4 viewport; //width, height, 1 / width, 1 / height
 	vec4 worldMap; //xy: world position of the corner of the world map, z: its size, w: sea level
 	vec4 shadowSettings; //x: number of cascades, y: strength of the sun inscattering in the fog
+	vec4 foliageInteractors[16]; //animals that push the plants aside (or where they just were), xyz: center of the body, w: its radius
+	vec4 foliagePushes[16]; //x: how far the plants are pushed aside (1: fully, negative: they spring back past upright), yz: motion (xz)
 } frame;
 
 vec3 cameraPosition()

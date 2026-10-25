@@ -28,11 +28,11 @@ namespace
 	/**
 	* Compiles like Shader::loadShader, but reports the error instead of exiting
 	*/
-	GLuint compile(const std::string& file, GLenum type)
+	GLuint compile(const std::string& file, GLenum type, const std::string& defines = "")
 	{
 		//With the files it includes, like Shader::loadShader
 		std::string error;
-		std::string code = bibo::Shader::preprocess(assetPath(file).string(), error);
+		std::string code = bibo::Shader::addDefines(bibo::Shader::preprocess(assetPath(file).string(), error), defines);
 		REQUIRE(error.empty());
 		const char* codePtr = code.c_str();
 
@@ -53,10 +53,10 @@ TEST_CASE("Every shader program of the game compiles and links", "[gl][shader]")
 {
 	GlContext gl;
 	const ShaderProgram program = GENERATE(from_range(gameShaderPrograms()));
-	CAPTURE(program.vertexShader, program.fragmentShader);
+	CAPTURE(program.vertexShader, program.fragmentShader, program.defines);
 
-	GLuint vertexShader = compile(program.vertexShader, GL_VERTEX_SHADER);
-	GLuint fragmentShader = compile(program.fragmentShader, GL_FRAGMENT_SHADER);
+	GLuint vertexShader = compile(program.vertexShader, GL_VERTEX_SHADER, program.defines);
+	GLuint fragmentShader = compile(program.fragmentShader, GL_FRAGMENT_SHADER, program.defines);
 	GLuint handle = glCreateProgram();
 	glAttachShader(handle, vertexShader);
 	glAttachShader(handle, fragmentShader);
@@ -114,6 +114,34 @@ TEST_CASE("The main shader has the inputs the game sets", "[gl][shader]")
 	SECTION("Unknown names are not found")
 	{
 		CHECK(shader.getUniformLocation("doesNotExist") == -1);
+	}
+
+	CHECK_THAT(gl.errors(), Catch::Matchers::IsEmpty());
+}
+
+TEST_CASE("The vegetation and terrain shaders have the inputs their renderers set", "[gl][shader]")
+{
+	GlContext gl;
+	SECTION("The plants sway in the wind and are pushed aside, also in the shadow maps (VegetationRenderer::drawBatches)")
+	{
+		for (const char* defines : { "", "LOD_DITHER" })
+		{
+			bibo::Shader shader(assetPath("Shader/vegetation.vert").string(), assetPath("Shader/vegetation.frag").string(), defines);
+			CAPTURE(defines);
+			CHECK(shader.getUniformLocation("windAmplitude") != -1);
+			CHECK(shader.getUniformLocation("fadeDistances") != -1);
+			CHECK(shader.getUniformLocation("interaction") != -1);
+		}
+		bibo::Shader depth(assetPath("Shader/vegetation_depth.vert").string(), assetPath("Shader/depth_shader.frag").string());
+		CHECK(depth.getUniformLocation("interaction") != -1);
+	}
+
+	SECTION("A chunk fades between its levels of detail (TerrainRenderer::draw)")
+	{
+		bibo::Shader dithered(assetPath("Shader/terrain.vert").string(), assetPath("Shader/terrain.frag").string(), "LOD_DITHER");
+		CHECK(dithered.getUniformLocation("lodFade") != -1);
+		bibo::Shader plain(assetPath("Shader/terrain.vert").string(), assetPath("Shader/terrain.frag").string());
+		CHECK(plain.getUniformLocation("lodFade") == -1);
 	}
 
 	CHECK_THAT(gl.errors(), Catch::Matchers::IsEmpty());

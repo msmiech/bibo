@@ -53,6 +53,7 @@ namespace bibo::test
 	{
 		std::string vertexShader;
 		std::string fragmentShader;
+		std::string defines; //variant of the program (Shader::addDefines)
 	};
 
 	/**

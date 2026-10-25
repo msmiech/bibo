@@ -15,6 +15,7 @@ add_executable(bibo_tests
 	unit/AnimationTest.cpp
 	unit/CharacterControllerTest.cpp
 	unit/DemoScriptTest.cpp
+	unit/FoliageTest.cpp
 	unit/FurTest.cpp
 	unit/GameRulesTest.cpp
 	unit/InputTest.cpp

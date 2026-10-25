@@ -7,6 +7,8 @@ namespace bibo
 	namespace render
 	{
 		constexpr int MAX_SHADOW_CASCADES = 4;
+		//Animals (and where they just were) that push the plants aside (world::FoliageInteraction)
+		constexpr int MAX_FOLIAGE_INTERACTORS = 16;
 
 		/**
 		* The data of a frame that all shaders of the scene use (uniform buffer, layout std140, see Shader/include/frame.glsl)
@@ -26,12 +28,14 @@ namespace bibo
 			glm::vec4 skyAmbientSnow = glm::vec4(0.0f);
 			glm::vec4 groundAmbient = glm::vec4(0.0f);
 			glm::vec4 fogDensity = glm::vec4(0.0f);
-			glm::vec4 wind = glm::vec4(0.0f);
+			glm::vec4 wind = glm::vec4(0.0f); //xy: direction, z: strength, w: number of foliage interactors
 			glm::vec4 viewport = glm::vec4(1.0f);
 			glm::vec4 worldMap = glm::vec4(0.0f);
 			glm::vec4 shadowSettings = glm::vec4(0.0f);
+			glm::vec4 foliageInteractors[MAX_FOLIAGE_INTERACTORS] = {}; //xyz: center of the body, w: its radius
+			glm::vec4 foliagePushes[MAX_FOLIAGE_INTERACTORS] = {}; //x: how far the plants are pushed aside (1: fully), yz: motion (xz, 1: running)
 		};
-		static_assert(sizeof(FrameUniforms) == 8 * 64 + 12 * 16, "FrameUniforms must match the uniform block Frame (std140)");
+		static_assert(sizeof(FrameUniforms) == 8 * 64 + 12 * 16 + 2 * MAX_FOLIAGE_INTERACTORS * 16, "FrameUniforms must match the uniform block Frame (std140)");
 
 		/**
 		* Uniform buffer with the FrameUniforms, bound to binding point 0

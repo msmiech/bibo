@@ -11,6 +11,7 @@
 #include "Render/FrameUniforms.hpp"
 #include "World/MaterialTextures.hpp"
 #include "World/SkyRenderer.hpp"
+#include "World/TerrainRenderer.hpp"
 #include "World/VegetationMeshes.hpp"
 #include "World/World.hpp"
 #include "TestSupport.hpp"
@@ -174,4 +175,52 @@ TEST_CASE("Every vegetation model has levels of detail with fewer triangles", "[
 			REQUIRE(vertex.parameters[0] <= VEGETATION_GRASS);
 		}
 	}
+}
+
+TEST_CASE("A chunk fades from its old level of detail to the new one instead of popping", "[gl][world]")
+{
+	GlContext gl;
+	AssetWorkingDirectory assets; //the renderer loads its shaders relative to the working directory
+	TerrainRenderer terrain;
+	const ChunkKey key = { 1, 0, 2 };
+	auto mesh = [&](int lod) {
+		auto chunk = std::make_shared<ChunkMesh>();
+		chunk->key = key;
+		chunk->lod = lod;
+		for (glm::vec3 position : { glm::vec3(32.0f, 1.0f, 64.0f), glm::vec3(64.0f, 1.0f, 64.0f), glm::vec3(32.0f, 1.0f, 96.0f) })
+		{
+			TerrainVertex vertex = {};
+			vertex.position = position;
+			vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+			chunk->vertices.push_back(vertex);
+		}
+		chunk->indices = { 0, 2, 1 };
+		chunk->surfaceIndexCount = 3;
+		chunk->bounds = chunkBox(key);
+		return std::shared_ptr<const ChunkMesh>(chunk);
+	};
+
+	//Loading: a new chunk, and one that changes in the same moment, just appear
+	terrain.apply({ key, mesh(2) }, 1.0f);
+	terrain.apply({ key, mesh(1) }, 1.0f);
+	CHECK(terrain.getChunkCount() == 1);
+	CHECK(terrain.getFadingCount() == 0);
+
+	terrain.apply({ key, mesh(0) }, 2.0f);
+	CHECK(terrain.getChunkCount() == 1);
+	CHECK(terrain.getFadingCount() == 1);
+	//Both meshes are drawn while it fades, the old one is released afterwards
+	terrain.draw(nullptr, 2.0f + 0.5f * TerrainRenderer::FADE_TIME);
+	CHECK(terrain.getDrawnTriangles() == 2);
+	CHECK(terrain.getFadingCount() == 1);
+	terrain.draw(nullptr, 2.0f + TerrainRenderer::FADE_TIME);
+	CHECK(terrain.getDrawnTriangles() == 1);
+	CHECK(terrain.getFadingCount() == 0);
+
+	//A chunk without a surface is removed at once
+	terrain.apply({ key, mesh(1) }, 5.0f);
+	terrain.apply({ key, nullptr }, 5.5f);
+	CHECK(terrain.getChunkCount() == 0);
+	CHECK(terrain.getFadingCount() == 0);
+	CHECK_THAT(gl.errors(), Catch::Matchers::IsEmpty());
 }

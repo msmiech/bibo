@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <vector>
 #include <GL/glew.h>
+#include "FoliageInteraction.hpp"
 #include "Vegetation.hpp"
 #include "VegetationMeshes.hpp"
 #include "WorldStreamer.hpp"
@@ -54,6 +55,11 @@ namespace bibo
 			int draw(const scene::ViewFrustum& frustum, glm::vec3 camera);
 			void drawShadow(const render::ShadowCascade& cascade, glm::vec3 camera);
 			void setDetail(float newDetail) { detail = newDetail; }
+			/**
+			* The bodies that push the plants aside in this frame (FoliageInteraction::getSelected): only the plants close to
+			* one of them are bent (the others skip the bending in the shader)
+			*/
+			void setInteractors(const std::vector<FoliageInteraction::Imprint>& imprints) { interactors = imprints; }
 			std::size_t getInstanceCount() const;
 
 		private:
@@ -87,6 +93,7 @@ namespace bibo
 				int model, lod;
 				std::size_t first, count;
 				bool dithered; //the instances fade (instance.parameters.w, Shader/include/dither.glsl)
+				bool interactive; //a body may push the instances aside
 			};
 
 			/**
@@ -95,6 +102,10 @@ namespace bibo
 			*/
 			void collect(const scene::ViewFrustum* frustum, const render::ShadowCascade* shadowCascade, glm::vec3 camera);
 			void drawBatches(Shader& shader, bool shadowPass, bool dithered);
+			/**
+			* @return true if one of the interactors is close enough to push the instance aside
+			*/
+			bool isTouched(const Instance& instance, const ModelData& model) const;
 
 			std::unique_ptr<Shader> shader;
 			std::unique_ptr<Shader> ditherShader;
@@ -103,7 +114,9 @@ namespace bibo
 			std::unordered_map<ColumnKey, ColumnData, ColumnKeyHash> columns;
 			GLuint instanceBuffer = 0;
 			std::vector<std::vector<Instance>> sorted; //per model and level of detail
+			std::vector<std::vector<Instance>> sortedTouched; //the instances close to a body, per model and level of detail
 			std::vector<std::vector<Instance>> sortedDithered; //the instances that fade, per model and level of detail
+			std::vector<FoliageInteraction::Imprint> interactors;
 			std::vector<Instance> staging;
 			std::vector<Batch> batches;
 			float detail;

@@ -98,6 +98,7 @@ VegetationRenderer::VegetationRenderer(float detail)
 	glGenBuffers(1, &instanceBuffer);
 	models.resize(MODEL_COUNT);
 	sorted.resize(MODEL_COUNT * MAX_LODS);
+	sortedTouched.resize(MODEL_COUNT * MAX_LODS);
 	sortedDithered.resize(MODEL_COUNT * MAX_LODS);
 	for (int m = 0; m < MODEL_COUNT; ++m)
 	{
@@ -192,9 +193,36 @@ std::size_t VegetationRenderer::getInstanceCount() const
 	return count;
 }
 
+bool VegetationRenderer::isTouched(const Instance& instance, const ModelData& model) const
+{
+	if (model.interaction <= 0.0f)
+	{
+		return false;
+	}
+	//Like pushAside in Shader/include/vegetation.glsl: a part of the plant within the reach of the body, the body not above it
+	glm::vec3 foot(instance.positionScale);
+	float scale = instance.positionScale.w;
+	float spread = modelRadius(instance.model()) * scale, height = model.height * scale;
+	for (const FoliageInteraction::Imprint& body : interactors)
+	{
+		glm::vec2 away(foot.x - body.center.x, foot.z - body.center.z);
+		float reach = body.radius * 1.15f + spread;
+		if (glm::dot(away, away) < reach * reach && body.center.y - body.radius < foot.y + height + 0.1f
+			&& foot.y - body.center.y < body.radius + 1.0f)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void VegetationRenderer::collect(const scene::ViewFrustum* frustum, const render::ShadowCascade* shadowCascade, glm::vec3 camera)
 {
 	for (std::vector<Instance>& list : sorted)
+	{
+		list.clear();
+	}
+	for (std::vector<Instance>& list : sortedTouched)
 	{
 		list.clear();
 	}
@@ -249,6 +277,7 @@ void VegetationRenderer::collect(const scene::ViewFrustum* frustum, const render
 				const float lodDistances[2] = { model.lodDistances[0] * factor, model.lodDistances[1] * factor };
 				LodBlend blend = blendLod(distance, lodDistances, lodCount, LOD_BAND);
 				int nearest = blend.next < 0.5f ? blend.lod : blend.lod + 1;
+				std::vector<std::vector<Instance>>& opaque = isTouched(instance, model) ? sortedTouched : sorted;
 				if (shadowCascade)
 				{
 					//One level is enough for the shadow, the shadow of a coarser model looks the same
@@ -256,7 +285,7 @@ void VegetationRenderer::collect(const scene::ViewFrustum* frustum, const render
 					{
 						nearest = std::min(1, lodCount - 1);
 					}
-					sorted[m * MAX_LODS + nearest].push_back(instance);
+					opaque[m * MAX_LODS + nearest].push_back(instance);
 					continue;
 				}
 				//The stones dissolve before they are left out (they do not shrink, their distance depends on their size)
@@ -273,24 +302,29 @@ void VegetationRenderer::collect(const scene::ViewFrustum* frustum, const render
 				}
 				else
 				{
-					sorted[m * MAX_LODS + blend.lod].push_back(instance);
+					opaque[m * MAX_LODS + blend.lod].push_back(instance);
 				}
 			}
 		}
 	}
 	staging.clear();
 	batches.clear();
-	for (int dithered = 0; dithered < 2; ++dithered)
+	//The fading instances are few, they are bent without checking whether a body is close
+	const struct
 	{
-		const std::vector<std::vector<Instance>>& lists = dithered ? sortedDithered : sorted;
+		const std::vector<std::vector<Instance>>& lists;
+		bool dithered, interactive;
+	} sets[] = { { sorted, false, false }, { sortedTouched, false, true }, { sortedDithered, true, true } };
+	for (const auto& set : sets)
+	{
 		for (int m = 0; m < MODEL_COUNT; ++m)
 		{
 			for (int lod = 0; lod < MAX_LODS; ++lod)
 			{
-				const std::vector<Instance>& list = lists[m * MAX_LODS + lod];
+				const std::vector<Instance>& list = set.lists[m * MAX_LODS + lod];
 				if (!list.empty())
 				{
-					batches.push_back({ m, lod, staging.size(), list.size(), dithered == 1 });
+					batches.push_back({ m, lod, staging.size(), list.size(), set.dithered, set.interactive });
 					staging.insert(staging.end(), list.begin(), list.end());
 				}
 			}
@@ -324,7 +358,7 @@ void VegetationRenderer::drawBatches(Shader& program, bool shadowPass, bool dith
 			model.twoSided ? glDisable(GL_CULL_FACE) : glEnable(GL_CULL_FACE);
 		}
 		glUniform1f(windLocation, model.windAmplitude);
-		glUniform2f(interactionLocation, model.interaction, model.height);
+		glUniform2f(interactionLocation, batch.interactive ? model.interaction : 0.0f, model.height);
 		float maximum = model.maxDistance * detail;
 		if (model.scaleDistances)
 		{

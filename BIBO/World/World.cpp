@@ -136,6 +136,7 @@ void World::update(float timeDelta, glm::vec3 camera, glm::vec3 bear, const std:
 {
 	time += timeDelta;
 	foliage.update(timeDelta, bodies, camera);
+	vegetation->setInteractors(foliage.getSelected());
 	streamer->update(camera, bear);
 	for (const WorldStreamer::MeshUpdate& update : streamer->takeMeshUpdates())
 	{

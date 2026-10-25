@@ -121,7 +121,7 @@ namespace
 	}
 }
 
-TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start, glm::vec2 startDirection, const std::vector<glm::vec2>& waypoints)
+TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start, glm::vec2 startDirection, const std::vector<glm::vec2>& waypoints, float waterLevel)
 {
 	//1. Costs on a grid: cheap on the floor of the canyon, more expensive close to the walls, very expensive up the walls
 	const int columns = std::max(1, terrain.getColumns() / GRID_STEP), rows = std::max(1, terrain.getRows() / GRID_STEP);
@@ -304,11 +304,136 @@ TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start, glm::vec2 sta
 		}
 		offsets.swap(next);
 	}
+	avoidWater(terrain, waterLevel, offsets);
 	for (std::size_t i = 0; i < samples.size(); ++i)
 	{
 		samples[i].trailOffset = offsets[i];
 	}
 	buildBuckets();
+}
+
+bool TrackPath::dryTrail(const TrackTerrain& terrain, float waterLevel, const Sample& sample, float offset, float halfWidth) const
+{
+	glm::vec2 center(sample.position.x, sample.position.z);
+	glm::vec2 right = rightOf(sample.tangent);
+	for (float lateral = offset - halfWidth; lateral <= offset + halfWidth + 1e-3f; lateral += 0.25f)
+	{
+		if (terrain.height(center + right * lateral) < waterLevel + 0.05f)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+void TrackPath::avoidWater(const TrackTerrain& terrain, float waterLevel, std::vector<float>& offsets) const
+{
+	//Where a pool of water lies on the floor, the trail goes around it on the dry side (if the floor has room there).
+	//Pools that fill the whole floor are crossed (the race jumps over them). The trail swerves in a smooth curve: the shift
+	//is fixed at the pool and fades out along the track before and after it (screened diffusion).
+	const std::size_t count = samples.size();
+	const float CLEARANCE = TRAIL_HALF_WIDTH + 0.2f;
+	std::vector<float> shift(count, 0.0f);
+	std::vector<bool> fixed(count, false);
+	std::vector<float> fixedShift(count, 0.0f);
+	for (int round = 0; round < 6; ++round)
+	{
+		bool changed = false;
+		//The closest dry place on the floor for the samples where the trail is wet (the trail may reach over the edge of the
+		//floor, where the ground only begins to rise), NaN if there is none. Where the dry side is narrow it may come closer to the water.
+		const float NONE = std::numeric_limits<float>::quiet_NaN();
+		std::vector<bool> wet(count, false);
+		std::vector<float> dryOffset(count, NONE);
+		for (std::size_t i = 0; i < count; ++i)
+		{
+			const Sample& sample = samples[i];
+			float offset = offsets[i] + shift[i];
+			wet[i] = !dryTrail(terrain, waterLevel, sample, offset, TRAIL_HALF_WIDTH);
+			for (float clearance : { CLEARANCE, TRAIL_HALF_WIDTH - 0.4f })
+			{
+				float bestDistance = std::numeric_limits<float>::max();
+				for (float candidate = -sample.floorLeft + TRAIL_HALF_WIDTH - 1.5f; wet[i] && std::isnan(dryOffset[i]) && candidate <= sample.floorRight - TRAIL_HALF_WIDTH + 1.5f; candidate += 0.25f)
+				{
+					if (std::abs(candidate - offset) < bestDistance && dryTrail(terrain, waterLevel, sample, candidate, clearance))
+					{
+						dryOffset[i] = candidate;
+						bestDistance = std::abs(candidate - offset);
+					}
+				}
+			}
+		}
+		//A stretch of wet trail goes around the pool if (almost) every sample of it has a dry place on the same side, the
+		//gaps are interpolated. Otherwise the pool fills the floor and the trail goes straight through (the race jumps over
+		//it). The start of the lap is never in the water.
+		for (std::size_t first = 0; first < count;)
+		{
+			if (!wet[first])
+			{
+				++first;
+				continue;
+			}
+			std::size_t end = first;
+			int missing = 0;
+			bool left = false, right = false;
+			while (end < count && wet[end])
+			{
+				missing += std::isnan(dryOffset[end]) ? 1 : 0;
+				left = left || dryOffset[end] < -0.5f;
+				right = right || dryOffset[end] > 0.5f;
+				++end;
+			}
+			if (left == right || static_cast<float>(missing) > 0.3f * static_cast<float>(end - first))
+			{
+				first = end;
+				continue;
+			}
+			for (std::size_t i = first; i < end; ++i)
+			{
+				float target = dryOffset[i];
+				if (std::isnan(target))
+				{
+					//Between the closest samples with a dry place
+					std::size_t before = i, after = i;
+					while (before > first && std::isnan(dryOffset[before]))
+					{
+						--before;
+					}
+					while (after + 1 < end && std::isnan(dryOffset[after]))
+					{
+						++after;
+					}
+					float a = std::isnan(dryOffset[before]) ? dryOffset[after] : dryOffset[before];
+					float b = std::isnan(dryOffset[after]) ? a : dryOffset[after];
+					target = after > before ? glm::mix(a, b, static_cast<float>(i - before) / static_cast<float>(after - before)) : a;
+				}
+				if (!fixed[i] || std::abs(fixedShift[i] - (target - offsets[i])) > 0.1f)
+				{
+					fixed[i] = true;
+					fixedShift[i] = target - offsets[i];
+					changed = true;
+				}
+			}
+			first = end;
+		}
+		if (!changed)
+		{
+			break;
+		}
+		//Fades out over about 10 m
+		std::vector<float> next(count);
+		for (int iteration = 0; iteration < 1500; ++iteration)
+		{
+			for (std::size_t i = 0; i < count; ++i)
+			{
+				next[i] = fixed[i] ? fixedShift[i] : 0.9985f * (0.5f * shift[i] + 0.25f * (shift[(i + count - 1) % count] + shift[(i + 1) % count]));
+			}
+			shift.swap(next);
+		}
+	}
+	for (std::size_t i = 0; i < count; ++i)
+	{
+		offsets[i] += shift[i];
+	}
 }
 
 void TrackPath::measure(const TrackTerrain& terrain, Sample& sample) const

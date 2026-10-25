@@ -706,6 +706,13 @@ std::vector<VegetationMesh> bibo::world::buildModel(Model model)
 			lods.push_back(buildStone(glm::vec3(0.85f, 1.25f, 0.8f), 0.35f, true, 43u, 3 - detail, rgb(132, 130, 128)));
 		}
 		break;
+	case Model::STONE_STANDING:
+		//Tall and narrow, set up by people long ago
+		for (int detail = 0; detail < 3; ++detail)
+		{
+			lods.push_back(buildStone(glm::vec3(0.6f, 2.6f, 0.42f), 0.16f, false, 44u, 3 - detail, rgb(128, 127, 122)));
+		}
+		break;
 	case Model::LOG:
 		lods.push_back(buildLog(0));
 		lods.push_back(buildLog(1));

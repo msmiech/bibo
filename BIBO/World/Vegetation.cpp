@@ -28,6 +28,7 @@ namespace
 		{ 0.8f, 0.6f }, //STONE_ROUND
 		{ 0.5f, 0.7f }, //STONE_FLAT
 		{ 1.0f, 0.55f }, //STONE_SHARP
+		{ 2.1f, 0.4f }, //STONE_STANDING
 		{ 0.8f, 2.6f }, //LOG
 		{ 0.7f, 0.6f } }; //STUMP
 
@@ -60,6 +61,8 @@ namespace
 		float forest = 0.0f; //density of the forest (0: clearing)
 		bool onFloor = false; //on the floor of the race track
 		float trailDistance = 1e6f; //from the edge of the trail (negative on the trail)
+		float pathDistance = 1e6f; //from the edge of the closest foot path (negative on it)
+		bool clearing = false; //in a point of interest
 	};
 
 	class Scatterer
@@ -99,6 +102,91 @@ namespace
 			return point.x >= origin.x && point.y >= origin.y && point.x < origin.x + CHUNK_SIZE && point.y < origin.y + CHUNK_SIZE;
 		}
 
+		bool nearColumn(glm::vec2 point, float radius) const
+		{
+			return point.x > origin.x - radius && point.y > origin.y - radius && point.x < origin.x + CHUNK_SIZE + radius && point.y < origin.y + CHUNK_SIZE + radius;
+		}
+
+		/**
+		* A stone, log or stump on the ground with its collision shape (like the ones scattered in the forest)
+		* @param alignment 0: upright, 1: like the ground
+		* @param sink How deep it is in the ground (times its scale)
+		* @param upright A standing stone (the collision is a capsule that goes up)
+		*/
+		void prop(Model model, glm::vec2 at, float yaw, float scale, float alignment, float sink, std::uint32_t seed, bool upright = false)
+		{
+			glm::vec3 position, normal;
+			if (!inColumn(at) || !world.surface(at, position, normal))
+			{
+				return;
+			}
+			noise::Random random(noise::hash(static_cast<int>(std::floor(at.x * 8.0f)), static_cast<int>(std::floor(at.y * 8.0f)), seed));
+			glm::quat rotation = orientation(yaw, normal, alignment);
+			glm::vec3 foot = position - glm::normalize(glm::mix(UP, normal, alignment)) * (sink * scale);
+			solid(model, foot, rotation, scale, normal, upright, random);
+		}
+
+		/**
+		* Flat stones stacked on each other, smaller to the top
+		*/
+		void cairn(glm::vec2 at, float size, int count, std::uint32_t seed)
+		{
+			glm::vec3 position, normal;
+			if (!inColumn(at) || !world.surface(at, position, normal))
+			{
+				return;
+			}
+			noise::Random random(noise::hash(static_cast<int>(std::floor(at.x * 8.0f)), static_cast<int>(std::floor(at.y * 8.0f)), seed));
+			glm::vec3 foot = position - glm::vec3(0.0f, 0.1f * size, 0.0f);
+			for (int i = 0; i < count; ++i)
+			{
+				float scale = size * (1.0f - 0.7f * static_cast<float>(i) / static_cast<float>(std::max(count - 1, 1)));
+				glm::vec3 jitter(random.range(-0.06f, 0.06f) * size, 0.0f, random.range(-0.06f, 0.06f) * size);
+				solid(Model::STONE_FLAT, foot + jitter, orientation(random.range(0.0f, 6.2831853f), UP, 0.0f), scale, UP, false, random);
+				foot.y += 0.36f * scale; //a flat stone is 0.5 high at scale 1, they lie a bit in each other
+			}
+		}
+
+		void solid(Model model, glm::vec3 foot, glm::quat rotation, float scale, glm::vec3 normal, bool upright, noise::Random& random)
+		{
+			add(model, foot, rotation, scale, random);
+			if (!collision)
+			{
+				return;
+			}
+			physics::ShapePart part;
+			if (model == Model::LOG)
+			{
+				//The log lies along its x axis, the capsule goes along y
+				part.type = physics::ShapePart::CAPSULE;
+				part.radius = 0.36f * scale;
+				part.halfHeight = 2.0f * scale;
+				part.rotation = rotation * glm::angleAxis(1.5707963f, glm::vec3(0.0f, 0.0f, 1.0f));
+				part.position = foot + rotation * glm::vec3(0.0f, part.radius, 0.0f);
+			}
+			else if (model == Model::STUMP)
+			{
+				part.type = physics::ShapePart::CAPSULE;
+				part.radius = 0.42f * scale;
+				part.halfHeight = 0.15f * scale;
+				part.position = foot + glm::vec3(0.0f, part.radius + part.halfHeight, 0.0f);
+			}
+			else if (upright)
+			{
+				part.type = physics::ShapePart::CAPSULE;
+				part.radius = 0.9f * scale * modelRadius(model);
+				part.halfHeight = std::max(0.0f, 0.5f * scale * modelHeight(model) - part.radius);
+				part.position = foot + glm::vec3(0.0f, part.radius + part.halfHeight, 0.0f);
+			}
+			else
+			{
+				part.type = physics::ShapePart::SPHERE;
+				part.radius = 0.85f * scale * modelRadius(model);
+				part.position = foot + normal * (0.2f * scale);
+			}
+			collision->push_back(part);
+		}
+
 		bool site(glm::vec2 point, Site& result) const
 		{
 			if (!world.surface(point, result.position, result.normal))
@@ -118,6 +206,9 @@ namespace
 					result.forest = std::max(result.forest, 0.92f); //trees on the slopes left and right of the track
 				}
 			}
+			const Landmarks& landmarks = world.getLandmarks();
+			result.pathDistance = landmarks.pathDistance(point) - Landmarks::PATH_HALF_WIDTH;
+			result.clearing = landmarks.pointAt(point) >= 0;
 			result.forest *= 1.0f - smoothstep(34.0f, 50.0f, result.position.y); //bare mountain tops
 			result.snow = world.snowCover(result.position, result.normal, 1.0f, result.material);
 			return true;
@@ -161,7 +252,7 @@ namespace
 			forEachPoint(4.4f, 101u, [&](glm::vec2 point, noise::Random& random) {
 				Site s;
 				if (!site(point, s) || s.onFloor || s.normal.y < 0.5f || s.position.y < seaLevel + 2.2f || s.material.sand > 0.25f
-					|| s.material.cave > 0.5f || (s.material.cliff > 0.5f && s.normal.y < 0.85f) || random.unit() > 0.9f * s.forest)
+					|| s.material.cave > 0.5f || (s.material.cliff > 0.5f && s.normal.y < 0.85f) || s.pathDistance < 1.8f || s.clearing || random.unit() > 0.9f * s.forest)
 				{
 					return;
 				}
@@ -197,7 +288,7 @@ namespace
 			forEachPoint(5.0f, 102u, [&](glm::vec2 point, noise::Random& random) {
 				Site s;
 				if (!site(point, s) || s.normal.y < 0.55f || s.position.y < seaLevel + 1.6f || s.material.sand > 0.4f || s.material.cave > 0.5f
-					|| s.trailDistance < 1.6f || random.unit() > 0.3f * (0.4f + 0.6f * s.forest))
+					|| s.trailDistance < 1.6f || s.pathDistance < 0.8f || s.clearing || random.unit() > 0.3f * (0.4f + 0.6f * s.forest))
 				{
 					return;
 				}
@@ -212,7 +303,7 @@ namespace
 			//Boulders, more of them on the cliffs and the mountains
 			forEachPoint(12.0f, 103u, [&](glm::vec2 point, noise::Random& random) {
 				Site s;
-				if (!site(point, s) || s.onFloor || s.normal.y < 0.4f || s.position.y < seaLevel - 1.0f || s.material.cave > 0.5f)
+				if (!site(point, s) || s.onFloor || s.normal.y < 0.4f || s.position.y < seaLevel - 1.0f || s.material.cave > 0.5f || s.pathDistance < 2.0f || s.clearing)
 				{
 					return;
 				}
@@ -243,7 +334,7 @@ namespace
 			forEachPoint(20.0f, 104u, [&](glm::vec2 point, noise::Random& random) {
 				Site s;
 				if (!site(point, s) || s.onFloor || s.normal.y < 0.82f || s.forest < 0.45f || s.position.y < seaLevel + 2.5f || s.material.cave > 0.5f
-					|| random.unit() > 0.38f || (s.track.found && std::abs(s.track.lateral) < s.track.floorHalfWidth + 3.0f))
+					|| s.pathDistance < 2.0f || s.clearing || random.unit() > 0.38f || (s.track.found && std::abs(s.track.lateral) < s.track.floorHalfWidth + 3.0f))
 				{
 					return;
 				}
@@ -281,6 +372,94 @@ namespace
 			});
 		}
 
+		/**
+		* The things at the points of interest (cairns, a fire ring with log seats, standing stones, driftwood) and the cairns
+		* where the foot paths begin. Every prop has its own random numbers, so it is the same in every column.
+		*/
+		void scatterLandmarks()
+		{
+			const Landmarks& landmarks = world.getLandmarks();
+			const std::vector<PointOfInterest>& points = landmarks.getPointsOfInterest();
+			const float TAU = 6.2831853f;
+			for (std::size_t p = 0; p < points.size(); ++p)
+			{
+				const PointOfInterest& point = points[p];
+				glm::vec2 middle(point.position.x, point.position.z);
+				if (!nearColumn(middle, point.radius + 8.0f))
+				{
+					continue;
+				}
+				std::uint32_t salt = WorldGenerator::SEED + 300u + static_cast<std::uint32_t>(p) * 101u;
+				noise::Random layout(noise::hash(static_cast<int>(p), 0, salt));
+				glm::vec2 facing = point.facing, across(-point.facing.y, point.facing.x);
+				auto around = [&](float angle, float radius) { return middle + radius * glm::vec2(std::cos(angle), std::sin(angle)); };
+				switch (point.kind)
+				{
+				case PointOfInterest::Kind::SUMMIT:
+					cairn(middle, 1.5f, 5, salt);
+					for (int i = 0; i < 4; ++i)
+					{
+						float angle = TAU * (static_cast<float>(i) + layout.range(0.0f, 0.6f)) / 4.0f;
+						Model model = layout.unit() < 0.5f ? Model::STONE_ROUND : Model::STONE_SHARP;
+						prop(model, around(angle, layout.range(4.5f, 6.0f)), layout.range(0.0f, TAU), layout.range(1.2f, 2.0f), 0.7f, 0.25f, salt + 10u + i);
+					}
+					break;
+				case PointOfInterest::Kind::CAMP:
+					//A ring of stones around the fire with two half burnt logs in it, logs and stumps to sit on
+					for (int i = 0; i < 10; ++i)
+					{
+						prop(Model::STONE_ROUND, around(TAU * static_cast<float>(i) / 10.0f, 0.9f), layout.range(0.0f, TAU), layout.range(0.26f, 0.34f), 0.6f, 0.3f, salt + 10u + i);
+					}
+					prop(Model::LOG, middle, layout.range(0.0f, TAU), 0.24f, 1.0f, 0.1f, salt + 30u);
+					prop(Model::LOG, middle, layout.range(0.0f, TAU), 0.22f, 1.0f, -0.2f, salt + 31u);
+					for (int i = 0; i < 3; ++i)
+					{
+						float angle = TAU * static_cast<float>(i) / 3.0f + layout.range(-0.15f, 0.15f);
+						//Along the circle: its axis (x) is the tangent
+						glm::vec2 tangent(-std::sin(angle), std::cos(angle));
+						prop(Model::LOG, around(angle, 3.3f), std::atan2(-tangent.y, tangent.x), 0.55f, 1.0f, 0.1f, salt + 40u + i);
+					}
+					prop(Model::STUMP, around(TAU / 6.0f, 3.4f), layout.range(0.0f, TAU), 0.85f, 0.2f, 0.15f, salt + 50u);
+					prop(Model::STUMP, around(TAU / 2.0f, 3.4f), layout.range(0.0f, TAU), 0.8f, 0.2f, 0.15f, salt + 51u);
+					break;
+				case PointOfInterest::Kind::STANDING_STONES:
+					for (int i = 0; i < 7; ++i)
+					{
+						float angle = TAU * (static_cast<float>(i) + layout.range(-0.15f, 0.15f)) / 7.0f;
+						prop(Model::STONE_STANDING, around(angle, 6.5f), layout.range(0.0f, TAU), layout.range(1.0f, 1.35f), 0.05f, 0.1f, salt + 10u + i, true);
+					}
+					prop(Model::STONE_FLAT, middle, layout.range(0.0f, TAU), 2.0f, 1.0f, 0.2f, salt + 20u);
+					break;
+				case PointOfInterest::Kind::BEACH:
+					//Driftwood and stones washed up on the sand
+					for (int i = 0; i < 3; ++i)
+					{
+						glm::vec2 at = middle + facing * layout.range(-1.0f, 4.0f) + across * layout.range(-6.0f, 6.0f);
+						prop(Model::LOG, at, layout.range(0.0f, TAU), layout.range(0.8f, 1.3f), 1.0f, 0.15f, salt + 10u + i);
+					}
+					prop(Model::STUMP, middle + facing * 2.0f + across * layout.range(-5.0f, 5.0f), layout.range(0.0f, TAU), 1.0f, 0.6f, 0.2f, salt + 20u);
+					for (int i = 0; i < 4; ++i)
+					{
+						glm::vec2 at = middle + facing * layout.range(-2.0f, 5.0f) + across * layout.range(-7.0f, 7.0f);
+						prop(layout.unit() < 0.5f ? Model::STONE_ROUND : Model::STONE_FLAT, at, layout.range(0.0f, TAU), layout.range(0.5f, 1.1f), 0.8f, 0.3f, salt + 30u + i);
+					}
+					break;
+				case PointOfInterest::Kind::CLIFF_VIEW:
+					//A log to sit on, looking at the sea, and a cairn at the edge
+					prop(Model::LOG, middle - facing * 1.5f, std::atan2(-across.y, across.x), 0.55f, 1.0f, 0.1f, salt + 10u);
+					cairn(middle + facing * 2.5f, 1.0f, 4, salt + 20u);
+					prop(Model::STONE_ROUND, middle + across * 4.5f, layout.range(0.0f, TAU), 1.6f, 0.7f, 0.25f, salt + 30u);
+					prop(Model::STONE_SHARP, middle - across * 4.0f, layout.range(0.0f, TAU), 1.3f, 0.7f, 0.25f, salt + 31u);
+					break;
+				}
+			}
+			const std::vector<glm::vec3>& markers = landmarks.getMarkers();
+			for (std::size_t m = 0; m < markers.size(); ++m)
+			{
+				cairn(glm::vec2(markers[m].x, markers[m].z), 0.75f, 3, WorldGenerator::SEED + 400u + static_cast<std::uint32_t>(m) * 7u);
+			}
+		}
+
 		void scatterSmall()
 		{
 			const float seaLevel = world.getSeaLevel();
@@ -293,11 +472,11 @@ namespace
 				}
 				Site s;
 				if (!site(point, s) || s.normal.y < 0.6f || s.position.y < seaLevel + 1.0f || s.material.sand > 0.15f || s.material.cave > 0.5f
-					|| s.material.cliff > 0.5f || s.trailDistance < -0.6f)
+					|| s.material.cliff > 0.5f || s.trailDistance < -0.6f || s.pathDistance < -0.5f)
 				{
 					return;
 				}
-				float nearTrail = smoothstep(-0.6f, 1.6f, s.trailDistance);
+				float nearTrail = smoothstep(-0.6f, 1.6f, std::min(s.trailDistance, s.pathDistance));
 				if (random.unit() > nearTrail * (1.0f - 1.8f * s.snow) || !keepsClear(s.position, 0.3f))
 				{
 					return;
@@ -308,7 +487,7 @@ namespace
 			//Ferns in the forest
 			forEachPoint(2.6f, 202u, [&](glm::vec2 point, noise::Random& random) {
 				Site s;
-				if (!site(point, s) || s.forest < 0.45f || s.normal.y < 0.6f || s.trailDistance < 1.5f || s.snow > 0.3f || s.material.cave > 0.5f
+				if (!site(point, s) || s.forest < 0.45f || s.normal.y < 0.6f || s.trailDistance < 1.5f || s.pathDistance < 0.8f || s.clearing || s.snow > 0.3f || s.material.cave > 0.5f
 					|| s.position.y < seaLevel + 2.0f || random.unit() > 0.35f * s.forest || !keepsClear(s.position, 0.8f))
 				{
 					return;
@@ -318,7 +497,7 @@ namespace
 			//Mushrooms in small groups
 			forEachPoint(7.0f, 203u, [&](glm::vec2 point, noise::Random& random) {
 				Site s;
-				if (!site(point, s) || s.forest < 0.4f || s.normal.y < 0.75f || s.trailDistance < 0.6f || s.material.cave > 0.5f || s.snow > 0.5f
+				if (!site(point, s) || s.forest < 0.4f || s.normal.y < 0.75f || s.trailDistance < 0.6f || s.pathDistance < 0.3f || s.material.cave > 0.5f || s.snow > 0.5f
 					|| s.position.y < seaLevel + 2.0f || random.unit() > 0.4f)
 				{
 					return;
@@ -410,6 +589,7 @@ std::vector<Instance> bibo::world::scatter(const WorldGenerator& world, ColumnKe
 	if (layer == Layer::LARGE)
 	{
 		scatterer.scatterLarge();
+		scatterer.scatterLandmarks();
 	}
 	else
 	{

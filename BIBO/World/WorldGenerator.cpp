@@ -14,6 +14,7 @@ namespace
 	//The track terrain turns into its blurred version in this band inside of its border (the floor of the track is further inside),
 	//the procedural land takes over in this band outside of it
 	const float TRACK_BLEND_INSIDE = 8.0f, TRACK_BLEND_OUTSIDE = 55.0f;
+	const float TRACK_BLEND_WARP = 26.0f;
 	//Mountains around the track (direction from the middle in degrees, distance, height, radius)
 	const struct Mountain { float angle, distance, height, radius; } MOUNTAINS[] = {
 		{ 128.0f, 190.0f, 44.0f, 48.0f },
@@ -64,12 +65,13 @@ WorldGenerator::WorldGenerator(Description description)
 	: track(std::move(description.track)), keepClear(std::move(description.keepClear)), seaLevel(description.seaLevel)
 {
 	center = track->getCenter();
-	path = std::make_unique<TrackPath>(*track, description.start, description.startDirection, description.checkpoints);
+	path = std::make_unique<TrackPath>(*track, description.start, description.startDirection, description.checkpoints, seaLevel);
 	chooseCaves();
 
 	float reach = COAST_RADIUS + COAST_VARIATION + 50.0f;
 	bounds.minimum = glm::vec3(center.x - reach, SEA_FLOOR - 8.0f, center.y - reach);
 	bounds.maximum = glm::vec3(center.x + reach, 80.0f, center.y + reach);
+	landmarks = std::make_unique<Landmarks>(*this);
 	computeColumnRanges();
 }
 
@@ -126,7 +128,24 @@ float WorldGenerator::proceduralHeight(glm::vec2 position) const
 	return smoothMax(height, seaFloor, 4.0f);
 }
 
+std::vector<glm::vec2> WorldGenerator::getMountainPeaks() const
+{
+	std::vector<glm::vec2> peaks;
+	for (const Mountain& mountain : MOUNTAINS)
+	{
+		float angle = glm::radians(mountain.angle);
+		peaks.push_back(center + mountain.distance * glm::vec2(std::cos(angle), std::sin(angle)));
+	}
+	return peaks;
+}
+
 float WorldGenerator::height(glm::vec2 position) const
+{
+	float natural = naturalHeight(position);
+	return landmarks ? landmarks->height(position, natural) : natural;
+}
+
+float WorldGenerator::naturalHeight(glm::vec2 position) const
 {
 	//Inside: the track terrain as it is. At its border it turns into its blurred version, which goes on outside of the
 	//border (the closest blurred height inside) and turns into the procedural land further out.
@@ -139,8 +158,20 @@ float WorldGenerator::height(glm::vec2 position) const
 	{
 		return glm::mix(track->smoothHeight(position), track->height(position), smoothstep(0.0f, TRACK_BLEND_INSIDE, inside));
 	}
-	float continued = track->smoothHeight(track->clampInside(position));
-	float weight = smoothstep(-TRACK_BLEND_OUTSIDE, 0.0f, inside);
+	//The closest blurred height inside, averaged along the border the more the further out (no straight stripes outwards)
+	glm::vec2 border = track->clampInside(position);
+	glm::vec2 out = position - border;
+	float outside = glm::length(out);
+	glm::vec2 along = outside > 1e-3f ? glm::vec2(-out.y, out.x) / outside : glm::vec2(1.0f, 0.0f);
+	float continued = 0.0f;
+	for (int k = -2; k <= 2; ++k)
+	{
+		continued += track->smoothHeight(track->clampInside(border + along * (0.3f * outside * static_cast<float>(k))));
+	}
+	continued /= 5.0f;
+	//The band where the land takes over is uneven, so that the rectangle of the track terrain does not show
+	float warp = TRACK_BLEND_WARP * noise::fbm(position * 0.011f, 3, SEED + 9u) * (1.0f - smoothstep(-20.0f, 0.0f, inside));
+	float weight = smoothstep(-TRACK_BLEND_OUTSIDE, 0.0f, inside + warp);
 	if (weight <= 0.0f)
 	{
 		return proceduralHeight(position);
@@ -380,6 +411,12 @@ SurfaceMaterial WorldGenerator::material(glm::vec3 position, glm::vec3 surfaceNo
 		float edge = TrackPath::TRAIL_HALF_WIDTH + 0.5f * noise::fbm(glm::vec2(nearest.distance * 0.15f, 1.7f), 2, SEED + 40u);
 		result.trail = 1.0f - smoothstep(edge - 0.8f, edge + 0.7f, std::abs(nearest.trailLateral));
 	}
+	if (landmarks && position.y > height(ground) - 1.5f)
+	{
+		result.trail = std::max(result.trail, landmarks->trail(ground));
+	}
+	//The trail ends at the water line (wet earth at the shore, the shader darkens it)
+	result.trail *= smoothstep(seaLevel - 0.5f, seaLevel + 0.05f, position.y);
 	if (isInCave(position) || position.y < caveRoofTop(ground) - 1.0f)
 	{
 		result.cave = 1.0f;

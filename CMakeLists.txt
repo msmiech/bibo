@@ -292,6 +292,8 @@ add_library(bibo_core STATIC
 	BIBO/World/ChunkMesher.cpp
 	BIBO/World/FoliageInteraction.cpp
 	BIBO/World/FoliageInteraction.hpp
+	BIBO/World/Landmarks.cpp
+	BIBO/World/Landmarks.hpp
 	BIBO/World/MaterialTextures.cpp
 	BIBO/World/MaterialTextures.hpp
 	BIBO/World/MeshBuilder.hpp

@@ -97,43 +97,58 @@ Material forestFloor(vec2 p)
 
 Material dirt(vec2 p)
 {
-	//Trodden earth with a few pebbles and fine gravel
+	//Trodden earth: trodden and smoother where it is walked on most, loose soil around it, fine gravel and pebbles of
+	//two sizes and different colors (more of them where the earth is loose)
 	float soil = tiledFbm(p, 5.0, 6);
-	vec3 albedo = mix(vec3(0.075, 0.05, 0.032), vec3(0.17, 0.12, 0.075), soil);
-	float height = 0.35 * soil;
-	vec3 cells = tiledCells(p, 14.0);
-	float pebble = step(0.68, cells.z) * (1.0 - smoothstep(0.2, 0.4, cells.x));
-	vec3 pebbleColor = mix(vec3(0.08, 0.07, 0.06), vec3(0.17, 0.15, 0.12), hash11(cells.z * 91.7));
-	albedo = mix(albedo, pebbleColor * (0.85 + 0.3 * tiledFbm(p, 64.0, 2)), pebble);
-	height += 0.5 * pebble * sqrt(1.0 - min(cells.x / 0.4, 1.0));
+	float trodden = smoothstep(0.35, 0.7, tiledFbm(p + vec2(0.23, 0.61), 3.0, 4));
+	vec3 albedo = mix(vec3(0.11, 0.068, 0.036), vec3(0.25, 0.16, 0.085), soil);
+	albedo = mix(albedo, albedo * vec3(1.15, 1.1, 1.0), trodden);
+	float height = 0.3 * soil + 0.1 * trodden;
+	float stones = 0.0;
+	for (int size = 0; size < 2; ++size)
+	{
+		vec3 cells = tiledCells(p + vec2(0.17, 0.43) * float(size), size == 0 ? 9.0 : 20.0);
+		float radius = size == 0 ? 0.34 : 0.3;
+		float pebble = step(size == 0 ? 0.84 : 0.7, cells.z) * (1.0 - smoothstep(0.7 * radius, radius, cells.x)) * (1.0 - 0.6 * trodden);
+		float tone = hash11(cells.z * 91.7 + float(size) * 7.3);
+		vec3 pebbleColor = mix(vec3(0.1, 0.09, 0.075), vec3(0.25, 0.21, 0.16), tone);
+		pebbleColor = mix(pebbleColor, vec3(0.21, 0.12, 0.07), step(0.8, hash11(cells.z * 13.1)) * 0.6); //a few reddish ones
+		albedo = mix(albedo, pebbleColor * (0.85 + 0.3 * tiledFbm(p, 64.0, 2)), pebble);
+		height = mix(height, 0.45 + 0.45 * sqrt(max(1.0 - cells.x / radius, 0.0)), pebble);
+		stones = max(stones, pebble);
+	}
 	vec3 gravel = tiledCells(p, 52.0);
-	float grit = step(0.55, gravel.z) * (1.0 - smoothstep(0.12, 0.32, gravel.x));
-	albedo = mix(albedo, vec3(0.16, 0.14, 0.12), grit * 0.5);
-	height += 0.1 * grit;
-	return Material(albedo, mix(0.92, 0.86, pebble), height);
+	float grit = step(0.55, gravel.z) * (1.0 - smoothstep(0.12, 0.32, gravel.x)) * (1.0 - 0.5 * trodden);
+	albedo = mix(albedo, vec3(0.19, 0.165, 0.135), grit * 0.5);
+	height += 0.08 * grit;
+	return Material(albedo, mix(mix(0.93, 0.82, trodden), 0.75, stones), height);
 }
 
 Material rock(vec2 p)
 {
-	//Granite: dark with light and black crystals, fractures along the contour lines of noise (organic, not cells),
-	//faces of different brightness between them, a bit of lichen
+	//Granite: dark with light and black crystals, split by joints into blocks (warped cells, a bit longer than high) whose
+	//faces are a bit different, the joints fade in and out along their length; rusty stains and a bit of lichen
 	vec2 warp = vec2(tiledFbm(p, 4.0, 4), tiledFbm(p + vec2(0.37, 0.71), 4.0, 4)) - 0.5;
 	vec2 q = p + 0.08 * warp;
 	float base = tiledFbm(q, 3.0, 6);
 	float detail = tiledFbm(q, 24.0, 4);
-	vec3 albedo = mix(vec3(0.075, 0.072, 0.068), vec3(0.2, 0.19, 0.175), 0.65 * base + 0.35 * detail);
+	vec3 albedo = mix(vec3(0.068, 0.065, 0.06), vec3(0.185, 0.175, 0.16), 0.65 * base + 0.35 * detail);
 	float crystals = tiledNoise(p * 256.0, 256.0);
-	albedo = mix(albedo, vec3(0.28, 0.26, 0.235), step(0.88, crystals) * 0.5);
+	albedo = mix(albedo, vec3(0.26, 0.245, 0.22), step(0.88, crystals) * 0.5);
 	albedo = mix(albedo, vec3(0.025), step(0.9, 1.0 - crystals) * 0.45);
-	float large = tiledFbm(q + vec2(0.13, 0.57), 4.0, 5) - 0.5;
-	float small = tiledFbm(q * 1.0 + vec2(0.61, 0.23), 11.0, 4) - 0.5;
-	float fracture = 1.0 - smoothstep(0.0, 0.014, abs(large));
-	float fine = (1.0 - smoothstep(0.0, 0.02, abs(small))) * 0.45;
-	//The faces on both sides of a fracture are a bit different
-	float face = smoothstep(-0.15, 0.15, large) * 0.6 + smoothstep(-0.2, 0.2, small) * 0.4;
-	albedo *= (0.82 + 0.32 * face) * (1.0 - 0.45 * max(fracture, fine));
-	float height = 0.35 * base + 0.25 * detail + 0.25 * face - 0.4 * fracture - 0.15 * fine;
-	float lichen = smoothstep(0.62, 0.7, tiledFbm(p + vec2(0.71, 0.29), 6.0, 5)) * smoothstep(0.3, 0.7, face);
+	vec3 blocks = tiledCells(q + 0.06 * warp, vec2(3.0, 5.0));
+	float edge = blocks.y - blocks.x;
+	float width = tiledFbm(q + vec2(0.83, 0.39), 8.0, 3);
+	float joint = (1.0 - smoothstep(0.0, 0.02 + 0.04 * width, edge)) * smoothstep(0.35, 0.65, tiledFbm(q + vec2(0.29, 0.83), 6.0, 4));
+	float small = tiledFbm(q + vec2(0.61, 0.23), 11.0, 4) - 0.5;
+	float fine = (1.0 - smoothstep(0.0, 0.015, abs(small))) * 0.3 * smoothstep(0.45, 0.7, tiledFbm(q + vec2(0.53, 0.07), 9.0, 3));
+	float face = blocks.z;
+	albedo *= (0.84 + 0.3 * face) * (1.0 - 0.4 * joint) * (1.0 - fine);
+	float stain = smoothstep(0.55, 0.78, tiledFbm(p + vec2(0.41, 0.19), 3.0, 5));
+	albedo = mix(albedo, albedo * vec3(1.3, 0.95, 0.68), stain * 0.55);
+	//The blocks are rounded off at their edges
+	float height = 0.3 * base + 0.2 * detail + 0.3 * smoothstep(0.0, 0.3, edge) + 0.1 * face - 0.2 * joint - 0.1 * fine;
+	float lichen = smoothstep(0.62, 0.7, tiledFbm(p + vec2(0.71, 0.29), 6.0, 5)) * smoothstep(0.1, 0.4, edge);
 	albedo = mix(albedo, vec3(0.17, 0.19, 0.11), lichen * 0.45);
 	return Material(albedo, mix(0.85, 0.65, detail) + 0.08 * lichen, height + 0.04 * lichen);
 }

@@ -4,9 +4,15 @@
 * sand at the beaches and patches of snow. The generated PBR materials (MaterialTextures) are projected from the three
 * axes (triplanar, so the cliffs and caves are not stretched) and blended by their height (snow fills the hollows of the
 * forest floor first, pebbles of the trail stick out of the moss).
+* With LOD_DITHER a chunk fades from its old level of detail to the new one (the old and the new mesh share the pixels).
 */
 #include "include/lighting.glsl"
 #include "include/noise.glsl"
+#ifdef LOD_DITHER
+#include "include/dither.glsl"
+//dither.glsl: from 0 to 1 the new mesh appears, from -1 to 0 the old one disappears
+uniform float lodFade;
+#endif
 
 in vec3 worldPosition;
 in vec3 worldNormal;
@@ -85,6 +91,12 @@ Sample sampleLayer(int layer, vec3 position, vec3 N, vec3 blend, bool normalMapp
 
 void main()
 {
+#ifdef LOD_DITHER
+	if (ditheredAway(lodFade))
+	{
+		discard;
+	}
+#endif
 	vec3 N = normalize(worldNormal);
 	vec3 position = worldPosition;
 	float distance = length(position - cameraPosition());

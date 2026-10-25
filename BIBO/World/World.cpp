@@ -132,13 +132,14 @@ void World::createWorldMap()
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void World::update(float timeDelta, glm::vec3 camera, glm::vec3 bear)
+void World::update(float timeDelta, glm::vec3 camera, glm::vec3 bear, const std::vector<FoliageInteraction::Body>& bodies)
 {
 	time += timeDelta;
+	foliage.update(timeDelta, bodies, camera);
 	streamer->update(camera, bear);
 	for (const WorldStreamer::MeshUpdate& update : streamer->takeMeshUpdates())
 	{
-		terrain->apply(update);
+		terrain->apply(update, time);
 	}
 	for (const WorldStreamer::VegetationUpdate& update : streamer->takeVegetationUpdates())
 	{
@@ -176,6 +177,7 @@ void World::fillFrameUniforms(render::FrameUniforms& uniforms) const
 	//The wind blows in gusts
 	float gusts = 0.75f + 0.25f * std::sin(time * 0.13f) + 0.1f * std::sin(time * 0.71f);
 	uniforms.wind = glm::vec4(atmosphere.windDirection, atmosphere.windStrength * gusts, 0.0f);
+	foliage.fillFrameUniforms(uniforms);
 	uniforms.worldMap = glm::vec4(worldMapOrigin, worldMapSize, generator->getSeaLevel());
 	uniforms.shadowSettings.y = atmosphere.fogSunScattering;
 }
@@ -205,7 +207,7 @@ void World::drawOpaque(const scene::ViewFrustum& frustum, glm::vec3 camera, bool
 	bindTextures();
 	GLboolean cullFace = glIsEnabled(GL_CULL_FACE);
 	glEnable(GL_CULL_FACE);
-	drawnChunks = terrain->draw(culling ? &frustum : nullptr);
+	drawnChunks = terrain->draw(culling ? &frustum : nullptr, time);
 	drawnInstances = vegetation->draw(frustum, camera);
 	cullFace ? glEnable(GL_CULL_FACE) : glDisable(GL_CULL_FACE);
 }

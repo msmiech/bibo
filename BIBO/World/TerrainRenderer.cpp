@@ -7,6 +7,7 @@ using namespace bibo::world;
 
 TerrainRenderer::TerrainRenderer()
 	: shader(std::make_unique<Shader>("Shader/terrain.vert", "Shader/terrain.frag")),
+	ditherShader(std::make_unique<Shader>("Shader/terrain.vert", "Shader/terrain.frag", "LOD_DITHER")),
 	depthShader(std::make_unique<Shader>("Shader/depth_shader.vert", "Shader/depth_shader.frag"))
 {
 }
@@ -17,6 +18,10 @@ TerrainRenderer::~TerrainRenderer()
 	{
 		release(entry.second);
 	}
+	for (auto& entry : fading)
+	{
+		release(entry.second.old);
+	}
 }
 
 void TerrainRenderer::release(GpuChunk& chunk)
@@ -26,15 +31,30 @@ void TerrainRenderer::release(GpuChunk& chunk)
 	glDeleteBuffers(2, buffers);
 }
 
-void TerrainRenderer::apply(const WorldStreamer::MeshUpdate& update)
+void TerrainRenderer::apply(const WorldStreamer::MeshUpdate& update, float time)
 {
+	bool replaced = update.mesh && !update.mesh->empty();
+	//A mesh that was still fading out is gone now, the current one fades out instead (unless it just came, e.g. while loading)
+	auto previous = fading.find(update.key);
+	if (previous != fading.end())
+	{
+		release(previous->second.old);
+		fading.erase(previous);
+	}
 	auto existing = chunks.find(update.key);
 	if (existing != chunks.end())
 	{
-		release(existing->second);
+		if (replaced && existing->second.uploadTime < time)
+		{
+			fading[update.key] = { existing->second, time };
+		}
+		else
+		{
+			release(existing->second);
+		}
 		chunks.erase(existing);
 	}
-	if (!update.mesh || update.mesh->empty())
+	if (!replaced)
 	{
 		return;
 	}
@@ -42,6 +62,7 @@ void TerrainRenderer::apply(const WorldStreamer::MeshUpdate& update)
 	GpuChunk chunk;
 	chunk.bounds = mesh.bounds;
 	chunk.lod = mesh.lod;
+	chunk.uploadTime = time;
 	chunk.indexCount = static_cast<GLsizei>(mesh.indices.size());
 	glGenVertexArrays(1, &chunk.vertexArray);
 	glBindVertexArray(chunk.vertexArray);
@@ -65,24 +86,62 @@ void TerrainRenderer::apply(const WorldStreamer::MeshUpdate& update)
 	chunks[update.key] = chunk;
 }
 
-int TerrainRenderer::draw(const scene::ViewFrustum* frustum)
+bool TerrainRenderer::drawChunk(const GpuChunk& chunk, const scene::ViewFrustum* frustum)
 {
-	shader->enable();
+	glm::vec3 center = 0.5f * (chunk.bounds.minimum + chunk.bounds.maximum);
+	float radius = 0.5f * glm::length(chunk.bounds.maximum - chunk.bounds.minimum);
+	if (frustum && frustum->sphereInFrustum(center, radius) == scene::ViewFrustum::OUTSIDE)
+	{
+		return false;
+	}
+	glBindVertexArray(chunk.vertexArray);
+	glDrawElements(GL_TRIANGLES, chunk.indexCount, GL_UNSIGNED_INT, nullptr);
+	drawnTriangles += static_cast<std::size_t>(chunk.indexCount) / 3;
+	return true;
+}
+
+int TerrainRenderer::draw(const scene::ViewFrustum* frustum, float time)
+{
+	for (auto it = fading.begin(); it != fading.end();)
+	{
+		if (time - it->second.start >= FADE_TIME || time < it->second.start)
+		{
+			release(it->second.old);
+			it = fading.erase(it);
+		}
+		else
+		{
+			++it;
+		}
+	}
 	int drawn = 0;
 	drawnTriangles = 0;
+	shader->enable();
 	for (auto& entry : chunks)
 	{
-		const GpuChunk& chunk = entry.second;
-		glm::vec3 center = 0.5f * (chunk.bounds.minimum + chunk.bounds.maximum);
-		float radius = 0.5f * glm::length(chunk.bounds.maximum - chunk.bounds.minimum);
-		if (frustum && frustum->sphereInFrustum(center, radius) == scene::ViewFrustum::OUTSIDE)
+		if (fading.count(entry.first) == 0 && drawChunk(entry.second, frustum))
 		{
-			continue;
+			++drawn;
 		}
-		glBindVertexArray(chunk.vertexArray);
-		glDrawElements(GL_TRIANGLES, chunk.indexCount, GL_UNSIGNED_INT, nullptr);
-		++drawn;
-		drawnTriangles += static_cast<std::size_t>(chunk.indexCount) / 3;
+	}
+	//The fading chunks: the old and the new mesh each on their part of the pixels
+	if (!fading.empty())
+	{
+		ditherShader->enable();
+		GLint fadeLocation = ditherShader->getUniformLocation("lodFade");
+		for (auto& entry : fading)
+		{
+			float fade = (time - entry.second.start) / FADE_TIME;
+			glUniform1f(fadeLocation, fade - 1.0f);
+			bool visible = drawChunk(entry.second.old, frustum);
+			auto current = chunks.find(entry.first);
+			if (current != chunks.end())
+			{
+				glUniform1f(fadeLocation, fade);
+				visible = drawChunk(current->second, frustum) || visible;
+			}
+			drawn += visible ? 1 : 0;
+		}
 	}
 	glBindVertexArray(0);
 	return drawn;

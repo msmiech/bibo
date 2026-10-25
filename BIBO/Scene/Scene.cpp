@@ -38,6 +38,8 @@ namespace
 	const float MISHKA_UPDATE_DISTANCE = 90.0f;
 	//Mishka looks at the bear when it comes this close, otherwise at the salmon of its pool
 	const float MISHKA_ATTENTION_DISTANCE = 12.0f;
+	//The bear pushes the plants aside within this distance of the center of its capsule (about down to its paws)
+	const float BEAR_FOLIAGE_RADIUS = 1.3f;
 
 	//The vertices of the meshes of a geometry in model space (the model matrix is not applied)
 	vector<vec3> modelVertices(Geometry* geometry)
@@ -511,8 +513,16 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 	}
 	updateCamera(time_delta);
 
-	//The world streams around the camera, the physics around the bear
-	world->update(time_delta, camera->getPosition(), bear->getPosition());
+	//The world streams around the camera, the physics around the bear. The bear and the animals push the plants aside.
+	vector<world::FoliageInteraction::Body> bodies;
+	bodies.push_back({ bear->getCharacter().getPosition(), BEAR_FOLIAGE_RADIUS });
+	bodies.push_back({ beaver->getColliderCenter(), beaver->getColliderRadius() });
+	bodies.push_back({ mishka->getColliderCenter(), mishka->getColliderRadius() });
+	for (const Hedgehog& hedgehog : hedgehogs)
+	{
+		bodies.push_back({ hedgehog.getColliderCenter(), hedgehog.getColliderRadius() });
+	}
+	world->update(time_delta, camera->getPosition(), bear->getPosition(), bodies);
 	placeAnimals();
 }
 

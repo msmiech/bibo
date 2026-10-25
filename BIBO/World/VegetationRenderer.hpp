@@ -15,9 +15,26 @@ namespace bibo
 	namespace world
 	{
 		/**
+		* Which level of detail an instance has at a distance, and how far it has faded into the next one
+		*/
+		struct LodBlend
+		{
+			int lod = 0;
+			float next = 0.0f; //0: only lod, up to 1: lod + 1 replaces it (both are drawn, dithered)
+		};
+
+		/**
+		* @param lodDistances Where the levels 1, 2, ... begin (lodCount - 1 of them)
+		* @param band Width of the cross-fade around every distance, relative to it
+		*/
+		LodBlend blendLod(float distance, const float* lodDistances, int lodCount, float band);
+
+		/**
 		* Draws the instances of the vegetation. Every frame (and every shadow map) it collects the visible instances of the
 		* columns in the view, picks the level of detail of every instance by its distance from the camera and draws each
-		* model and level with one instanced draw call. Far away the models shrink to nothing before they are left out.
+		* model and level with one instanced draw call. Around the distance where the level changes both levels are drawn,
+		* each on a part of the pixels (dithered), so that the models change gradually instead of popping. Far away the
+		* models shrink to nothing (the stones dissolve) before they are left out.
 		*/
 		class VegetationRenderer
 		{
@@ -53,6 +70,8 @@ namespace bibo
 				float maxDistance = 100.0f;
 				float shadowDistance = 0.0f; //0: no shadow
 				float windAmplitude = 0.0f;
+				float interaction = 0.0f; //how far the bear and the animals push it aside (relative to its height)
+				float height = 0.0f;
 				bool twoSided = false;
 				bool scaleDistances = false; //the distances grow with the scale (stones)
 			};
@@ -67,6 +86,7 @@ namespace bibo
 			{
 				int model, lod;
 				std::size_t first, count;
+				bool dithered; //the instances fade (instance.parameters.w, Shader/include/dither.glsl)
 			};
 
 			/**
@@ -74,14 +94,16 @@ namespace bibo
 			* @param shadowCascade nullptr: for the camera
 			*/
 			void collect(const scene::ViewFrustum* frustum, const render::ShadowCascade* shadowCascade, glm::vec3 camera);
-			void drawBatches(Shader& shader, bool shadowPass);
+			void drawBatches(Shader& shader, bool shadowPass, bool dithered);
 
 			std::unique_ptr<Shader> shader;
+			std::unique_ptr<Shader> ditherShader;
 			std::unique_ptr<Shader> depthShader;
 			std::vector<ModelData> models;
 			std::unordered_map<ColumnKey, ColumnData, ColumnKeyHash> columns;
 			GLuint instanceBuffer = 0;
 			std::vector<std::vector<Instance>> sorted; //per model and level of detail
+			std::vector<std::vector<Instance>> sortedDithered; //the instances that fade, per model and level of detail
 			std::vector<Instance> staging;
 			std::vector<Batch> batches;
 			float detail;

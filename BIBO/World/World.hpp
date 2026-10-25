@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 #include "Chunk.hpp"
+#include "FoliageInteraction.hpp"
 #include "WorldGenerator.hpp"
 #include "WorldStreamer.hpp"
 #include "../Physics/Physics.hpp"
@@ -80,8 +81,9 @@ namespace bibo
 
 			/**
 			* Streams the world for the camera and the bear (physics), lets the time pass (wind, polar lights, snow)
+			* @param bodies The bear and the animals that push the plants aside (in the same order every frame)
 			*/
-			void update(float timeDelta, glm::vec3 camera, glm::vec3 bear);
+			void update(float timeDelta, glm::vec3 camera, glm::vec3 bear, const std::vector<FoliageInteraction::Body>& bodies = {});
 			/**
 			* Waits until the world around the camera and the bear is complete (loading)
 			*/
@@ -121,6 +123,7 @@ namespace bibo
 			void setDetail(int level);
 			const WorldGenerator& getGenerator() const { return *generator; }
 			const Atmosphere& getAtmosphere() const { return atmosphere; }
+			const FoliageInteraction& getFoliageInteraction() const { return foliage; }
 			float getTime() const { return time; }
 			Statistics getStatistics() const;
 
@@ -129,6 +132,7 @@ namespace bibo
 
 			std::unique_ptr<WorldGenerator> generator;
 			Atmosphere atmosphere;
+			FoliageInteraction foliage;
 			bool lowDetail;
 			int detailLevel = 2;
 			float time = 0.0f;

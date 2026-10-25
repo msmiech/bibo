@@ -16,9 +16,11 @@ namespace bibo {
 		/**
 		@param vertexShader Path to vertex mainShader file *.vert
 		@param fragmentShader Path to fragment mainShader file *.frag
+		@param defines Names separated by spaces that are defined in both shaders (variants of a shader, e.g. "LOD_DITHER")
 		**/
 		Shader(const string& vertexShader,
-			const string& fragmentShader);
+			const string& fragmentShader,
+			const string& defines = "");
 		~Shader();
 
 		/**
@@ -38,11 +40,17 @@ namespace bibo {
 		* @return The source code, empty if a file is missing
 		*/
 		static string preprocess(const string& path, string& error);
+		/**
+		* @param defines Names separated by spaces
+		* @return The code with a line #define NAME for every name after the #version line
+		*/
+		static string addDefines(const string& code, const string& defines);
 
 	private:
 		void loadShader(const string& shader, 
 						GLenum shaderType,
-						GLuint& handle);
+						GLuint& handle,
+						const string& defines);
 		void link();
 
 		GLuint vertexHandle;

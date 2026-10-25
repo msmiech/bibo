@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <cstdlib>
 #include "../Util/Console.hpp"
 
@@ -11,7 +12,7 @@ using namespace std;
 
 const bool LOCATION_NOT_FOUND_OUTPUT = false;
 
-Shader::Shader(const string& vertexShader, const string& fragmentShader)
+Shader::Shader(const string& vertexShader, const string& fragmentShader, const string& defines)
 	: programHandle(0)
 	, vertexHandle(0)
 	, fragmentHandle(0)
@@ -24,8 +25,8 @@ Shader::Shader(const string& vertexShader, const string& fragmentShader)
 		util::pause();
 		exit(EXIT_FAILURE);
 	}
-	loadShader(vertexShader, GL_VERTEX_SHADER, vertexHandle);
-	loadShader(fragmentShader, GL_FRAGMENT_SHADER, fragmentHandle);
+	loadShader(vertexShader, GL_VERTEX_SHADER, vertexHandle, defines);
+	loadShader(fragmentShader, GL_FRAGMENT_SHADER, fragmentHandle, defines);
 	link();
 }
 
@@ -115,12 +116,36 @@ string Shader::preprocess(const string& path, string& error)
 	return readIncluding(path, 0, error);
 }
 
+string Shader::addDefines(const string& code, const string& defines)
+{
+	string lines;
+	istringstream names(defines);
+	string name;
+	while (names >> name)
+	{
+		lines += "#define " + name + "\n";
+	}
+	if (lines.empty())
+	{
+		return code;
+	}
+	//The #version line must stay the first one
+	size_t version = code.find("#version");
+	size_t end = version == string::npos ? string::npos : code.find('\n', version);
+	if (end == string::npos)
+	{
+		return lines + code;
+	}
+	return code.substr(0, end + 1) + lines + code.substr(end + 1);
+}
+
 void Shader::loadShader(const string& shader,
 	GLenum shaderType,
-	GLuint& handle)
+	GLuint& handle,
+	const string& defines)
 {
 	string error;
-	string code = preprocess(shader, error);
+	string code = addDefines(preprocess(shader, error), defines);
 	if (!error.empty()) {
 		cerr << error << endl;
 		util::pause();

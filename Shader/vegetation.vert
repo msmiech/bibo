@@ -9,6 +9,7 @@ out vec2 textureCoordinates;
 out vec3 vertexColor;
 out vec4 vertexParameters;
 out vec2 instanceVariation;
+flat out float lodFade;
 
 void main()
 {
@@ -18,5 +19,6 @@ void main()
 	vertexColor = pow(color.rgb, vec3(2.2)); //sRGB to linear
 	vertexParameters = parameters;
 	instanceVariation = instanceParameters.xy;
+	lodFade = instanceParameters.w;
 	gl_Position = frame.viewProjection * vec4(worldPosition, 1.0);
 }

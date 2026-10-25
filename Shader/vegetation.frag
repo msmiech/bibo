@@ -2,9 +2,15 @@
 /*
 * Shading of the vegetation and the stones: every vertex says which material it is (VegetationMeshes.hpp). Bark, needles,
 * leaves and stones use the generated material textures; snow lies on the parts that face up.
+* With LOD_DITHER (the instances that fade between two levels of detail or out at the largest distance) every instance only
+* covers the part of the pixels that its fade says.
 */
 #include "include/lighting.glsl"
 #include "include/noise.glsl"
+#ifdef LOD_DITHER
+#include "include/dither.glsl"
+flat in float lodFade;
+#endif
 
 in vec3 worldPosition;
 in vec3 worldNormal;
@@ -51,6 +57,12 @@ vec3 perturb(vec3 N, vec2 uv, float layer, float strength)
 
 void main()
 {
+#ifdef LOD_DITHER
+	if (ditheredAway(lodFade))
+	{
+		discard;
+	}
+#endif
 	int material = int(round(vertexParameters.x * 255.0));
 	vec3 N = normalize(worldNormal);
 	if (!gl_FrontFacing)

@@ -9,32 +9,61 @@ using namespace bibo::world;
 namespace
 {
 	const int MAX_LODS = 3;
+	//Width of the cross-fade between two levels of detail (relative to the distance where they change)
+	const float LOD_BAND = 0.2f;
+	//The stones dissolve over this last part of their largest distance
+	const float DISSOLVE_BAND = 0.15f;
 
 	//Distances of the levels of detail, the largest distance, the distance up to which it casts shadows (0: never),
-	//how much it sways in the wind, whether it is seen from both sides and whether the distances grow with its scale
+	//how much it sways in the wind, how far the bear and the animals push it aside (relative to its height), whether it
+	//is seen from both sides and whether the distances grow with its scale
 	const struct
 	{
-		float lod1, lod2, maximum, shadow, wind;
+		float lod1, lod2, maximum, shadow, wind, interaction;
 		bool twoSided, scaled;
 	} MODEL_SETTINGS[MODEL_COUNT] = {
-		{ 50.0f, 150.0f, 1100.0f, 450.0f, 0.35f, true, false }, //SPRUCE_TALL
-		{ 50.0f, 150.0f, 1100.0f, 450.0f, 0.35f, true, false }, //SPRUCE_WIDE
-		{ 40.0f, 120.0f, 900.0f, 300.0f, 0.3f, true, false }, //SPRUCE_YOUNG
-		{ 50.0f, 150.0f, 1100.0f, 450.0f, 0.4f, true, false }, //PINE
-		{ 30.0f, 1e9f, 220.0f, 60.0f, 0.08f, false, false }, //BUSH
-		{ 30.0f, 1e9f, 220.0f, 60.0f, 0.06f, true, false }, //JUNIPER
-		{ 1e9f, 1e9f, 42.0f, 0.0f, 0.12f, true, false }, //FERN
-		{ 1e9f, 1e9f, 40.0f, 0.0f, 0.12f, true, false }, //GRASS
-		{ 1e9f, 1e9f, 40.0f, 0.0f, 0.12f, true, false }, //GRASS_DRY
-		{ 1e9f, 1e9f, 28.0f, 0.0f, 0.02f, false, false }, //MUSHROOM_RED
-		{ 1e9f, 1e9f, 28.0f, 0.0f, 0.02f, false, false }, //MUSHROOM_BROWN
-		{ 1e9f, 1e9f, 60.0f, 0.0f, 0.02f, false, false }, //MUSHROOM_GLOW
-		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, false, true }, //STONE_ROUND
-		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, false, true }, //STONE_FLAT
-		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, false, true }, //STONE_SHARP
-		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, false, true }, //STONE_STANDING
-		{ 35.0f, 1e9f, 200.0f, 120.0f, 0.0f, false, false }, //LOG
-		{ 35.0f, 1e9f, 160.0f, 80.0f, 0.0f, false, false } }; //STUMP
+		{ 50.0f, 150.0f, 1100.0f, 450.0f, 0.35f, 0.0f, true, false }, //SPRUCE_TALL
+		{ 50.0f, 150.0f, 1100.0f, 450.0f, 0.35f, 0.0f, true, false }, //SPRUCE_WIDE
+		{ 40.0f, 120.0f, 900.0f, 300.0f, 0.3f, 0.0f, true, false }, //SPRUCE_YOUNG
+		{ 50.0f, 150.0f, 1100.0f, 450.0f, 0.4f, 0.0f, true, false }, //PINE
+		{ 30.0f, 1e9f, 220.0f, 60.0f, 0.08f, 0.35f, false, false }, //BUSH
+		{ 30.0f, 1e9f, 220.0f, 60.0f, 0.06f, 0.4f, true, false }, //JUNIPER
+		{ 1e9f, 1e9f, 42.0f, 0.0f, 0.12f, 0.8f, true, false }, //FERN
+		{ 1e9f, 1e9f, 40.0f, 0.0f, 0.12f, 0.9f, true, false }, //GRASS
+		{ 1e9f, 1e9f, 40.0f, 0.0f, 0.12f, 0.9f, true, false }, //GRASS_DRY
+		{ 1e9f, 1e9f, 28.0f, 0.0f, 0.02f, 0.5f, false, false }, //MUSHROOM_RED
+		{ 1e9f, 1e9f, 28.0f, 0.0f, 0.02f, 0.5f, false, false }, //MUSHROOM_BROWN
+		{ 1e9f, 1e9f, 60.0f, 0.0f, 0.02f, 0.5f, false, false }, //MUSHROOM_GLOW
+		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, 0.0f, false, true }, //STONE_ROUND
+		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, 0.0f, false, true }, //STONE_FLAT
+		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, 0.0f, false, true }, //STONE_SHARP
+		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, 0.0f, false, true }, //STONE_STANDING
+		{ 35.0f, 1e9f, 200.0f, 120.0f, 0.0f, 0.0f, false, false }, //LOG
+		{ 35.0f, 1e9f, 160.0f, 80.0f, 0.0f, 0.0f, false, false } }; //STUMP
+
+	Instance withFade(const Instance& instance, float fade)
+	{
+		Instance faded = instance;
+		faded.parameters.w = fade;
+		return faded;
+	}
+}
+
+LodBlend bibo::world::blendLod(float distance, const float* lodDistances, int lodCount, float band)
+{
+	for (int i = 0; i < lodCount - 1; ++i)
+	{
+		float start = lodDistances[i] * (1.0f - 0.5f * band), end = lodDistances[i] * (1.0f + 0.5f * band);
+		if (distance < start)
+		{
+			return { i, 0.0f };
+		}
+		if (distance < end)
+		{
+			return { i, (distance - start) / (end - start) };
+		}
+	}
+	return { std::max(lodCount - 1, 0), 0.0f };
 }
 
 void VegetationRenderer::ColumnData::updateBounds()
@@ -62,12 +91,14 @@ void VegetationRenderer::ColumnData::updateBounds()
 
 VegetationRenderer::VegetationRenderer(float detail)
 	: shader(std::make_unique<Shader>("Shader/vegetation.vert", "Shader/vegetation.frag")),
+	ditherShader(std::make_unique<Shader>("Shader/vegetation.vert", "Shader/vegetation.frag", "LOD_DITHER")),
 	depthShader(std::make_unique<Shader>("Shader/vegetation_depth.vert", "Shader/depth_shader.frag")),
 	detail(detail)
 {
 	glGenBuffers(1, &instanceBuffer);
 	models.resize(MODEL_COUNT);
 	sorted.resize(MODEL_COUNT * MAX_LODS);
+	sortedDithered.resize(MODEL_COUNT * MAX_LODS);
 	for (int m = 0; m < MODEL_COUNT; ++m)
 	{
 		ModelData& model = models[m];
@@ -76,6 +107,8 @@ VegetationRenderer::VegetationRenderer(float detail)
 		model.maxDistance = MODEL_SETTINGS[m].maximum;
 		model.shadowDistance = MODEL_SETTINGS[m].shadow;
 		model.windAmplitude = MODEL_SETTINGS[m].wind;
+		model.interaction = MODEL_SETTINGS[m].interaction;
+		model.height = modelHeight(static_cast<Model>(m));
 		model.twoSided = MODEL_SETTINGS[m].twoSided;
 		model.scaleDistances = MODEL_SETTINGS[m].scaled;
 		for (const VegetationMesh& mesh : buildModel(static_cast<Model>(m)))
@@ -165,6 +198,10 @@ void VegetationRenderer::collect(const scene::ViewFrustum* frustum, const render
 	{
 		list.clear();
 	}
+	for (std::vector<Instance>& list : sortedDithered)
+	{
+		list.clear();
+	}
 	const float reach = 1100.0f * detail;
 	for (const auto& entry : columns)
 	{
@@ -189,7 +226,8 @@ void VegetationRenderer::collect(const scene::ViewFrustum* frustum, const render
 				float scale = instance.positionScale.w;
 				float distance = glm::distance(position, camera);
 				float factor = detail * (model.scaleDistances ? std::max(scale, 0.3f) : 1.0f);
-				if (distance > model.maxDistance * factor)
+				float maximum = model.maxDistance * factor;
+				if (distance > maximum)
 				{
 					continue;
 				}
@@ -207,27 +245,54 @@ void VegetationRenderer::collect(const scene::ViewFrustum* frustum, const render
 				{
 					continue;
 				}
-				int lod = distance < model.lodDistances[0] * factor ? 0 : distance < model.lodDistances[1] * factor ? 1 : 2;
-				if (shadowCascade && lod == 0 && distance > 25.0f)
+				int lodCount = std::min(static_cast<int>(model.lods.size()), MAX_LODS);
+				const float lodDistances[2] = { model.lodDistances[0] * factor, model.lodDistances[1] * factor };
+				LodBlend blend = blendLod(distance, lodDistances, lodCount, LOD_BAND);
+				int nearest = blend.next < 0.5f ? blend.lod : blend.lod + 1;
+				if (shadowCascade)
 				{
-					lod = 1; //the shadow of a coarser model looks the same
+					//One level is enough for the shadow, the shadow of a coarser model looks the same
+					if (nearest == 0 && distance > 25.0f)
+					{
+						nearest = std::min(1, lodCount - 1);
+					}
+					sorted[m * MAX_LODS + nearest].push_back(instance);
+					continue;
 				}
-				lod = std::min(lod, static_cast<int>(model.lods.size()) - 1);
-				sorted[m * MAX_LODS + lod].push_back(instance);
+				//The stones dissolve before they are left out (they do not shrink, their distance depends on their size)
+				float dissolve = model.scaleDistances ? (distance - maximum * (1.0f - DISSOLVE_BAND)) / (maximum * DISSOLVE_BAND) : 0.0f;
+				if (dissolve > 0.0f)
+				{
+					sortedDithered[m * MAX_LODS + nearest].push_back(withFade(instance, 1.0f - dissolve));
+				}
+				else if (blend.next > 0.0f)
+				{
+					//The finer level gives way to the coarser one on the same pixels
+					sortedDithered[m * MAX_LODS + blend.lod].push_back(withFade(instance, blend.next - 1.0f));
+					sortedDithered[m * MAX_LODS + blend.lod + 1].push_back(withFade(instance, blend.next));
+				}
+				else
+				{
+					sorted[m * MAX_LODS + blend.lod].push_back(instance);
+				}
 			}
 		}
 	}
 	staging.clear();
 	batches.clear();
-	for (int m = 0; m < MODEL_COUNT; ++m)
+	for (int dithered = 0; dithered < 2; ++dithered)
 	{
-		for (int lod = 0; lod < MAX_LODS; ++lod)
+		const std::vector<std::vector<Instance>>& lists = dithered ? sortedDithered : sorted;
+		for (int m = 0; m < MODEL_COUNT; ++m)
 		{
-			const std::vector<Instance>& list = sorted[m * MAX_LODS + lod];
-			if (!list.empty())
+			for (int lod = 0; lod < MAX_LODS; ++lod)
 			{
-				batches.push_back({ m, lod, staging.size(), list.size() });
-				staging.insert(staging.end(), list.begin(), list.end());
+				const std::vector<Instance>& list = lists[m * MAX_LODS + lod];
+				if (!list.empty())
+				{
+					batches.push_back({ m, lod, staging.size(), list.size(), dithered == 1 });
+					staging.insert(staging.end(), list.begin(), list.end());
+				}
 			}
 		}
 	}
@@ -241,12 +306,17 @@ void VegetationRenderer::collect(const scene::ViewFrustum* frustum, const render
 	}
 }
 
-void VegetationRenderer::drawBatches(Shader& program, bool shadowPass)
+void VegetationRenderer::drawBatches(Shader& program, bool shadowPass, bool dithered)
 {
 	GLint windLocation = program.getUniformLocation("windAmplitude");
 	GLint fadeLocation = program.getUniformLocation("fadeDistances");
+	GLint interactionLocation = program.getUniformLocation("interaction");
 	for (const Batch& batch : batches)
 	{
+		if (batch.dithered != dithered)
+		{
+			continue;
+		}
 		const ModelData& model = models[batch.model];
 		const GpuMesh& mesh = model.lods[batch.lod];
 		if (!shadowPass)
@@ -254,6 +324,7 @@ void VegetationRenderer::drawBatches(Shader& program, bool shadowPass)
 			model.twoSided ? glDisable(GL_CULL_FACE) : glEnable(GL_CULL_FACE);
 		}
 		glUniform1f(windLocation, model.windAmplitude);
+		glUniform2f(interactionLocation, model.interaction, model.height);
 		float maximum = model.maxDistance * detail;
 		if (model.scaleDistances)
 		{
@@ -275,7 +346,10 @@ int VegetationRenderer::draw(const scene::ViewFrustum& frustum, glm::vec3 camera
 	collect(&frustum, nullptr, camera);
 	GLboolean cullFace = glIsEnabled(GL_CULL_FACE);
 	shader->enable();
-	drawBatches(*shader, false);
+	drawBatches(*shader, false, false);
+	//The fading instances with the shader that leaves out pixels (the others keep the early depth test)
+	ditherShader->enable();
+	drawBatches(*ditherShader, false, true);
 	cullFace ? glEnable(GL_CULL_FACE) : glDisable(GL_CULL_FACE);
 	return static_cast<int>(staging.size());
 }
@@ -285,5 +359,5 @@ void VegetationRenderer::drawShadow(const render::ShadowCascade& cascade, glm::v
 	collect(nullptr, &cascade, camera);
 	depthShader->enable();
 	glUniformMatrix4fv(depthShader->getUniformLocation("lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(cascade.lightSpace));
-	drawBatches(*depthShader, true);
+	drawBatches(*depthShader, true, false);
 }

@@ -290,6 +290,8 @@ add_library(bibo_core STATIC
 	BIBO/Util/Util.hpp
 	BIBO/World/Chunk.hpp
 	BIBO/World/ChunkMesher.cpp
+	BIBO/World/Landmarks.cpp
+	BIBO/World/Landmarks.hpp
 	BIBO/World/MaterialTextures.cpp
 	BIBO/World/MaterialTextures.hpp
 	BIBO/World/MeshBuilder.hpp

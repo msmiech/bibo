@@ -32,6 +32,7 @@ namespace
 		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, false, true }, //STONE_ROUND
 		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, false, true }, //STONE_FLAT
 		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, false, true }, //STONE_SHARP
+		{ 12.0f, 40.0f, 80.0f, 100.0f, 0.0f, false, true }, //STONE_STANDING
 		{ 35.0f, 1e9f, 200.0f, 120.0f, 0.0f, false, false }, //LOG
 		{ 35.0f, 1e9f, 160.0f, 80.0f, 0.0f, false, false } }; //STUMP
 }

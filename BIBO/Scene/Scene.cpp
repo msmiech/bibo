@@ -1041,7 +1041,13 @@ void Scene::placeAnimals()
 	}
 
 	//Chonk offers its quest and waits for the report (the mark above it), a large mark shows the way to the stone circle
-	chonkRenderer->setPose(0, chonk->getPose());
+	//The vertices of the raccoons are moved on the CPU: Chonk only while the camera is close enough to see it move, a hidden fan
+	//once when it goes back into the woods
+	if (!chonkPosed || distance(camera->getPosition(), chonk->getPosition()) < MISHKA_UPDATE_DISTANCE)
+	{
+		chonkRenderer->setPose(0, chonk->getPose());
+		chonkPosed = true;
+	}
 	if (stonesQuest->isOffered() || stonesQuest->hasReport())
 	{
 		creatures->add(CreatureModel::QUEST_MARKER, chonk->getMarkerPosition(), chonk->getMarkerRotation(), MARKER_SCALE);
@@ -1052,17 +1058,18 @@ void Scene::placeAnimals()
 		creatures->add(CreatureModel::QUEST_MARKER, stonesCenter + UP * (GOAL_MARKER_HEIGHT + bob), chonk->getMarkerRotation(), GOAL_MARKER_SCALE);
 	}
 	const vector<Raccoon>& raccoons = fans->getRaccoons();
+	fansHidden.resize(raccoons.size(), false);
 	for (std::size_t i = 0; i < raccoons.size(); ++i)
 	{
-		vector<mat4> pose = raccoons[i].getPose();
-		if (!raccoons[i].isVisible())
+		if (raccoons[i].isVisible())
 		{
-			for (mat4& part : pose)
-			{
-				part = glm::translate(mat4(1.0f), HIDDEN_PLACE) * glm::scale(mat4(1.0f), vec3(Raccoon::SCALE));
-			}
+			fansRenderer->setPose(i, raccoons[i].getPose());
 		}
-		fansRenderer->setPose(i, pose);
+		else if (!fansHidden[i])
+		{
+			fansRenderer->setPose(i, vector<mat4>(RaccoonModel::PART_COUNT, glm::translate(mat4(1.0f), HIDDEN_PLACE) * glm::scale(mat4(1.0f), vec3(Raccoon::SCALE))));
+		}
+		fansHidden[i] = !raccoons[i].isVisible();
 	}
 }
 

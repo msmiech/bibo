@@ -34,8 +34,9 @@ namespace
 	const float PREFERRED_GRADE = 0.3f;
 	//The ground around the summit is blurred over this distance, the crags fade out within this radius
 	const float SOFTENING_BLUR = 3.0f, SUMMIT_SOFTENING = 34.0f;
-	//Ground steeper than this within STEEP_REACH (and twice as far) of a cell makes a path through it more expensive
-	const float STEEP_SLOPE = 0.7f, STEEP_REACH = 2.5f;
+	//Ground steeper than this to the cells around a cell (up to STEEP_CELLS away) makes a path through it more expensive
+	const float STEEP_SLOPE = 0.7f;
+	const int STEEP_CELLS = 2;
 
 	float smoothstep(float edge0, float edge1, float x)
 	{
@@ -555,10 +556,15 @@ void Landmarks::findPaths(const WorldGenerator& world)
 	grid.height.resize(cellCount);
 	grid.penalty.assign(cellCount, 0.0f);
 	grid.network.assign(cellCount, Grid::NONE);
+	std::vector<float> naturals(cellCount);
+	for (std::size_t c = 0; c < cellCount; ++c)
+	{
+		naturals[c] = naturalGround(world, grid.position(static_cast<int>(c)));
+	}
 	for (std::size_t c = 0; c < cellCount; ++c)
 	{
 		glm::vec2 at = grid.position(static_cast<int>(c));
-		float natural = naturalGround(world, at);
+		float natural = naturals[c];
 		grid.height[c] = applyLeveling(at, natural);
 		float inland, cliff;
 		world.coast(at, inland, cliff);
@@ -571,15 +577,23 @@ void Landmarks::findPaths(const WorldGenerator& world)
 		{
 			grid.penalty[c] = 30.0f * cliff; //the edge of the cliffs
 		}
-		//Steep ground around the cell (also across the way): a path there would be a ledge under a crag or above a drop
+		//Steep ground around the cell (also across the way): a path there would be a ledge under a crag or above a drop.
+		//To the neighbors in 8 directions, one and two cells away.
 		float steepest = 0.0f;
-		for (int k = 0; k < 8; ++k)
+		const int i = static_cast<int>(c) % grid.columns, j = static_cast<int>(c) / grid.columns;
+		for (int di = -1; di <= 1; ++di)
 		{
-			float angle = PI * static_cast<float>(k) / 4.0f;
-			glm::vec2 direction(std::cos(angle), std::sin(angle));
-			for (float reach : { STEEP_REACH, 2.0f * STEEP_REACH })
+			for (int dj = -1; dj <= 1; ++dj)
 			{
-				steepest = std::max(steepest, std::abs(naturalGround(world, at + reach * direction) - natural) / reach);
+				for (int reach = 1; reach <= STEEP_CELLS && (di != 0 || dj != 0); ++reach)
+				{
+					int ni = i + di * reach, nj = j + dj * reach;
+					if (ni >= 0 && nj >= 0 && ni < grid.columns && nj < grid.rows)
+					{
+						float distance = ROUTE_CELL * static_cast<float>(reach) * std::sqrt(static_cast<float>(di * di + dj * dj));
+						steepest = std::max(steepest, std::abs(naturals[static_cast<std::size_t>(nj) * grid.columns + ni] - natural) / distance);
+					}
+				}
 			}
 		}
 		if (steepest > STEEP_SLOPE)

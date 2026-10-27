@@ -179,6 +179,8 @@ namespace bibo
 			unique_ptr<FurryRenderer> chonkRenderer;
 			unique_ptr<RaccoonFans> fans;
 			unique_ptr<FurryRenderer> fansRenderer;
+			vector<bool> fansHidden; //the fan is drawn under the island (its pose need not change)
+			bool chonkPosed = false;
 			float cheerLinger = 0.0f; //the raccoons go on cheering for a while after a quest was completed
 			int raccoonChatters = 0; //for takeRaccoonChatters
 

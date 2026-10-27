@@ -293,8 +293,8 @@ TEST_CASE(
     CHECK_FALSE(quest.isPlayerInControl());
     CHECK_FALSE(quest.isOffered());
     q.update(1.0f);
-    CHECK(q.count(RaceQuest::Event::BEAVER_SOUND) >
-          0);  // it chatters while its words appear
+    // it chatters while its words appear
+    CHECK(q.count(RaceQuest::Event::BEAVER_SOUND) > 0);
 
     q.answer(true);
     CHECK(q.count(RaceQuest::Event::ACCEPTED) == 1);

@@ -4,10 +4,12 @@
 namespace bibo {
 enum WindowMode {
   WINDOWED = 0,
-  FULLSCREEN = 1,  // Exclusive full screen, switches the monitor to the video
-                   // mode of the resolution
-  BORDERLESS = 2   // Window without border covering the monitor, keeps the
-                   // resolution of the desktop
+  // Exclusive full screen, switches the monitor to the video mode of the
+  // resolution
+  FULLSCREEN = 1,
+  // Window without border covering the monitor, keeps the resolution of the
+  // desktop
+  BORDERLESS = 2
 };
 
 /**
@@ -31,8 +33,9 @@ struct Settings {
   bool bilinearFiltering = true;  // false = nearest neighbor
   int mipmapping = 2;             // 0 = off, 1 = nearest neighbor, 2 = linear
   bool wireframe = false;
-  int worldDetail = 2;  // 0 = low, 1 = medium, 2 = high: how far the details
-                        // and the vegetation of the world reach
+  // 0 = low, 1 = medium, 2 = high: how far the details and the vegetation of
+  // the world reach
+  int worldDetail = 2;
 
   // Controls
   int cameraSensitivity = 5;   // 1 (slow) to 10 (fast), mouse and gamepad

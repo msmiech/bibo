@@ -15,8 +15,8 @@ enum VegetationMaterial : std::uint8_t {
   VEGETATION_BARK,     // bark texture along the uv (u around, v along)
   VEGETATION_NEEDLES,  // needle texture, translucent
   VEGETATION_LEAVES,   // leaf texture, translucent
-  VEGETATION_STONE,  // rock texture projected in model space, moss and snow on
-                     // top
+  // rock texture projected in model space, moss and snow on top
+  VEGETATION_STONE,
   VEGETATION_CAP_SPOTTED,  // mushroom cap with white spots
   VEGETATION_STEM,         // mushroom stem
   VEGETATION_GLOW,         // glowing mushroom
@@ -32,9 +32,10 @@ struct VegetationVertex {
   glm::vec3 position;
   glm::vec3 normal;
   glm::vec2 uv;
-  std::uint8_t color[4];       // sRGB color (rgb), a: unused
-  std::uint8_t parameters[4];  // material, wind weight (how much it sways),
-                               // snow (how much it can hold), ambient occlusion
+  std::uint8_t color[4];  // sRGB color (rgb), a: unused
+  // material, wind weight (how much it sways), snow (how much it can hold),
+  // ambient occlusion
+  std::uint8_t parameters[4];
 };
 
 struct VegetationMesh {

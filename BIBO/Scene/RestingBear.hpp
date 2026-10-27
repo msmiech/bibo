@@ -125,8 +125,8 @@ class RestingBear {
   glm::vec3 colliderCenter = glm::vec3(0.0f);
   float time = 0.0f;
   float mouth = 0.0f;
-  float mouthTime =
-      -1.0f;  // since the last sound started, -1 if the mouth is closed
+  // since the last sound started, -1 if the mouth is closed
+  float mouthTime = -1.0f;
 
   std::vector<glm::mat4> skinMatrices;
   std::vector<glm::vec3> positions, normals, combDirections, bindCombDirections;

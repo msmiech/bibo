@@ -67,8 +67,8 @@ class Framebuffer {
 TEST_CASE("The bear waits at the start of the race without losing",
           "[gl][scene]") {
   GlContext gl;
-  AssetWorkingDirectory
-      assets;  // the scene loads its files relative to the working directory
+  // the scene loads its files relative to the working directory
+  AssetWorkingDirectory assets;
   Shader mainShader("Shader/main_shader.vert", "Shader/main_shader.frag");
   PhysicsWorld physicsWorld;
   Scene scene(&gl.window(), &mainShader, &physicsWorld);
@@ -156,8 +156,8 @@ TEST_CASE("The bear waits at the start of the race without losing",
     // two frames.)
     Shader silhouetteShader(assetPath("tests/gl/silhouette.vert").string(),
                             assetPath("tests/gl/silhouette.frag").string());
-    Framebuffer framebuffer(
-        800, 600);  // size of the window, the camera uses its aspect ratio
+    // size of the window, the camera uses its aspect ratio
+    Framebuffer framebuffer(800, 600);
     glDisable(GL_DEPTH_TEST);
     silhouetteShader.enable();
     REQUIRE(scene.isViewFrustumCullingEnabled());
@@ -528,8 +528,8 @@ TEST_CASE(
     for (int i = 0; i < 60 * 60 && !quest.isPlayerInControl(); ++i) {
       scene.update(frame, i % 30 == 0 ? press : bibo::input::PlayerInput());
     }
-    scene.update(frame);  // the other quests learn that this one is on (or
-                          // over)
+    // the other quests learn that this one is on (or over)
+    scene.update(frame);
   };
 
   REQUIRE(putBear(chonk, 3.5f));
@@ -540,8 +540,8 @@ TEST_CASE(
   std::vector<StonesQuest::Event> events = scene.takeStonesEvents();
   CHECK(std::count(events.begin(), events.end(),
                    StonesQuest::Event::ACCEPTED) == 1);
-  CHECK(scene.takeRaccoonChatters() >
-        3);  // Chonk chitters while its words appear
+  // Chonk chitters while its words appear
+  CHECK(scene.takeRaccoonChatters() > 3);
   CHECK_FALSE(scene.getRaceQuest().isOffered());  // one quest at a time
   // The bear faced Chonk from close by while they talked
   glm::vec3 offset = chonk - scene.getBear().getPosition();

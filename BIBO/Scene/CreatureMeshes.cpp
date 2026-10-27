@@ -32,8 +32,8 @@ void addEllipsoid(MeshBuilder& builder, glm::vec3 center, glm::vec3 radii,
                       static_cast<float>(longitude);
       glm::vec3 direction(std::sin(polar) * std::cos(azimuth), std::cos(polar),
                           std::sin(polar) * std::sin(azimuth));
-      float occlusion =
-          glm::mix(0.6f, 1.0f, 0.5f + 0.5f * direction.y);  // darker underneath
+      // darker underneath
+      float occlusion = glm::mix(0.6f, 1.0f, 0.5f + 0.5f * direction.y);
       builder.add(center + direction * radii, direction / radii,
                   glm::vec2(0.0f), color(direction), material, 0.0f, 0.0f,
                   occlusion);

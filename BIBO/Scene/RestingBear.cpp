@@ -135,8 +135,8 @@ void RestingBear::update(float timeDelta, const glm::vec3* watch) {
   time += timeDelta;
   if (watch) {
     rig.lookAt(position +
-               (*watch - position) /
-                   SCALE);  // into the frame of the rig before it is scaled
+               // into the frame of the rig before it is scaled
+               (*watch - position) / SCALE);
   } else {
     rig.stopLooking();
   }

@@ -28,16 +28,16 @@ struct FrameUniforms {
   glm::vec4 skyAmbientSnow = glm::vec4(0.0f);
   glm::vec4 groundAmbient = glm::vec4(0.0f);
   glm::vec4 fogDensity = glm::vec4(0.0f);
-  glm::vec4 wind = glm::vec4(
-      0.0f);  // xy: direction, z: strength, w: number of foliage interactors
+  // xy: direction, z: strength, w: number of foliage interactors
+  glm::vec4 wind = glm::vec4(0.0f);
   glm::vec4 viewport = glm::vec4(1.0f);
   glm::vec4 worldMap = glm::vec4(0.0f);
   glm::vec4 shadowSettings = glm::vec4(0.0f);
-  glm::vec4 foliageInteractors[MAX_FOLIAGE_INTERACTORS] =
-      {};  // xyz: center of the body, w: its radius
-  glm::vec4 foliagePushes[MAX_FOLIAGE_INTERACTORS] =
-      {};  // x: how far the plants are pushed aside (1: fully), yz: motion (xz,
-           // 1: running)
+  // xyz: center of the body, w: its radius
+  glm::vec4 foliageInteractors[MAX_FOLIAGE_INTERACTORS] = {};
+  // x: how far the plants are pushed aside (1: fully), yz: motion (xz, 1:
+  // running)
+  glm::vec4 foliagePushes[MAX_FOLIAGE_INTERACTORS] = {};
 };
 static_assert(sizeof(FrameUniforms) ==
                   8 * 64 + 12 * 16 + 2 * MAX_FOLIAGE_INTERACTORS * 16,

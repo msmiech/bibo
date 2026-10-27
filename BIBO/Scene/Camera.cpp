@@ -1,4 +1,4 @@
-﻿#include "Camera.hpp"
+#include "Camera.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -17,8 +17,8 @@ namespace {
 const float PIVOT_HEIGHT = 0.75f;
 const float DEFAULT_PITCH = glm::radians(17.0f);
 const float MIN_PITCH = glm::radians(-20.0f),
-            MAX_PITCH =
-                glm::radians(70.0f);  // from slightly below to high above
+            // from slightly below to high above
+    MAX_PITCH = glm::radians(70.0f);
 const float FREE_MAX_PITCH = glm::radians(89.0f);
 // Following: closely in the horizontal, the height lags behind (a jump does not
 // shake the view), but not too far
@@ -272,8 +272,7 @@ mat4 Camera::getViewMatrix() {
 }
 
 mat4 Camera::getProjectionMatrix() {
-  return perspective(radians(aperture),  // OEffnungswinkel der Kamera
-                     getAspectRatio(), zNear, zFar);
+  return perspective(radians(aperture), getAspectRatio(), zNear, zFar);
 }
 
 ViewFrustum Camera::getViewFrustum() {

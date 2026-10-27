@@ -22,11 +22,11 @@ struct SphereCollider {
  */
 struct Environment {
   glm::vec3 gravity = glm::vec3(0.0f, -9.81f, 0.0f);
-  glm::vec3 wind = glm::vec3(0.0f);  // acceleration of the fur tips (fur
-                                     // lengths / s^2), varies with gusts
-  float time = 0.0f;                 // seconds, for the gusts of the wind
-  bool hasGround =
-      false;  // the fur lies on the ground plane instead of going through it
+  // acceleration of the fur tips (fur lengths / s^2), varies with gusts
+  glm::vec3 wind = glm::vec3(0.0f);
+  float time = 0.0f;  // seconds, for the gusts of the wind
+  // the fur lies on the ground plane instead of going through it
+  bool hasGround = false;
   glm::vec3 groundPoint = glm::vec3(0.0f);
   glm::vec3 groundNormal = glm::vec3(0.0f, 1.0f, 0.0f);
   std::vector<SphereCollider> spheres;  // e.g. rocks
@@ -91,11 +91,11 @@ class GuideHairs {
 struct Strand {
   std::uint32_t vertices[3];  // the vertices of the triangle
   std::uint32_t seed;         // random number for the variations of the strand
-  float barycentric[2];  // weights of the first two vertices (the third one has
-                         // the rest)
-  float lengthScale;  // the strand is a bit shorter or longer than the fur of
-                      // the triangle
-  float shade;        // brightness variation
+  // weights of the first two vertices (the third one has the rest)
+  float barycentric[2];
+  // the strand is a bit shorter or longer than the fur of the triangle
+  float lengthScale;
+  float shade;  // brightness variation
 };
 
 /**

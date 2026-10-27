@@ -680,9 +680,8 @@ Ragdoll::Ragdoll(PhysicsWorld& world, const std::vector<RagdollPart>& parts)
     body.mRotation = bind.GetQuaternion();
     body.mMotionType = JPH::EMotionType::Dynamic;
     body.mObjectLayer = Layers::MOVING;
-    body.mMotionQuality =
-        JPH::EMotionQuality::LinearCast;  // does not tunnel through thin walls
-                                          // when it is hit hard
+    // does not tunnel through thin walls when it is hit hard
+    body.mMotionQuality = JPH::EMotionQuality::LinearCast;
     body.mOverrideMassProperties =
         JPH::EOverrideMassProperties::CalculateInertia;
     body.mMassPropertiesOverride.mMass = part.mass;

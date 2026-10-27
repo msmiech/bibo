@@ -616,9 +616,8 @@ VegetationMesh buildStone(glm::vec3 scale, float roughness, bool sharp,
                 VEGETATION_STONE, 0.0f, 1.0f, occlusion);
   }
   for (std::size_t t = 0; t + 2 < triangles.size(); t += 3) {
-    builder.triangle(triangles[t], triangles[t + 1],
-                     triangles[t + 2]);  // faces outwards (the normals are the
-                                         // directions yet)
+    // faces outwards (the normals are the directions yet)
+    builder.triangle(triangles[t], triangles[t + 1], triangles[t + 2]);
   }
   builder.smoothNormals(0, 0);
   return builder.finish();

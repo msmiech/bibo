@@ -63,12 +63,12 @@ const glm::vec3 WIND(9.0f, 0.0f, 6.0f);
 
 physics::CharacterControllerDesc BearCharacter::characterControllerDesc(
     glm::vec3 position) {
-  physics::CharacterControllerDesc
-      desc;  // A controller is a kinematic capsule, moved by the game logic
-  desc.position = position;    // initial position
-  desc.contactOffset = 0.05f;  // controller skin within which contacts
-                               // generated
-  desc.stepOffset = 1.0f;      // max obstacle height the character can climb
+  // A controller is a kinematic capsule, moved by the game logic
+  physics::CharacterControllerDesc desc;
+  desc.position = position;  // initial position
+  // controller skin within which contacts generated
+  desc.contactOffset = 0.05f;
+  desc.stepOffset = 1.0f;  // max obstacle height the character can climb
   desc.slopeLimit = glm::radians(45.0f);  // max slope the character can walk
   desc.radius = 1.0f;                     // radius of the capsule
   desc.height = 0.6f;                     // height of the controller
@@ -306,8 +306,8 @@ void BearCharacter::updateControl(float timeDelta,
   }
   if (fish == Fish::EATING) {
     if (rig.getIdle() != BearRig::IDLE_EAT) {
-      fish =
-          Fish::NONE;  // finished (or the player moved on after the last bite)
+      // finished (or the player moved on after the last bite)
+      fish = Fish::NONE;
     } else if (rig.getIdleTime() < BearRig::EAT_BITES[2]) {
       input = BearInput();
       jumpWasHeld = playerInput.jump;  // a jump needs a new press afterwards
@@ -390,8 +390,8 @@ void BearCharacter::updateControl(float timeDelta,
     jumping = jumped = true;
     jumpBuffer = 0.0f;
   } else if (controller->isOnWalkableGround() && !jumping) {
-    verticalSpeed = 0.0f;  // the controller keeps the bear on the ground when
-                           // it walks down a slope
+    // the controller keeps the bear on the ground when it walks down a slope
+    verticalSpeed = 0.0f;
   } else {
     // Holding the button until the highest point jumps highest, falling is
     // faster than rising
@@ -404,8 +404,8 @@ void BearCharacter::updateControl(float timeDelta,
 
   glm::vec3 displacement = (horizontal + UP * verticalSpeed) * timeDelta;
   glm::vec3 before = controller->getPosition();
-  standingOnGround = controller->move(
-      displacement, timeDelta);  // may knock the bear down (onHit)
+  // may knock the bear down (onHit)
+  standingOnGround = controller->move(displacement, timeDelta);
   velocity = (controller->getPosition() - before) / timeDelta;
   if (verticalSpeed > 0.0f && velocity.y < 0.5f * verticalSpeed) {
     verticalSpeed = std::max(velocity.y, 0.0f);  // hit something above
@@ -574,8 +574,8 @@ void BearCharacter::updateRagdoll(float timeDelta) {
 }
 
 void BearCharacter::startGettingUp() {
-  ragdoll->deactivate();  // the character controller must not collide with the
-                          // ragdoll
+  // the character controller must not collide with the ragdoll
+  ragdoll->deactivate();
   BearRig::GetUpStart start = rig.beginGetUp(probe, direction);
   glm::vec3 before = getPosition();
   direction = start.direction;

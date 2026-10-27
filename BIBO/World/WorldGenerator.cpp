@@ -28,9 +28,9 @@ const struct Mountain {
                  {310.0f, 200.0f, 22.0f, 34.0f}};
 // Caves
 const float CAVE_LENGTHS[] = {52.0f, 42.0f};
-const float CAVE_CEILING =
-    7.5f;  // above the floor of the track (the bear jumps about 1.5 high, the
-           // camera needs room)
+// above the floor of the track (the bear jumps about 1.5 high, the camera needs
+// room)
+const float CAVE_CEILING = 7.5f;
 const float CAVE_MIN_WALLS = 10.0f;
 const float CAVE_START_CLEARANCE = 45.0f;  // no cave at the start and finish
 const float CAVE_SEPARATION = 60.0f;       // between the ends of two caves

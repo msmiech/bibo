@@ -63,8 +63,8 @@ TEST_CASE("The bear model has every bone the animation needs",
   CAPTURE(rig.getMissingBones());
   CHECK(rig.isValid());
   CHECK(model.skeleton.bones.size() >= 30);
-  CHECK(model.skeleton.find("root") ==
-        0);  // the root bone comes first, every parent before its children
+  // the root bone comes first, every parent before its children
+  CHECK(model.skeleton.find("root") == 0);
   for (std::size_t i = 0; i < model.skeleton.bones.size(); ++i) {
     CHECK(model.skeleton.bones[i].parent < static_cast<int>(i));
   }

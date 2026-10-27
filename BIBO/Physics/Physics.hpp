@@ -21,9 +21,9 @@ const BodyHandle INVALID_BODY = 0xffffffff;
 struct RayHit {
   BodyHandle body = INVALID_BODY;
   glm::vec3 position = glm::vec3(0.0f);
-  glm::vec3 normal =
-      glm::vec3(0.0f, 1.0f, 0.0f);  // surface normal of the body at the hit
-  float fraction = 1.0f;            // position = origin + fraction * ray
+  // surface normal of the body at the hit
+  glm::vec3 normal = glm::vec3(0.0f, 1.0f, 0.0f);
+  float fraction = 1.0f;  // position = origin + fraction * ray
 };
 
 /**
@@ -53,8 +53,8 @@ struct ShapePart {
   enum Type { CAPSULE, SPHERE };
   Type type = SPHERE;
   glm::vec3 position = glm::vec3(0.0f);  // center
-  glm::quat rotation =
-      glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // the capsule goes along the y axis
+  // the capsule goes along the y axis
+  glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
   float halfHeight = 0.0f;  // capsule: half the length of its cylinder
   float radius = 0.5f;
 };
@@ -179,12 +179,12 @@ class PhysicsWorld {
 struct CharacterControllerDesc {
   glm::vec3 position = glm::vec3(0.0f);  // center of the capsule
   float radius = 0.5f;                   // radius of the capsule
-  float height = 1.0f;  // height of the cylinder between the two hemispheres of
-                        // the capsule
+  // height of the cylinder between the two hemispheres of the capsule
+  float height = 1.0f;
   float stepOffset = 0.4f;    // max obstacle height the character can climb
   float slopeLimit = 0.785f;  // max slope the character can walk (radians)
-  float contactOffset =
-      0.02f;  // skin around the capsule within which contacts are generated
+  // skin around the capsule within which contacts are generated
+  float contactOffset = 0.02f;
 };
 
 /**
@@ -199,8 +199,8 @@ class CharacterController {
    */
   struct Hit {
     BodyHandle body = INVALID_BODY;
-    glm::vec3 position =
-        glm::vec3(0.0f);  // where the character touches the body
+    // where the character touches the body
+    glm::vec3 position = glm::vec3(0.0f);
     glm::vec3 normal = glm::vec3(
         0.0f, 1.0f,
         0.0f);  // contact normal, pointing from the body towards the character
@@ -254,23 +254,24 @@ struct RagdollJoint {
   glm::vec3 twistAxis = glm::vec3(
       1.0f, 0.0f,
       0.0f);  // swing twist: along the child part; hinge: rotation axis
-  glm::vec3 planeAxis =
-      glm::vec3(0.0f, 1.0f, 0.0f);  // perpendicular to the twist axis
+  // perpendicular to the twist axis
+  glm::vec3 planeAxis = glm::vec3(0.0f, 1.0f, 0.0f);
   float swingAngle = 0.5f;  // swing twist: half angle of the cone (radians)
   float twistAngle = 0.3f;  // swing twist: twist limit in both directions
   float minAngle = -1.0f, maxAngle = 1.0f;  // hinge: limits around the axis
-  float friction = 1.0f;  // torque that slows down the joint when it moves (N
-                          // m)
+  // torque that slows down the joint when it moves (N m)
+  float friction = 1.0f;
 };
 
 /**
  * Rigid body of a ragdoll: a capsule that moves like a bone of a skeleton
  */
 struct RagdollPart {
-  int parent = -1;  // index of the parent part, -1 for the root part (parents
-                    // come before their children)
-  glm::mat4 bindTransform = glm::mat4(
-      1.0f);  // transform of the part (its bone) when the joints are relaxed
+  // index of the parent part, -1 for the root part (parents come before their
+  // children)
+  int parent = -1;
+  // transform of the part (its bone) when the joints are relaxed
+  glm::mat4 bindTransform = glm::mat4(1.0f);
   glm::vec3 capsuleStart = glm::vec3(0.0f),
             capsuleEnd = glm::vec3(0.0f, 1.0f,
                                    0.0f);  // in the same space as bindTransform

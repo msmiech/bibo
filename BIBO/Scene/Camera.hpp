@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <functional>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -33,8 +33,8 @@ class Camera : public SceneObject {
         vec3(0.0f, 0.0f,
              1.0f);  // where the target looks (the camera goes behind it)
     vec3 velocity = vec3(0.0f);
-    bool airborne =
-        false;  // jumping or falling: the camera follows the height more slowly
+    // jumping or falling: the camera follows the height more slowly
+    bool airborne = false;
   };
   /**
    * Moves a sphere of the given radius from one point to another, e.g. a sphere
@@ -194,8 +194,8 @@ class Camera : public SceneObject {
   CollisionProbe collisionProbe;
   // Shots of cutscenes and conversations
   bool inShot = false;
-  float shotBlend = 0.0f;  // 1 right after a shot ended: blends from the shot
-                           // to the following camera
+  // 1 right after a shot ended: blends from the shot to the following camera
+  float shotBlend = 0.0f;
   vec3 shotPosition = vec3(0.0f), shotDirection = vec3(0.0f, 0.0f, 1.0f);
 
   bool locked = true;

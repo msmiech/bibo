@@ -9,18 +9,14 @@ SceneObject::SceneObject(GLFWwindow& window)
 SceneObject::SceneObject(mat4 modelMatrix, GLFWwindow& window)
     : modelMatrix(modelMatrix), window(&window) {}
 
-SceneObject::~SceneObject() {}
-
 vec3 SceneObject::getPosition() { return vec3(modelMatrix[3]); }
 
 void SceneObject::setPosition(vec3 position) {
-  modelMatrix[3].x = position.x;
-  modelMatrix[3].y = position.y;
-  modelMatrix[3].z = position.z;
+  modelMatrix[3] = vec4(position, modelMatrix[3].w);
 }
 
 /**
- * This method is based on
+ * Based on
  * https://www.opengl.org/discussion_boards/showthread.php/159215-Is-it-possible-to-extract-rotation-translation-scale-given-a-matrix
  */
 vec3 SceneObject::getDirection() {
@@ -41,7 +37,7 @@ vec3 SceneObject::getDirection() {
     cosYaw = 1;
   }
 
-  float yaw = atan2(sinYaw, cosYaw);  // in radians
+  float yaw = atan2(sinYaw, cosYaw);
   float pitch = atan2(sinPitch, cosPitch);
   float roll = atan2(sinRoll, cosRoll);
   return vec3(yaw, pitch, roll);

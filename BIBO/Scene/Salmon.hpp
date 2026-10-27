@@ -68,8 +68,8 @@ class SalmonPools {
     glm::vec3 velocity;     // at the start
     float time = 0.0f;      // since the start
     float duration = 0.0f;  // until it is back in the water
-    float spin =
-        0.0f;  // rolls around its length while it flies (radians per second)
+    // rolls around its length while it flies (radians per second)
+    float spin = 0.0f;
     float wiggle = 0.0f;  // phase of the tail
     glm::vec3 position() const;
     /**

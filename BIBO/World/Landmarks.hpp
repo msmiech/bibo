@@ -27,12 +27,12 @@ struct PointOfInterest {
  * interest
  */
 struct FootPath {
-  std::vector<glm::vec3>
-      points;  // along its middle, about 1 apart, at the height of the path,
-               // from its start to the point of interest
+  // along its middle, about 1 apart, at the height of the path, from its start
+  // to the point of interest
+  std::vector<glm::vec3> points;
   int pointOfInterest = 0;
-  bool fromTrack = true;  // starts at the floor of the race track, otherwise at
-                          // another foot path
+  // starts at the floor of the race track, otherwise at another foot path
+  bool fromTrack = true;
 };
 
 /**

@@ -10,8 +10,8 @@ using namespace std;
 
 namespace texSettings {
 extern bool bilinear;  // 0 = NEAREST (neighbor), 1 = (BI)LINEAR
-extern unsigned int
-    mipMappingQuality;  // 0 = Off, 1 = Nearest Neighbor, 2 = Linear
+// 0 = Off, 1 = Nearest Neighbor, 2 = Linear
+extern unsigned int mipMappingQuality;
 }  // namespace texSettings
 
 namespace bibo {

@@ -17,8 +17,8 @@ TEST_CASE(
   const float inner = 0.15f, outer = 0.95f;
 
   CHECK(applyDeadZone(vec2(0.0f), inner, outer) == vec2(0.0f));
-  CHECK(applyDeadZone(vec2(0.1f, -0.05f), inner, outer) ==
-        vec2(0.0f));  // a stick at rest is never exactly at 0
+  // a stick at rest is never exactly at 0
+  CHECK(applyDeadZone(vec2(0.1f, -0.05f), inner, outer) == vec2(0.0f));
   CHECK_THAT(applyDeadZone(vec2(0.55f, 0.0f), inner, outer),
              IsNear(vec2(0.5f, 0.0f), 1e-5f));
   CHECK_THAT(applyDeadZone(vec2(0.0f, -0.97f), inner, outer),

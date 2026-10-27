@@ -105,8 +105,8 @@ class Beaver {
   bool talking = false;
   float talkBlend = 0.0f;  // 0 to 1: blends the gestures in and out
   float mouth = 0.0f;
-  float mouthTime =
-      -1.0f;  // since the last sound started, -1 if the mouth is closed
+  // since the last sound started, -1 if the mouth is closed
+  float mouthTime = -1.0f;
   float nod = 0.0f;
   float nibbleTime = -1.0f, nextNibble = 3.0f;
   float cheerTime = -1.0f;

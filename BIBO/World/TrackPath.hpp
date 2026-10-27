@@ -20,13 +20,15 @@ class TrackPath {
     glm::vec2 tangent;      // direction of the track in the ground plane
     float distance = 0.0f;  // along the track from the start
     float floorLeft = 0.0f,
-          floorRight = 0.0f;  // width of the flat floor to the left and right
-                              // of the center
+          // width of the flat floor to the left and right of the center
+        floorRight = 0.0f;
     float wallLeft = 0.0f,
-          wallRight = 0.0f;    // height of the walls above the floor (highest
-                               // point close to the track)
-    float trailOffset = 0.0f;  // the trail winds a bit on the floor (and around
-                               // the pools): offset of its middle to the right
+          // height of the walls above the floor (highest point close to the
+          // track)
+        wallRight = 0.0f;
+    // the trail winds a bit on the floor (and around the pools): offset of its
+    // middle to the right
+    float trailOffset = 0.0f;
   };
 
   /**
@@ -34,13 +36,13 @@ class TrackPath {
    */
   struct Nearest {
     float distance = 0.0f;  // along the track
-    float lateral = 0.0f;   // from the center line, positive to the right (of
-                            // the driving direction)
+    // from the center line, positive to the right (of the driving direction)
+    float lateral = 0.0f;
     float trailLateral = 0.0f;    // from the middle of the trail
     float floorHalfWidth = 0.0f;  // width of the floor on the side of the point
     float floorHeight = 0.0f;
-    bool found = false;  // false if the point is far from the track (further
-                         // than SEARCH_RADIUS)
+    // false if the point is far from the track (further than SEARCH_RADIUS)
+    bool found = false;
   };
 
   static constexpr float SAMPLE_SPACING = 1.0f;
@@ -87,8 +89,8 @@ class TrackPath {
   static constexpr float BUCKET_SIZE = 16.0f;
   glm::vec2 bucketOrigin;
   int bucketColumns = 0, bucketRows = 0;
-  std::vector<std::vector<int>> buckets;  // indices of the segments (from
-                                          // sample i to i + 1) that come close
+  // indices of the segments (from sample i to i + 1) that come close
+  std::vector<std::vector<int>> buckets;
 };
 }  // namespace world
 }  // namespace bibo

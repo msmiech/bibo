@@ -279,8 +279,8 @@ void BearRig::updateSprings(int bone, animation::SpringPoint& spring,
                             float length, float stiffness, float damping,
                             float gravity, float maxAngle, float timeDelta) {
   glm::vec3 origin = positionOf(world[bone]);
-  glm::vec3 direction =
-      rotationOf(world[bone]) * UP;  // bones point along their local y axis
+  // bones point along their local y axis
+  glm::vec3 direction = rotationOf(world[bone]) * UP;
   glm::vec3 anchor = origin + direction * length;
   if (timeDelta <= 0.0f ||
       glm::distance(spring.position, anchor) > 3.0f * length) {
@@ -296,8 +296,8 @@ void BearRig::updateSprings(int bone, animation::SpringPoint& spring,
   }
   rotateBone(bone, limitAngle(rotationBetween(direction, toTip), maxAngle));
   spring.position =
-      origin +
-      glm::normalize(toTip) * length;  // the tip stays at the end of the bone
+      // the tip stays at the end of the bone
+      origin + glm::normalize(toTip) * length;
 }
 
 void BearRig::applyFace(int bone, const FaceControls& face, float timeDelta) {
@@ -314,11 +314,8 @@ void BearRig::applyFace(int bone, const FaceControls& face, float timeDelta) {
         std::clamp(std::max(face.jawOpen, 0.2f * tongueOut), 0.0f, 1.0f);
     float angle = glm::radians(-JAW_BIND_OPEN_DEGREES - JAW_PRESS_DEGREES +
                                open * (JAW_OPEN_DEGREES + JAW_PRESS_DEGREES));
-    rotateBone(
-        bone,
-        aroundModelAxes(
-            head, glm::angleAxis(
-                      angle, LEFT)));  // positive around the left axis opens
+    // Positive around the left axis opens
+    rotateBone(bone, aroundModelAxes(head, glm::angleAxis(angle, LEFT)));
   } else if (bone == tongue[0]) {
     // The tongue slides forward along the floor of the mouth, rising a bit to
     // come over the lower lip
@@ -342,10 +339,9 @@ void BearRig::applyFace(int bone, const FaceControls& face, float timeDelta) {
                 TONGUE_LIP_DISTANCE + 0.03f) /
                0.08f);
     float hang = (index == 2 ? 0.7f : 0.3f) * tongueOut * outside;
-    float curl =
-        (index == 2 ? 0.6f : 0.4f) * face.tongueCurl *
-        (face.tongueCurl > 0.0f ? outside
-                                : 1.0f);  // curling up is always possible
+    float curl = (index == 2 ? 0.6f : 0.4f) * face.tongueCurl *
+                 // curling up is always possible
+                 (face.tongueCurl > 0.0f ? outside : 1.0f);
     rotateBone(bone, aroundModelAxes(bone, glm::angleAxis(hang + curl, LEFT)));
   } else if (bone == earLeft || bone == earRight) {
     rotateBone(bone,
@@ -816,8 +812,8 @@ void BearRig::updateLocomotion(float timeDelta, const LocomotionInput& input,
 
     gallop += (std::clamp((speed - 3.0f) / 6.0f, 0.0f, 1.0f) - gallop) *
               smoothingFactor(0.06f, timeDelta);
-    const float frequency =
-        glm::mix(1.8f, 3.6f, gallop);  // steps per second of every leg
+    // steps per second of every leg
+    const float frequency = glm::mix(1.8f, 3.6f, gallop);
     // Part of the cycle a foot is on the ground: never longer than the leg can
     // follow the body (e.g. while speeding up)
     float duty = glm::mix(0.6f, 0.3f, gallop);
@@ -1266,8 +1262,8 @@ void BearRig::buildIdleAnimations() {
       float time = EAT_BITES[bite];
       bool last = bite == 2;
       IdleKey open = hold;
-      open.headPitch = last ? -0.2f : -0.55f;  // the last bite with the head
-                                               // back, like gulping it down
+      // the last bite with the head back, like gulping it down
+      open.headPitch = last ? -0.2f : -0.55f;
       open.neckPitch = last ? -0.65f : -0.25f;
       open.face.jawOpen = last ? 0.85f : 0.65f;
       open.face.earsBack = 0.3f;
@@ -1374,8 +1370,8 @@ BearRig::Controls BearRig::idleControls(const LocomotionInput& input,
   c.pelvisOffset.y = key.pelvisHeight;
   c.pelvisPitch = key.pelvisPitch;
   c.pelvisRoll = key.pelvisRoll + rocking;
-  c.spinePitch =
-      key.spinePitch + 0.02f * std::sin(2.0f * PI * 0.33f * time);  // breathing
+  // breathing
+  c.spinePitch = key.spinePitch + 0.02f * std::sin(2.0f * PI * 0.33f * time);
   c.spineYaw = key.spineYaw;
   c.spineRoll = key.spineRoll - 0.6f * rocking;
   c.neckPitch = key.neckPitch;

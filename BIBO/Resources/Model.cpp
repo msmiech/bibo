@@ -1,6 +1,5 @@
 #include "Model.hpp"
 
-#include <fstream>
 #include <iostream>
 
 #include "../Util/Util.hpp"
@@ -9,28 +8,12 @@ using namespace bibo;
 using namespace resources;
 using namespace util;
 
-/**
- * Model constructor to load model/scene information from a file
- *
- * @path to file which should be loaded.
- * @nodeName Name of the node that should be loaded
- */
 Model::Model(Shader* shader, const char* path, const char* nodeName,
              Texture* texture) {
   Assimp::Importer importer;
-
-  ifstream fin(path);
-  if (!fin.fail()) {
-    fin.close();
-  } else {
-    printf("Couldn't open file: %s\n", path);
-    printf("%s\n", importer.GetErrorString());
-  }
-
   auto scene =
       importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs |
                                   aiProcess_CalcTangentSpace);
-
   if (!scene) {
     printf("Unable to load model: %s\n", importer.GetErrorString());
     return;
@@ -95,19 +78,12 @@ void Model::computeBoundingSphere() {
   }
 }
 
-/**
- *	Deletes loaded model meshes.
- **/
 Model::~Model() {
-  for (unsigned int i = 0; i < meshes.size(); ++i) {
-    delete meshes[i];
+  for (Mesh* mesh : meshes) {
+    delete mesh;
   }
-  meshes.clear();
 }
 
-/**
- *	Creates model meshes
- **/
 void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node,
                          Texture* texture) {
   if (node->mNumChildren == 0) {
@@ -174,16 +150,13 @@ void Model::createMeshes(Shader* shader, const aiScene* scene, aiNode* node,
   }
 }
 
-/**
- *	Draws loaded model meshes
- **/
 void Model::draw(Shader* shader) {
-  for (unsigned int i = 0; i < meshes.size(); ++i) {
-    meshes[i]->draw(shader);
+  for (Mesh* mesh : meshes) {
+    mesh->draw(shader);
   }
 }
 
-// This Method was taken from:
+// From
 // http://gamedev.stackexchange.com/questions/87239/how-to-properly-transform-vertices-for-a-model-loaded-using-assimp
 void Model::transformNode(aiMatrix4x4* result, aiNode* rootNode) {
   if (rootNode->mParent) {

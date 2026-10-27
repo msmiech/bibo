@@ -71,8 +71,8 @@ void addHarmonics(std::vector<float>& samples, int sampleRate,
     float f = frequency(t);
     phase += TAU * f / static_cast<float>(sampleRate);
     if (phase > TAU * 1000.0f) {
-      phase -=
-          TAU * 1000.0f;  // keeps the precision (whole cycles of all harmonics)
+      // keeps the precision (whole cycles of all harmonics)
+      phase -= TAU * 1000.0f;
     }
     float value = 0.0f;
     for (int k = 1; k <= harmonics && k * f < nyquist; ++k) {
@@ -96,10 +96,9 @@ std::vector<float> beaver(int sampleRate, int variant) {
   Random random(static_cast<std::uint32_t>(variant) * 7919u + 17u);
   float duration = 0.11f + 0.08f * random.next();
   float base = 430.0f + 230.0f * random.next();
-  float vowel =
-      1150.0f +
-      900.0f *
-          random.next();  // the second formant: "ee" when high, "oo" when low
+  float vowel = 1150.0f +
+                // the second formant: "ee" when high, "oo" when low
+                900.0f * random.next();
   float chatterRate = 24.0f + 12.0f * random.next();
   float chatterDepth = 0.25f + 0.35f * random.next();
   int contour = variant % 3;

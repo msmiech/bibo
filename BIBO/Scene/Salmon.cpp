@@ -368,8 +368,8 @@ int SalmonPools::update(float timeDelta, glm::vec3 bearCenter,
     float distance = glm::distance(glm::vec2(bearCenter.x, bearCenter.z),
                                    glm::vec2(pool.center.x, pool.center.z));
     if (isClosed(closed, p) || distance > APPROACH_DISTANCE + pool.radius) {
-      nextJump[p] = std::min(
-          nextJump[p], 0.3f);  // the first one soon after the bear came close
+      // the first one soon after the bear came close
+      nextJump[p] = std::min(nextJump[p], 0.3f);
       continue;
     }
     nextJump[p] -= timeDelta;

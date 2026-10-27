@@ -29,8 +29,9 @@ TEST_CASE("A checkpoint is passed within its radius, at any height",
   CHECK(rules::passCheckpoint(
             atCheckpoint(0, vec2(rules::CHECKPOINT_RADIUS - 0.1f, 0.0f)), 0) ==
         1);
+  // jumping over it
   CHECK(rules::passCheckpoint(atCheckpoint(0) + vec3(0.0f, 20.0f, 0.0f), 0) ==
-        1);  // jumping over it
+        1);
 
   CHECK(rules::passCheckpoint(
             atCheckpoint(0, vec2(0.0f, rules::CHECKPOINT_RADIUS + 0.1f)), 0) ==

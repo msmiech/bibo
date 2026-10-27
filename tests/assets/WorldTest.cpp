@@ -384,8 +384,8 @@ TEST_CASE(
         CHECK(closest < 0.01f);
       }
     }
-    CHECK(fromTrack >=
-          1);  // where the side of the canyon is gentle, the others branch off
+    // where the side of the canyon is gentle, the others branch off
+    CHECK(fromTrack >= 1);
     for (std::size_t i = 0; i < points.size(); ++i) {
       CAPTURE(i);
       CHECK(pathsTo[i] == 1);
@@ -406,8 +406,9 @@ TEST_CASE(
         TrackPath::Nearest nearest = track.nearest(ground(point));
         if (nearest.found &&
             std::abs(nearest.lateral) < nearest.floorHalfWidth + 4.0f) {
-          continue;  // where it comes out of the canyon of the track, the floor
-                     // is not changed
+          // where it comes out of the canyon of the track, the floor is not
+          // changed
+          continue;
         }
         vec3 surface, normal;
         REQUIRE(world.surface(ground(point), surface, normal));
@@ -609,8 +610,8 @@ TEST_CASE("The chunks of the world fit together", "[assets][world]") {
       for (const TerrainVertex& vertex : coarse.vertices) {
         onSurface += std::abs(world.density(vertex.position)) < 0.5f ? 1 : 0;
       }
-      CHECK(onSurface >= static_cast<int>(coarse.vertices.size()) /
-                             2);  // the others are the skirts
+      // the others are the skirts
+      CHECK(onSurface >= static_cast<int>(coarse.vertices.size()) / 2);
     }
   }
 
@@ -661,8 +662,8 @@ TEST_CASE("Trees grow on the slopes and in the forest, but not on the track",
       vec3 position(instance.positionScale);
       if (instance.model() == Model::MUSHROOM_GLOW) {
         ++glowingMushrooms;
-        CHECK(world.caveRoofTop(ground(position)) >
-              position.y);  // only in the caves
+        // only in the caves
+        CHECK(world.caveRoofTop(ground(position)) > position.y);
       } else {
         TrackPath::Nearest nearest = path.nearest(ground(position));
         bool onTrail = nearest.found &&

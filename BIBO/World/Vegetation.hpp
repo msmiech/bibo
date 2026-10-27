@@ -52,8 +52,8 @@ enum class Layer {
 struct Instance {
   glm::vec4 positionScale;  // position of the foot, uniform scale
   glm::vec4 rotation;       // quaternion x, y, z, w
-  glm::vec4 parameters;  // x: tint (-1 to 1, color variation), y: random number
-                         // (0 to 1), z, w: unused
+  // x: tint (-1 to 1, color variation), y: random number (0 to 1), z, w: unused
+  glm::vec4 parameters;
   Model model() const {
     return static_cast<Model>(static_cast<int>(parameters.z));
   }

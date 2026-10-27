@@ -258,8 +258,6 @@ add_library(bibo_core STATIC
 	BIBO/Scene/HedgehogModel.hpp
 	BIBO/Scene/HedgehogRenderer.cpp
 	BIBO/Scene/HedgehogRenderer.hpp
-	BIBO/Scene/Light.cpp
-	BIBO/Scene/Light.hpp
 	BIBO/Scene/RaccoonModel.cpp
 	BIBO/Scene/RaccoonModel.hpp
 	BIBO/Scene/Raccoon.cpp

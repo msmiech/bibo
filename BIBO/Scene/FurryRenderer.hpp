@@ -27,8 +27,9 @@ class FurryRenderer {
   struct Strands {
     std::size_t furCount = 0;
     std::size_t spineCount = 0;
-    float spineLength = 0.0f;  // of the longest spines (world units), the fur
-                               // is as long as the fur of the bear
+    // of the longest spines (world units), the fur is as long as the fur of the
+    // bear
+    float spineLength = 0.0f;
     float spineWidth = 0.0f;
     std::uint32_t furSeed = 1;
     std::uint32_t spineSeed = 2;
@@ -93,8 +94,9 @@ class FurryRenderer {
   std::size_t vertexCount;
   Strands strands;
   Bounds bounds;
-  GLsizeiptr blockSize;  // bytes of the vertices of one animal in the skin
-                         // buffer (aligned for the shader storage buffer)
+  // bytes of the vertices of one animal in the skin buffer (aligned for the
+  // shader storage buffer)
+  GLsizeiptr blockSize;
   std::unique_ptr<Shader> skinShader;
   std::unique_ptr<Shader> furShader;
   GLuint vertexArray = 0, strandVertexArray = 0;
@@ -102,8 +104,8 @@ class FurryRenderer {
   GLuint spineBuffer = 0, furBuffer = 0;
   std::size_t spineCount = 0, furCount = 0;
   GLsizei indexCount = 0;
-  std::vector<glm::vec4>
-      staging;  // position, normal, bend, comb per vertex, a block per animal
+  // position, normal, bend, comb per vertex, a block per animal
+  std::vector<glm::vec4> staging;
   std::vector<Pose> poses;
   std::vector<glm::vec3> centers;
   std::vector<float> radii;

@@ -19,10 +19,12 @@ class SkinnedModel {
    * What the material of a vertex is (from the material name in the model file)
    */
   enum Surface {
-    FUR = 0,  // fur color and length in the vertex color, bare skin where the
-              // fur length is 0 (paw pads, lips), also the eyelids
-    EYE = 1,  // the vertex color is the direction from the center of the eye in
-              // eye space (gaze along +Z), see bear_skin.frag
+    // fur color and length in the vertex color, bare skin where the fur length
+    // is 0 (paw pads, lips), also the eyelids
+    FUR = 0,
+    // the vertex color is the direction from the center of the eye in eye space
+    // (gaze along +Z), see bear_skin.frag
+    EYE = 1,
     NOSE = 2,
     MOUTH = 3,  // inside of the mouth
     TONGUE = 4,
@@ -43,11 +45,11 @@ class SkinnedModel {
   // In model space in the bind pose (one entry per vertex)
   std::vector<glm::vec3> positions;
   std::vector<glm::vec3> normals;
-  std::vector<glm::vec4> colors;   // RGB: color (linear), A: fur length from 0
-                                   // (no fur) to 1 (longest)
-  std::vector<float> surfaces;     // Surface
-  std::vector<glm::ivec4> joints;  // the 4 bones that move a vertex most
-  std::vector<glm::vec4> weights;  // their weights (sum 1)
+  // RGB: color (linear), A: fur length from 0 (no fur) to 1 (longest)
+  std::vector<glm::vec4> colors;
+  std::vector<float> surfaces;        // Surface
+  std::vector<glm::ivec4> joints;     // the 4 bones that move a vertex most
+  std::vector<glm::vec4> weights;     // their weights (sum 1)
   std::vector<unsigned int> indices;  // 3 per triangle
   std::vector<Part> parts;
 

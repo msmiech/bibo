@@ -23,15 +23,15 @@ using GroundProbe = std::function<bool(glm::vec3 from, glm::vec3 to,
  * How the character moves (from the character controller)
  */
 struct LocomotionInput {
-  glm::vec3 rootPosition =
-      glm::vec3(0.0f);  // on the ground under the center of the body
-  glm::vec3 direction =
-      glm::vec3(0.0f, 0.0f, 1.0f);  // where the bear looks (horizontal)
+  // on the ground under the center of the body
+  glm::vec3 rootPosition = glm::vec3(0.0f);
+  // where the bear looks (horizontal)
+  glm::vec3 direction = glm::vec3(0.0f, 0.0f, 1.0f);
   glm::vec3 velocity = glm::vec3(0.0f);
   float yawRate = 0.0f;  // radians per second, positive: turning left
   bool grounded = true;
-  bool jumped = false;  // took off for a jump in this frame (not when it walks
-                        // over an edge)
+  // took off for a jump in this frame (not when it walks over an edge)
+  bool jumped = false;
   bool swimming = false;  // floating in deep water (the paws paddle)
 };
 
@@ -45,8 +45,8 @@ struct FaceControls {
   float tongueSide = 0.0f;  //-1 right, 1 left
   float lids = 0.0f;        // 0: eyes open, 1: closed
   float gazeYaw = 0.0f,
-        gazePitch =
-            0.0f;         // where the eyes look (radians, relative to the head)
+        // where the eyes look (radians, relative to the head)
+      gazePitch = 0.0f;
   float earsBack = 0.0f;  // 0: up, 1: flat on the head
 
   static FaceControls mix(const FaceControls& a, const FaceControls& b,
@@ -263,21 +263,21 @@ class BearRig {
   struct Controls {
     glm::vec3 rootPosition = glm::vec3(0.0f);
     float yaw = 0.0f;
-    float bodyRoll =
-        0.0f;  // whole body around its length axis (lying on the side or back)
+    // whole body around its length axis (lying on the side or back)
+    float bodyRoll = 0.0f;
     glm::vec3 pelvisOffset = glm::vec3(0.0f);  // in the frame of the body
     float pelvisPitch = 0.0f, pelvisYaw = 0.0f,
-          pelvisRoll =
-              0.0f;  // pitch: nose up, yaw: left, roll: right side down
+          // pitch: nose up, yaw: left, roll: right side down
+        pelvisRoll = 0.0f;
     float spinePitch = 0.0f, spineYaw = 0.0f,
           spineRoll = 0.0f;  // split between spine and chest
     float neckPitch = 0.0f, neckYaw = 0.0f;
     float headPitch = 0.0f, headYaw = 0.0f, headRoll = 0.0f;
-    std::array<glm::vec3, LEG_COUNT>
-        feet{};  // world positions where the paws are on the ground
+    // world positions where the paws are on the ground
+    std::array<glm::vec3, LEG_COUNT> feet{};
     std::array<glm::vec3, LEG_COUNT> footNormals{};
-    std::array<float, LEG_COUNT>
-        toePitch{};  // paw tilted (toes down) while the leg swings
+    // paw tilted (toes down) while the leg swings
+    std::array<float, LEG_COUNT> toePitch{};
     FaceControls face;
   };
 
@@ -290,10 +290,10 @@ class BearRig {
     float spinePitch = 0.0f, spineYaw = 0.0f, spineRoll = 0.0f;
     float neckPitch = 0.0f, neckYaw = 0.0f;
     float headPitch = 0.0f, headYaw = 0.0f, headRoll = 0.0f;
-    std::array<glm::vec3, LEG_COUNT>
-        feet{};  // where the paws are, in the frame of the body
-    std::array<float, LEG_COUNT>
-        grounded{};  // 1: on the ground (found with the probe), 0: in the air
+    // where the paws are, in the frame of the body
+    std::array<glm::vec3, LEG_COUNT> feet{};
+    // 1: on the ground (found with the probe), 0: in the air
+    std::array<float, LEG_COUNT> grounded{};
     std::array<float, LEG_COUNT> toePitch{};
     FaceControls face;
     float sway = 0.0f;  // slow rocking from side to side
@@ -305,8 +305,8 @@ class BearRig {
     int upper = -1, lower = -1, paw = -1;
     float upperLength = 0.0f, lowerLength = 0.0f;
     float pawHeight = 0.0f;
-    glm::vec3 neutral = glm::vec3(
-        0.0f);  // ground point under the paw in the bind pose (model space)
+    // ground point under the paw in the bind pose (model space)
+    glm::vec3 neutral = glm::vec3(0.0f);
     glm::quat pawRotation =
         glm::quat(1.0f, 0.0f, 0.0f,
                   0.0f);  // model space rotation of the paw in the bind pose
@@ -315,8 +315,8 @@ class BearRig {
   };
 
   struct Foot {
-    glm::vec3 position =
-        glm::vec3(0.0f);  // current ground point of the paw (world)
+    // current ground point of the paw (world)
+    glm::vec3 position = glm::vec3(0.0f);
     glm::vec3 normal = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::vec3 planted = glm::vec3(0.0f);
     glm::vec3 swingFrom = glm::vec3(0.0f);
@@ -326,9 +326,9 @@ class BearRig {
 
   struct Eye {
     int eye = -1, upperLid = -1, lowerLid = -1;
-    glm::vec3 lidAxis =
-        glm::vec3(1.0f, 0.0f, 0.0f);  // model space axis the upper lid closes
-                                      // around (the lower one the other way)
+    // model space axis the upper lid closes around (the lower one the other
+    // way)
+    glm::vec3 lidAxis = glm::vec3(1.0f, 0.0f, 0.0f);
   };
 
   glm::mat4 bodyFrame(const Controls& controls) const;
@@ -396,8 +396,8 @@ class BearRig {
   glm::vec3 tongueDirection = glm::vec3(
       0.0f, 0.0f,
       1.0f);  // model space, from the root to the tip in the bind pose
-  std::array<float, 3> tongueBoneDistance{};  // of the tongue bones from the
-                                              // root along the tongue
+  // of the tongue bones from the root along the tongue
+  std::array<float, 3> tongueBoneDistance{};
 
   animation::Pose bind;
   animation::Pose pose;
@@ -413,22 +413,22 @@ class BearRig {
   float bodyHeight = 0.0f, bodyPitch = 0.0f, lean = 0.0f, bend = 0.0f;
   float airborneTime = 0.0f;
   float lastVerticalSpeed = 0.0f;
-  float launchTime = -1.0f;  // since the jump took off (the hind legs push
-                             // off), -1 if the bear did not jump
-  float airPose = 0.0f;      // 0: on the ground, 1: legs in the air pose
-  float reach =
-      0.0f;  // 0: legs tucked, 1: reaching for the ground before landing
-  std::array<glm::vec3, LEG_COUNT>
-      airOffsets{};  // paws in the air, relative to the root (they move with
-                     // the body)
-  float landingBlend = 1.0f;  // 0 right after landing: the steps start smoothly
-                              // from where the paws landed
-  float swimPhase = 0.0f;     // strokes (1 per cycle of every leg)
-  float swimEffort = 0.0f;    // 0 treading water, 1 swimming fast
+  // since the jump took off (the hind legs push off), -1 if the bear did not
+  // jump
+  float launchTime = -1.0f;
+  float airPose = 0.0f;  // 0: on the ground, 1: legs in the air pose
+  // 0: legs tucked, 1: reaching for the ground before landing
+  float reach = 0.0f;
+  // paws in the air, relative to the root (they move with the body)
+  std::array<glm::vec3, LEG_COUNT> airOffsets{};
+  // 0 right after landing: the steps start smoothly from where the paws landed
+  float landingBlend = 1.0f;
+  float swimPhase = 0.0f;   // strokes (1 per cycle of every leg)
+  float swimEffort = 0.0f;  // 0 treading water, 1 swimming fast
   bool wasSwimming = false;
   animation::SpringValue squash;
-  animation::SpringValue pitchKick;  // nose up when taking off, down when the
-                                     // front legs take the landing
+  // nose up when taking off, down when the front legs take the landing
+  animation::SpringValue pitchKick;
   std::array<animation::SpringPoint, 2> earSprings;
   animation::SpringPoint tailSpring;
 
@@ -443,13 +443,14 @@ class BearRig {
   float earTwitchTimer = 4.0f;
   bool carrying = false;
   float mouthOpen = 0.0f;
-  float alert = 0.0f;  // lying: 0 the key poses (resting its chin), 1 the head
-                       // up (looking at something)
+  // lying: 0 the key poses (resting its chin), 1 the head up (looking at
+  // something)
+  float alert = 0.0f;
   bool looking = false;
   glm::vec3 lookTarget = glm::vec3(0.0f);
   float fixationYaw = 0.0f,
-        fixationPitch =
-            0.0f;  // tiny jumps of the eyes around the point they look at
+        // tiny jumps of the eyes around the point they look at
+      fixationPitch = 0.0f;
 
   // Idle animations
   std::array<std::vector<IdleKey>, IDLE_COUNT> idleAnimations;

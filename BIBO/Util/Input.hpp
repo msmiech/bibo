@@ -15,20 +15,22 @@ namespace input {
  * the gamepad
  */
 struct PlayerInput {
-  glm::vec2 move = glm::vec2(
-      0.0f);  // relative to the camera: x right, y forward, length 0 to 1
-  glm::vec2 look = glm::vec2(
-      0.0f);  // camera rotation in this frame (radians): x to the right, y down
-  float zoom =
-      0.0f;  // camera closer (positive) or further away, in mouse wheel steps
+  // relative to the camera: x right, y forward, length 0 to 1
+  glm::vec2 move = glm::vec2(0.0f);
+  // camera rotation in this frame (radians): x to the right, y down
+  glm::vec2 look = glm::vec2(0.0f);
+  // camera closer (positive) or further away, in mouse wheel steps
+  float zoom = 0.0f;
   bool jump = false;      // held
   bool recenter = false;  // camera back behind the bear (pressed in this frame)
   // Pressed in this frame:
   bool interact = false;  // talk to an animal (E, X / Square)
-  bool confirm = false;   // go on in a conversation, choose the answer (E,
-                          // Enter, Space, A / Cross, X / Square)
-  int navigate = 0;  // select the previous (-1) or next (1) answer (arrow keys,
-                     // WASD, D-pad, left stick)
+  // go on in a conversation, choose the answer (E, Enter, Space, A / Cross, X /
+  // Square)
+  bool confirm = false;
+  // select the previous (-1) or next (1) answer (arrow keys, WASD, D-pad, left
+  // stick)
+  int navigate = 0;
   bool cancel = false;  // end a conversation (Backspace, B / Circle)
 };
 
@@ -128,12 +130,12 @@ class Input {
   int gamepad = -1;  // GLFW joystick id
   GLFWgamepadstate state{}, previousState{};
   std::vector<int> menuKeys;
-  glm::ivec2 stickDirection =
-      glm::ivec2(0);  // left stick pushed in a direction (for the menus)
-  glm::ivec2 stickPushed =
-      glm::ivec2(0);  // pushed in a direction since the last update
-  std::bitset<GLFW_KEY_LAST + 1>
-      keysWereDown;  // of the keys that only count when they are pressed
+  // left stick pushed in a direction (for the menus)
+  glm::ivec2 stickDirection = glm::ivec2(0);
+  // pushed in a direction since the last update
+  glm::ivec2 stickPushed = glm::ivec2(0);
+  // of the keys that only count when they are pressed
+  std::bitset<GLFW_KEY_LAST + 1> keysWereDown;
 
   bool mouseCaptured = false;
   bool hasCursor = false;

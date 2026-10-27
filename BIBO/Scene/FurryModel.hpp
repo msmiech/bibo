@@ -18,18 +18,18 @@ struct FurryModel {
   // Per vertex
   std::vector<glm::vec3> positions;
   std::vector<glm::vec3> normals;
-  std::vector<glm::vec4>
-      colors;  // like SkinnedModel: linear color, fur length (0 to 1); for the
-               // eyes the direction in eye space
+  // like SkinnedModel: linear color, fur length (0 to 1); for the eyes the
+  // direction in eye space
+  std::vector<glm::vec4> colors;
   std::vector<float> surfaces;  // SkinnedModel::Surface
-  std::vector<int>
-      parts;  // index of the part (into the matrices of FurryRenderer::setPose)
-  std::vector<glm::vec3>
-      combs;  // direction of the fur and the spines (model space)
+  // index of the part (into the matrices of FurryRenderer::setPose)
+  std::vector<int> parts;
+  // direction of the fur and the spines (model space)
+  std::vector<glm::vec3> combs;
   std::vector<bool> spines;  // the strands of this vertex are spines (else fur)
   std::vector<unsigned int> indices;  // 3 per triangle
-  std::vector<unsigned int>
-      spineTriangles;  // where the spines grow (3 indices per triangle)
+  // where the spines grow (3 indices per triangle)
+  std::vector<unsigned int> spineTriangles;
   std::vector<unsigned int> furTriangles;  // where the fur grows
 };
 

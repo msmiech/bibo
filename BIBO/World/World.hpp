@@ -33,8 +33,8 @@ struct Atmosphere {
   glm::vec3 toSun;     // direction towards the sun
   glm::vec3 sunColor;  // radiance
   float auroraIntensity = 1.0f;
-  float snowOnObjects = 0.3f;  // how much of the upper sides of the trees and
-                               // stones is covered with snow
+  // how much of the upper sides of the trees and stones is covered with snow
+  float snowOnObjects = 0.3f;
   float fogDensity = 0.0011f;  // at the sea level
   float fogFalloff = 0.012f;   // the fog gets thinner with the height
   float fogMaximum = 0.93f;

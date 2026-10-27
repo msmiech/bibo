@@ -1,9 +1,7 @@
 #include "Shader.hpp"
 
-#include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <memory>
 #include <sstream>
 
 #include "../Util/Console.hpp"
@@ -11,27 +9,18 @@
 using namespace bibo;
 using namespace std;
 
-const bool LOCATION_NOT_FOUND_OUTPUT = false;
-
 Shader::Shader(const string& vertexShader, const string& fragmentShader,
                const string& defines)
-    : programHandle(0),
-      vertexHandle(0),
-      fragmentHandle(0)
-
-{
-  programHandle = glCreateProgram();
+    : programHandle(glCreateProgram()) {
   if (programHandle == 0) {
-    cerr << "Failed to create shader program" << endl;
-    util::pause();
-    exit(EXIT_FAILURE);
+    util::fatalError("Failed to create shader program");
   }
   loadShader(vertexShader, GL_VERTEX_SHADER, vertexHandle, defines);
   loadShader(fragmentShader, GL_FRAGMENT_SHADER, fragmentHandle, defines);
   link();
 }
 
-Shader::~Shader() {  // Destructor
+Shader::~Shader() {
   // A program in use would only be flagged for deletion: whoever saved it as
   // the current one (render::StateGuard) would later bind a program that no
   // longer exists
@@ -47,20 +36,16 @@ Shader::~Shader() {  // Destructor
 
 void Shader::enable() const { glUseProgram(programHandle); }
 
-GLint Shader::getUniformLocation(const char* strUniform) {
-  auto loc = glGetUniformLocation(programHandle, strUniform);
-  if (LOCATION_NOT_FOUND_OUTPUT && loc == 0xFFFFFFFF) {
-    cerr << "Unable to get uniform location for " << strUniform << endl;
-  }
-  return loc;
+GLint Shader::getUniformLocation(const char* name) {
+  return glGetUniformLocation(programHandle, name);
 }
 
-GLint Shader::getAttribLocation(const char* strAttrib) {
-  auto loc = glGetAttribLocation(programHandle, strAttrib);
-  if (loc == 0xFFFFFFFF) {
-    cerr << "Unable to get attribute location for " << strAttrib << endl;
+GLint Shader::getAttribLocation(const char* name) {
+  GLint location = glGetAttribLocation(programHandle, name);
+  if (location == -1) {
+    cerr << "Unable to get attribute location for " << name << endl;
   }
-  return loc;
+  return location;
 }
 
 namespace {
@@ -132,60 +117,37 @@ void Shader::loadShader(const string& shader, GLenum shaderType, GLuint& handle,
   string error;
   string code = addDefines(preprocess(shader, error), defines);
   if (!error.empty()) {
-    cerr << error << endl;
-    util::pause();
-    exit(EXIT_FAILURE);
+    util::fatalError(error);
   }
-
   handle = glCreateShader(shaderType);
   if (handle == 0) {
-    cerr << "Failed to create shader" << endl;
-    util::pause();
-    exit(EXIT_FAILURE);
+    util::fatalError("Failed to create shader " + shader);
   }
-
-  auto codePtr = code.c_str();
-  glShaderSource(handle, 1, &codePtr, nullptr);
+  const char* source = code.c_str();
+  glShaderSource(handle, 1, &source, nullptr);
   glCompileShader(handle);
-
   GLint succeeded;
   glGetShaderiv(handle, GL_COMPILE_STATUS, &succeeded);
-  if (!succeeded || !glIsShader(handle)) {
+  if (!succeeded) {
     GLint logSize;
     glGetShaderiv(handle, GL_INFO_LOG_LENGTH, &logSize);
-
-    auto msg = make_unique<char[]>(logSize);
-    glGetShaderInfoLog(handle, logSize, nullptr, msg.get());
-
-    cerr << "Failed to compile shader " << shader << endl << msg.get() << endl;
-
-    util::pause();
-
-    msg.reset(nullptr);
-
-    exit(EXIT_FAILURE);
+    string log(logSize, '\0');
+    glGetShaderInfoLog(handle, logSize, nullptr, log.data());
+    util::fatalError("Failed to compile shader " + shader + "\n" + log);
   }
 }
 
 void Shader::link() {
   glAttachShader(programHandle, vertexHandle);
   glAttachShader(programHandle, fragmentHandle);
-
   glLinkProgram(programHandle);
-
   GLint succeeded;
   glGetProgramiv(programHandle, GL_LINK_STATUS, &succeeded);
-
   if (!succeeded) {
     GLint logSize;
     glGetProgramiv(programHandle, GL_INFO_LOG_LENGTH, &logSize);
-    auto msg = make_unique<char[]>(logSize);
-    glGetProgramInfoLog(programHandle, logSize, nullptr, msg.get());
-
-    cerr << "Failed to link prog" << endl << msg.get() << endl;
-    util::pause();
-
-    msg.reset(nullptr);  // just eye-candy
-    exit(EXIT_FAILURE);
+    string log(logSize, '\0');
+    glGetProgramInfoLog(programHandle, logSize, nullptr, log.data());
+    util::fatalError("Failed to link the shader program\n" + log);
   }
 }

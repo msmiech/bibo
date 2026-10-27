@@ -15,9 +15,9 @@ const float PI = glm::pi<float>();
 const glm::vec3 UP(0.0f, 1.0f, 0.0f);
 const glm::vec3 LEFT(1.0f, 0.0f, 0.0f);
 const glm::vec3 FORWARD(0.0f, 0.0f, 1.0f);
-const float TURN_RATE = 2.5f;        // radians per second
-const float SOUND_DURATION = 0.17f;  // the mouth opens and closes once per
-                                     // sound
+const float TURN_RATE = 2.5f;  // radians per second
+// the mouth opens and closes once per sound
+const float SOUND_DURATION = 0.17f;
 const float NIBBLE_DURATION = 2.4f;
 const float CHEER_DURATION = 1.0f;
 const float SLAP_DURATION = 0.7f;

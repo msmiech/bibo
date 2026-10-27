@@ -9,29 +9,30 @@ using namespace std;
 namespace bibo {
 
 /**
-Reads mainShader file
-*/
+ * Program of a vertex and a fragment shader file (the game exits with the log
+ * of the compiler if they do not compile)
+ */
 class Shader {
  public:
   /**
-  @param vertexShader Path to vertex mainShader file *.vert
-  @param fragmentShader Path to fragment mainShader file *.frag
-  @param defines Names separated by spaces that are defined in both shaders
-  (variants of a shader, e.g. "LOD_DITHER")
-  **/
+   * @param vertexShader Path of the *.vert file
+   * @param fragmentShader Path of the *.frag file
+   * @param defines Names separated by spaces that are defined in both shaders
+   * (variants of a shader, e.g. "LOD_DITHER")
+   */
   Shader(const string& vertexShader, const string& fragmentShader,
          const string& defines = "");
   ~Shader();
+  Shader(const Shader&) = delete;
+  Shader& operator=(const Shader&) = delete;
 
-  /**
-   * useShader() formerly
-   * sometimes only "Use()"
-   */
+  // Makes it the current program
   void enable() const;
 
-  GLint getUniformLocation(const char* strUniform);
-  GLint getAttribLocation(const char* strAttrib);
-  GLuint programHandle;
+  GLint getUniformLocation(const char* name);
+  // Prints an error if the attribute does not exist
+  GLint getAttribLocation(const char* name);
+  GLuint programHandle = 0;
 
   /**
    * Reads a shader file and replaces the lines #include "file" with the content
@@ -53,7 +54,7 @@ class Shader {
                   const string& defines);
   void link();
 
-  GLuint vertexHandle;
-  GLuint fragmentHandle;
+  GLuint vertexHandle = 0;
+  GLuint fragmentHandle = 0;
 };
 }  // namespace bibo

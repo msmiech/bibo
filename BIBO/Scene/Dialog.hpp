@@ -8,10 +8,10 @@ namespace scene {
  * What the player does in a conversation, pressed in this frame
  */
 struct DialogInput {
-  bool confirm = false;  // next page, or the selected answer (E, Enter, Space,
-                         // A on a gamepad)
-  int navigate = 0;      //-1: previous answer, 1: next answer
-  bool cancel = false;   // ends the conversation (the cancel answer, e.g. "No")
+  // next page, or the selected answer (E, Enter, Space, A on a gamepad)
+  bool confirm = false;
+  int navigate = 0;     //-1: previous answer, 1: next answer
+  bool cancel = false;  // ends the conversation (the cancel answer, e.g. "No")
 };
 
 /**

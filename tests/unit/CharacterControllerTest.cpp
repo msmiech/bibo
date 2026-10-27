@@ -122,8 +122,8 @@ TEST_CASE_METHOD(BearOnGround, "The bear cannot walk through a thin wall",
                         vec3(7.0f, 7.0f, 0.01f));
   land();
 
-  moveFor(2.0f, vec3(0.0f, 0.0f, BACKWARD_SPEED) +
-                    DOWN);  // would walk 15 units without the wall
+  // would walk 15 units without the wall
+  moveFor(2.0f, vec3(0.0f, 0.0f, BACKWARD_SPEED) + DOWN);
 
   float frontOfBear = bear.getPosition().z + desc.radius;
   CHECK(frontOfBear < wallZ);

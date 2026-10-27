@@ -90,8 +90,8 @@ TEST_CASE("A hedgehog strolls around its home on the ground it can walk on",
     hedgehog.update(0.2f);
     CHECK(hedgehog.getColliderCenter().y > before + 0.2f);
     hedgehog.update(0.5f);
-    CHECK(std::abs(hedgehog.getColliderCenter().y - before) <
-          0.1f);  // it may bob with its steps
+    // it may bob with its steps
+    CHECK(std::abs(hedgehog.getColliderCenter().y - before) < 0.1f);
   }
 }
 
@@ -124,8 +124,8 @@ TEST_CASE(
   }
   CAPTURE(jumps, highest);
   CHECK(jumps >= 4);  // every now and then
-  CHECK(highest >
-        -0.5f + 2.0f);  // high enough for the bear to catch it in a jump
+  // high enough for the bear to catch it in a jump
+  CHECK(highest > -0.5f + 2.0f);
   CHECK_FALSE(salmon.getDroplets().empty());  // splashes
 }
 
@@ -228,8 +228,8 @@ TEST_CASE("The models of the animals are closed meshes of the right size",
     CHECK(vertex.parameters[2] == 0);  // no snow on them
   }
   CHECK(mesh.radius > 0.0f);
-  CHECK(mesh.radius <= 1.0001f);  // the hedgehog and the salmon are about 1
-                                  // long, a droplet has a radius of 1
+  // the hedgehog and the salmon are about 1 long, a droplet has a radius of 1
+  CHECK(mesh.radius <= 1.0001f);
 }
 
 TEST_CASE(
@@ -251,8 +251,8 @@ TEST_CASE(
     REQUIRE(index < vertices);
   }
   CAPTURE(model.spineTriangles.size(), model.furTriangles.size());
-  CHECK(model.spineTriangles.size() >
-        model.furTriangles.size());  // mostly spines
+  // mostly spines
+  CHECK(model.spineTriangles.size() > model.furTriangles.size());
   CHECK_FALSE(model.furTriangles.empty());
   for (std::size_t i = 0; i < model.spineTriangles.size(); i += 3) {
     // Down to the belly (they hide the legs) and behind the face
@@ -303,8 +303,8 @@ TEST_CASE(
     REQUIRE(index < vertices);
   }
   CHECK(model.spineTriangles.empty());  // no spines
-  CHECK(model.furTriangles.size() >
-        model.indices.size() / 3);  // fur on most of it
+  // fur on most of it
+  CHECK(model.furTriangles.size() > model.indices.size() / 3);
 
   int surfaces[7] = {};
   int parts[BeaverModel::PART_COUNT] = {};

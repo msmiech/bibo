@@ -272,8 +272,8 @@ TEST_CASE("A bear lying on its back rolls over before it gets up",
   rig.updateFromRagdoll(FRAME, parts);
   BearRig::GetUpStart start = rig.beginGetUp(ground, vec3(0.0f, 0.0f, 1.0f));
 
-  CHECK(rig.getGetUpDuration() >
-        standingDuration + 0.5f);  // the roll takes extra time
+  // the roll takes extra time
+  CHECK(rig.getGetUpDuration() > standingDuration + 0.5f);
   CHECK_THAT(start.direction, IsNear(vec3(0.0f, 0.0f, 1.0f), 1e-3f));
   CHECK_THAT(start.rootPosition.y, WithinAbs(0.0f, 1e-3f));
   bool done = false;
@@ -473,8 +473,8 @@ TEST_CASE("Jumping: shortly after running over an edge the bear can still jump",
   }
   SECTION("Falling off an edge starts slowly (no sudden drop)") {
     float speed = bear.getVelocity().y;
-    CHECK(speed > -3.0f);  // gravity of a frame or two (earlier versions fell
-                           // at 59 m/s at once)
+    // gravity of a frame or two (earlier versions fell at 59 m/s at once)
+    CHECK(speed > -3.0f);
     run(forward);
     CHECK(bear.getVelocity().y < speed);
   }
@@ -545,8 +545,8 @@ TEST_CASE("Steering: the bear turns towards where it should go and runs there",
   BearOnGround scene;  // looks along +z
   scene.run(0.5f);
   BearInput right;
-  right.move =
-      vec3(-1.0f, 0.0f, 0.0f);  // the model looks along +z, its right is -x
+  // the model looks along +z, its right is -x
+  right.move = vec3(-1.0f, 0.0f, 0.0f);
 
   scene.run(0.2f, right);
   vec3 turning = scene.bear->getDirection();
@@ -607,8 +607,8 @@ TEST_CASE(
   CHECK(scene.bear->getRig().getIdle() == BearRig::IDLE_EAT);
   vec3 start = scene.bear->getPosition();
   scene.run(BearRig::EAT_BITES[0] + 0.05f, forward());
-  CHECK(glm::distance(scene.bear->getPosition(), start) <
-        1.0f);  // only slows down
+  // only slows down
+  CHECK(glm::distance(scene.bear->getPosition(), start) < 1.0f);
   REQUIRE(scene.bear->getHeldFish(held));
   CHECK(held.bites == 1);
   CHECK(glm::distance(held.center, scene.bear->getMouthPosition()) < 0.6f);

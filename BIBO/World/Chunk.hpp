@@ -55,10 +55,10 @@ inline ChunkKey chunkAt(glm::vec3 position) {
 struct TerrainVertex {
   glm::vec3 position;
   glm::vec3 normal;
-  std::uint8_t
-      material[4];  // trail, sand, bare rock (cave, cliff), snow from 0 to 255
-  std::uint8_t skyVisibility;  // ambient occlusion: 0 in a closed cave, 255 on
-                               // open ground
+  // trail, sand, bare rock (cave, cliff), snow from 0 to 255
+  std::uint8_t material[4];
+  // ambient occlusion: 0 in a closed cave, 255 on open ground
+  std::uint8_t skyVisibility;
   std::uint8_t padding[3];
 };
 

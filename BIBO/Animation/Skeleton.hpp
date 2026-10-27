@@ -33,19 +33,18 @@ using Pose = std::vector<Transform>;
 
 struct Bone {
   std::string name;
-  int parent = -1;      // index of the parent bone, -1 for the root bone
-  Transform bindLocal;  // relative to the parent in the bind pose (the pose the
-                        // model was skinned in)
-  glm::mat4 inverseBind = glm::mat4(
-      1.0f);  // from model space into the space of the bone in the bind pose
+  int parent = -1;  // index of the parent bone, -1 for the root bone
+  // relative to the parent in the bind pose (the pose the model was skinned in)
+  Transform bindLocal;
+  // from model space into the space of the bone in the bind pose
+  glm::mat4 inverseBind = glm::mat4(1.0f);
 };
 
 class Skeleton {
  public:
   std::vector<Bone> bones;  // parents come before their children
-  glm::mat4 rootParent =
-      glm::mat4(1.0f);  // model space transform of the parent of the root bone
-                        // (e.g. the armature)
+  // model space transform of the parent of the root bone (e.g. the armature)
+  glm::mat4 rootParent = glm::mat4(1.0f);
 
   /**
    * @return Index of the bone or -1

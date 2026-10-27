@@ -21,8 +21,8 @@ const float FRAME = 1.0f / 60.0f;
  */
 std::vector<RagdollPart> puppet() {
   std::vector<RagdollPart> parts(4);
-  parts[0].bindTransform =
-      glm::translate(mat4(1.0f), vec3(0.0f, 1.0f, 0.0f));  // body
+  // body
+  parts[0].bindTransform = glm::translate(mat4(1.0f), vec3(0.0f, 1.0f, 0.0f));
   parts[0].capsuleStart = vec3(0.0f, 0.8f, 0.0f);
   parts[0].capsuleEnd = vec3(0.0f, 1.3f, 0.0f);
   parts[0].radius = 0.25f;
@@ -188,8 +188,8 @@ TEST_CASE(
 
   auto rockHit = std::ranges::find(hits, rock, &CharacterController::Hit::body);
   REQUIRE(rockHit != hits.end());
-  CHECK(rockHit->normal.z >
-        0.5f);  // pointing from the rock back to the character
-  CHECK(glm::distance(rockHit->position, vec3(0.0f, 0.7f, -4.0f)) <
-        0.75f);  // on the surface of the rock
+  // pointing from the rock back to the character
+  CHECK(rockHit->normal.z > 0.5f);
+  // on the surface of the rock
+  CHECK(glm::distance(rockHit->position, vec3(0.0f, 0.7f, -4.0f)) < 0.75f);
 }

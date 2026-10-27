@@ -1,4 +1,4 @@
-﻿#include "Mesh.hpp"
+#include "Mesh.hpp"
 
 #include <cmath>
 #include <map>
@@ -11,13 +11,6 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture)
     : material(material), texture(texture) {
   glGenVertexArrays(1, &vao);
   glBindVertexArray(vao);
-
-  vbo[POS_BUFFER] = 0;
-  vbo[UV_BUFFER] = 0;
-  vbo[NORMAL_BUFFER] = 0;
-  vbo[INDEX_BUFFER] = 0;
-  vbo[TANGENT_BUFFER] = 0;
-  vbo[BITANGENT_BUFFER] = 0;
 
   numFaces = mesh->mNumFaces;
   numVertices = mesh->mNumVertices;
@@ -109,7 +102,6 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture)
   if (mesh->HasPositions() && mesh->HasTextureCoords(0)) {
     tangents = new float[mesh->mNumVertices * 3];
     bitangents = new float[mesh->mNumVertices * 3];
-    // calculate tangent/bitangent vectors for normal mapping
     if (mesh->HasTangentsAndBitangents()) {
       for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
         auto tangent = mesh->mTangents[i];
@@ -171,8 +163,9 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture)
 
         float determinant = DeltaU1 * DeltaV2 - DeltaU2 * DeltaV1;
         if (std::abs(determinant) < 1e-12f) {
-          continue;  // the texture coordinates of the triangle are degenerate,
-                     // they define no tangent
+          // the texture coordinates of the triangle are degenerate, they define
+          // no tangent
+          continue;
         }
         float f = 1.0f / determinant;
 
@@ -228,28 +221,8 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture)
   glBindVertexArray(0);
 }
 
-/**
- * Frees up graphics memory (deletes buffers)
- */
 Mesh::~Mesh() {
-  if (vbo[POS_BUFFER]) {
-    glDeleteBuffers(1, &vbo[POS_BUFFER]);
-  }
-  if (vbo[NORMAL_BUFFER]) {
-    glDeleteBuffers(1, &vbo[NORMAL_BUFFER]);
-  }
-  if (vbo[UV_BUFFER]) {
-    glDeleteBuffers(1, &vbo[UV_BUFFER]);
-  }
-  if (vbo[INDEX_BUFFER]) {
-    glDeleteBuffers(1, &vbo[INDEX_BUFFER]);
-  }
-  if (vbo[TANGENT_BUFFER]) {
-    glDeleteBuffers(1, &vbo[TANGENT_BUFFER]);
-  }
-  if (vbo[BITANGENT_BUFFER]) {
-    glDeleteBuffers(1, &vbo[BITANGENT_BUFFER]);
-  }
+  glDeleteBuffers(BUFFER_COUNT, vbo);  // the ones that were not created are 0
   glDeleteVertexArrays(1, &vao);
 
   delete[] vertices;
@@ -260,9 +233,6 @@ Mesh::~Mesh() {
   delete[] indices;
 }
 
-/**
- *	Draws model content (which is in vertex array in graphics memory)
- **/
 void Mesh::draw(Shader* shader) {
   GLuint materialAmbientLocation =
       shader->getUniformLocation("material.ambient");

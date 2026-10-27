@@ -81,12 +81,12 @@ class RaceQuest {
    */
   struct Situation {
     glm::vec3 bear = glm::vec3(0.0f);  // center of the bear
-    bool nearBeaver =
-        false;  // within TALK_DISTANCE, and the bear can talk (not tumbling)
+    // within TALK_DISTANCE, and the bear can talk (not tumbling)
+    bool nearBeaver = false;
     bool swimming = false;
     bool onTrack = true;
-    bool atStart = false;  // at the starting line, looking along the track (end
-                           // of the cutscene)
+    // at the starting line, looking along the track (end of the cutscene)
+    bool atStart = false;
     bool interact = false;  // the player wants to talk (pressed in this frame)
     bool busy = false;      // on another quest, the race is not offered
     DialogInput dialog;

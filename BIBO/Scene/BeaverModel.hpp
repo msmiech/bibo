@@ -9,12 +9,12 @@ namespace scene {
 // head)
 constexpr glm::vec3 BEAVER_NECK(0.0f, 0.74f, 0.04f);
 constexpr glm::vec3 BEAVER_JAW(0.0f, 0.025f, 0.11f);
-constexpr glm::vec3 BEAVER_TAIL(
-    0.0f, 0.03f, -0.42f);  // where the paddle of the tail joins its furry root
-constexpr glm::vec3 BEAVER_SHOULDER(
-    0.15f, 0.58f, 0.1f);  // left, the right one mirrored (inside the chest)
-constexpr glm::vec3 BEAVER_FOOT(
-    0.16f, 0.0f, 0.1f);  // left heel on the ground, under the haunch
+// where the paddle of the tail joins its furry root
+constexpr glm::vec3 BEAVER_TAIL(0.0f, 0.03f, -0.42f);
+// left, the right one mirrored (inside the chest)
+constexpr glm::vec3 BEAVER_SHOULDER(0.15f, 0.58f, 0.1f);
+// left heel on the ground, under the haunch
+constexpr glm::vec3 BEAVER_FOOT(0.16f, 0.0f, 0.1f);
 // Height of the top of the head when it sits upright
 constexpr float BEAVER_HEIGHT = 1.05f;
 

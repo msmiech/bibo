@@ -23,8 +23,8 @@ struct BearInput {
   glm::vec3 move = glm::vec3(0.0f);
   float forward = 0.0f;  // relative to the bear: 1 forward, -1 backward
   float turn = 0.0f;     // 1: left, -1: right
-  bool jump = false;  // held: the longer, the higher the jump (a new jump needs
-                      // a new press)
+  // held: the longer, the higher the jump (a new jump needs a new press)
+  bool jump = false;
 };
 
 /**
@@ -278,12 +278,12 @@ class BearCharacter {
   float yawRate = 0.0f;
   glm::vec3 velocity = glm::vec3(0.0f);
   // Jumping and falling
-  glm::vec3 airVelocity = glm::vec3(
-      0.0f);  // horizontal velocity in the air (the bear keeps its momentum)
+  // horizontal velocity in the air (the bear keeps its momentum)
+  glm::vec3 airVelocity = glm::vec3(0.0f);
   float verticalSpeed = 0.0f;
   float airTime = 0.0f;  // since the bear left the ground
-  float jumpBuffer =
-      0.0f;  // jump was pressed this long ago (it still jumps if it lands soon)
+  // jump was pressed this long ago (it still jumps if it lands soon)
+  float jumpBuffer = 0.0f;
   bool jumping = false;  // rising from a jump (not falling off an edge)
   bool jumpWasHeld = false;
   float fallingTime = 0.0f;  // getting up
@@ -297,8 +297,8 @@ class BearCharacter {
   float stateTime = 0.0f, restTime = 0.0f, protectedTime = 0.0f;
   float idleWaitTime = 0.0f;  // standing without input
   int nextIdle = BearRig::IDLE_STRETCH;
-  glm::vec3 positionOffset =
-      glm::vec3(0.0f);  // smooths getPosition when the state changes
+  // smooths getPosition when the state changes
+  glm::vec3 positionOffset = glm::vec3(0.0f);
   Fish fish = Fish::NONE;
   bool lastBiteTaken = false;
   int eatenFish = 0;

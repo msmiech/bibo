@@ -118,13 +118,13 @@ TEST_CASE("The bear starts standing on the terrain without touching a hedgehog",
   CAPTURE(track.bearStart, position);
   CHECK(run.supported);
   CHECK(position.y >
-        worldGenerator().getSeaLevel() +
-            1.0f);  // did not fall through the terrain into the sea
-  CHECK(std::abs(position.y - track.bearStart.y) <
-        2.0f);  // starts close to the surface
+        // did not fall through the terrain into the sea
+        worldGenerator().getSeaLevel() + 1.0f);
+  // starts close to the surface
+  CHECK(std::abs(position.y - track.bearStart.y) < 2.0f);
   CHECK(glm::distance(vec3(position.x, 0.0f, position.z),
-                      vec3(track.bearStart.x, 0.0f, track.bearStart.z)) <
-        0.5f);  // does not slide away
+                      // does not slide away
+                      vec3(track.bearStart.x, 0.0f, track.bearStart.z)) < 0.5f);
   for (BodyHandle hedgehog : track.hedgehogs) {
     CHECK_FALSE(run.touched(hedgehog));  // would knock it over
   }
@@ -146,8 +146,8 @@ TEST_CASE(
 
   CAPTURE(track.bearStart, run.end());
   CHECK(run.end().z >
-        track.bearStart.z +
-            5.0f);  // walks past where the wall was (3 units behind the start)
+        // walks past where the wall was (3 units behind the start)
+        track.bearStart.z + 5.0f);
   CHECK_FALSE(rules::isOnFinishLine(run.end(), finishLine));
   std::size_t nextCheckpoint = 0;
   for (const vec3& position : run.path) {
@@ -190,8 +190,9 @@ TEST_CASE("The ground of the physics world is the terrain of the track",
           glm::vec2(sample.position.x, sample.position.z) +
           right * (lateral * std::min(sample.floorLeft, sample.floorRight));
       if (terrain.height(point) > sample.position.y + 0.5f) {
-        continue;  // the floor is narrower here (on the walls the voxels round
-                   // the steep surface a bit)
+        // the floor is narrower here (on the walls the voxels round the steep
+        // surface a bit)
+        continue;
       }
       vec3 above(point.x, sample.position.y + 4.0f, point.y);
       track.streamer->ensureCollision(above, 6.0f);
@@ -206,8 +207,8 @@ TEST_CASE("The ground of the physics world is the terrain of the track",
     }
   }
   CAPTURE(worst, terrain.height(glm::vec2(worst.x, worst.z)));
-  CHECK(largestDifference < 0.25f);  // a voxel is 1 unit, steep edges (of the
-                                     // puddles) are a bit rounded
+  // a voxel is 1 unit, steep edges (of the puddles) are a bit rounded
+  CHECK(largestDifference < 0.25f);
 }
 
 TEST_CASE("The caves leave room for the bear to run and jump",

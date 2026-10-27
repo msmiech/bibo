@@ -92,8 +92,9 @@ class Hedgehog {
   struct Pose {
     glm::vec3 bodyPosition;  // origin of the model
     glm::quat bodyRotation;
-    std::array<glm::vec3, 4> feet;  // front left, front right, hind left, hind
-                                    // right (origins of the foot models)
+    // front left, front right, hind left, hind right (origins of the foot
+    // models)
+    std::array<glm::vec3, 4> feet;
     glm::quat footRotation;
     float bristle = 0.0f;  // 0 to 1: the spines stand up (startled)
   };

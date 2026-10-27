@@ -18,13 +18,15 @@ class SceneObject {
   SceneObject(GLFWwindow& window);
   SceneObject(mat4 modelMatrix, GLFWwindow& window);
 
-  virtual ~SceneObject();
+  virtual ~SceneObject() = default;
 
   virtual void update(float time_delta) = 0;
   virtual void draw(Shader* shader) = 0;
 
   virtual vec3 getPosition();
   virtual void setPosition(vec3 position);
+  // Here the Euler angles of the model matrix (yaw, pitch, roll in radians),
+  // the bear and the camera return the direction they face
   virtual vec3 getDirection();
   mat4 modelMatrix;
 

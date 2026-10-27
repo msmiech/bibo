@@ -113,8 +113,8 @@ MusicPlayer::MusicPlayer() : impl(std::make_unique<Impl>()) {
   ma_device_config config = ma_device_config_init(ma_device_type_playback);
   config.playback.format = ma_format_f32;
   config.playback.channels = 2;
-  config.sampleRate =
-      SAMPLE_RATE;  // miniaudio converts it to the rate of the device
+  // miniaudio converts it to the rate of the device
+  config.sampleRate = SAMPLE_RATE;
   config.dataCallback = Impl::fill;
   config.pUserData = impl.get();
   if (ma_device_init(nullptr, &config, &impl->device) != MA_SUCCESS) {

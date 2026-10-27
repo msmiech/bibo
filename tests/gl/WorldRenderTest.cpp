@@ -182,8 +182,8 @@ TEST_CASE(
     "popping",
     "[gl][world]") {
   GlContext gl;
-  AssetWorkingDirectory assets;  // the renderer loads its shaders relative to
-                                 // the working directory
+  // the renderer loads its shaders relative to the working directory
+  AssetWorkingDirectory assets;
   TerrainRenderer terrain;
   const ChunkKey key = {1, 0, 2};
   auto mesh = [&](int lod) {

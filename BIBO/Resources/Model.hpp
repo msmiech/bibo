@@ -22,13 +22,9 @@ namespace resources {
 class Mesh;
 
 /**
- * Model and Mesh class is based on
- *
- * http://www.nexcius.net/2014/04/13/loading-meshes-using-assimp-in-opengl/
- * and
+ * The meshes of a node of a model file in the graphics memory. Based on
+ * http://www.nexcius.net/2014/04/13/loading-meshes-using-assimp-in-opengl/ and
  * http://ogldev.atspace.co.uk/www/tutorial22/tutorial22.html
- *
- * Adapted for our project.
  */
 class Model {
   mat4 tranformationMat;
@@ -68,8 +64,7 @@ class Model {
   float getBoundingSphereRadius() const { return boundingSphereRadius; }
   void draw(Shader* shader);
 
-  // Fields
-  vector<Mesh*> meshes;
+  vector<Mesh*> meshes;  // owned
 };
 }  // namespace resources
 }  // namespace bibo

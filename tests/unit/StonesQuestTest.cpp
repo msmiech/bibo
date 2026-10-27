@@ -97,8 +97,8 @@ TEST_CASE(
   CHECK(quest.isActive());
   CHECK(quest.isPlayerInControl());
   CHECK(q.count(StonesQuest::Event::ACCEPTED) == 1);
-  CHECK(q.count(StonesQuest::Event::CHONK_SOUND) >
-        3);  // it chitters while its words appear
+  // it chitters while its words appear
+  CHECK(q.count(StonesQuest::Event::CHONK_SOUND) > 3);
   CHECK_FALSE(quest.isOffered());
   CHECK(quest.getObjective() == "Explore the stone circle on the hill");
 

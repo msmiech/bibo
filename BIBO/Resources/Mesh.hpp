@@ -15,13 +15,9 @@ using namespace glm;
 namespace bibo {
 namespace resources {
 /**
- * Model and Mesh class is based on
- *
- * http://www.nexcius.net/2014/04/13/loading-meshes-using-assimp-in-opengl/
- * and
+ * A mesh of a Model in the graphics memory. Based on
+ * http://www.nexcius.net/2014/04/13/loading-meshes-using-assimp-in-opengl/ and
  * http://ogldev.atspace.co.uk/www/tutorial22/tutorial22.html
- *
- * Adapted for our project.
  */
 class Mesh {
   enum BUFFERS {
@@ -34,8 +30,8 @@ class Mesh {
     BUFFER_COUNT = 6
   };
 
-  GLuint vao;
-  GLuint vbo[BUFFER_COUNT];
+  GLuint vao = 0;
+  GLuint vbo[BUFFER_COUNT] = {};
 
   Material material;
   Texture* texture;

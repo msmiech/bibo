@@ -143,8 +143,8 @@ float noise::ridged(glm::vec2 position, int octaves, std::uint32_t seed) {
     ridge *= ridge;
     sum += amplitude * ridge * weight;
     total += amplitude;
-    weight =
-        glm::clamp(ridge * 1.5f, 0.0f, 1.0f);  // details mostly on the crests
+    // details mostly on the crests
+    weight = glm::clamp(ridge * 1.5f, 0.0f, 1.0f);
     position = rotation * position * 2.0f + glm::vec2(-3.1f, 11.7f);
     amplitude *= 0.5f;
   }

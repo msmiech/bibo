@@ -53,11 +53,10 @@ TEST_CASE("The projection of the camera fits the window", "[gl][camera]") {
              WithinAbs(-1.0f, 1e-4f));  // near plane
   CHECK_THAT(depth(projection, -camera.getFarPlane()),
              WithinAbs(1.0f, 1e-4f));  // far plane
-  CHECK(camera.getNearPlane() <
-        Camera::COLLISION_RADIUS);  // the environment never comes closer than
-                                    // the near plane
-  CHECK(camera.getFarPlane() >
-        1000.0f);  // the island and the sea up to the horizon
+  // the environment never comes closer than the near plane
+  CHECK(camera.getNearPlane() < Camera::COLLISION_RADIUS);
+  // the island and the sea up to the horizon
+  CHECK(camera.getFarPlane() > 1000.0f);
 }
 
 TEST_CASE("The camera looks from its position along its direction",
@@ -118,9 +117,8 @@ TEST_CASE("The camera follows a target from behind and above", "[gl][camera]") {
     CHECK(offset.z > 0.0f);  // behind (the target looks along -z)
     CHECK_THAT(glm::length(camera.getPosition() - camera.getPivot()),
                WithinAbs(Camera::DEFAULT_DISTANCE, 1e-3f));
-    vec3 pivotInView =
-        toView(camera, camera.getPivot());  // the camera orbits around the
-                                            // point above the target
+    // the camera orbits around the point above the target
+    vec3 pivotInView = toView(camera, camera.getPivot());
     CHECK_THAT(pivotInView.x, WithinAbs(0.0f, 1e-4f));
     CHECK_THAT(pivotInView.y, WithinAbs(0.0f, 1e-4f));
     CHECK(pivotInView.z < 0.0f);
@@ -281,8 +279,8 @@ TEST_CASE("The camera follows the bear and goes back behind it when it runs",
     }
     CHECK_THAT(camera.getYaw(), WithinAbs(0.0f, 0.05f));
     CHECK(glm::distance(vec3(camera.getPivot().x, 0.0f, camera.getPivot().z),
-                        position) <
-          0.5f);  // keeps up (a bit behind at full speed)
+                        // keeps up (a bit behind at full speed)
+                        position) < 0.5f);
   }
   SECTION("Recentered") {
     camera.recenter();
@@ -304,8 +302,8 @@ TEST_CASE("The camera does not go into the environment", "[gl][camera]") {
   camera.snapBehind(bear);
   REQUIRE_THAT(glm::distance(camera.getPosition(), camera.getPivot()),
                WithinAbs(Camera::DEFAULT_DISTANCE, 1e-3f));
-  CHECK(probedRadius > 0.13f);  // larger than the near plane (the camera does
-                                // not see into a wall)
+  // larger than the near plane (the camera does not see into a wall)
+  CHECK(probedRadius > 0.13f);
 
   // Something gets between the bear and the camera: it moves in front of it at
   // once

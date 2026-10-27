@@ -20,8 +20,8 @@ namespace world {
  */
 struct LodBlend {
   int lod = 0;
-  float next = 0.0f;  // 0: only lod, up to 1: lod + 1 replaces it (both are
-                      // drawn, dithered)
+  // 0: only lod, up to 1: lod + 1 replaces it (both are drawn, dithered)
+  float next = 0.0f;
 };
 
 /**
@@ -72,8 +72,8 @@ class VegetationRenderer {
     float maxDistance = 100.0f;
     float shadowDistance = 0.0f;  // 0: no shadow
     float windAmplitude = 0.0f;
-    float interaction = 0.0f;  // how far the bear and the animals push it aside
-                               // (relative to its height)
+    // how far the bear and the animals push it aside (relative to its height)
+    float interaction = 0.0f;
     float height = 0.0f;
     bool twoSided = false;
     bool scaleDistances = false;  // the distances grow with the scale (stones)
@@ -87,8 +87,8 @@ class VegetationRenderer {
   struct Batch {
     int model, lod;
     std::size_t first, count;
-    bool dithered;  // the instances fade (instance.parameters.w,
-                    // Shader/include/dither.glsl)
+    // the instances fade (instance.parameters.w, Shader/include/dither.glsl)
+    bool dithered;
   };
 
   /**
@@ -107,8 +107,8 @@ class VegetationRenderer {
   std::unordered_map<ColumnKey, ColumnData, ColumnKeyHash> columns;
   GLuint instanceBuffer = 0;
   std::vector<std::vector<Instance>> sorted;  // per model and level of detail
-  std::vector<std::vector<Instance>>
-      sortedDithered;  // the instances that fade, per model and level of detail
+  // the instances that fade, per model and level of detail
+  std::vector<std::vector<Instance>> sortedDithered;
   std::vector<Instance> staging;
   std::vector<Batch> batches;
   float detail;

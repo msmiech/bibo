@@ -10,6 +10,7 @@
 #include "../World/World.hpp"
 #include "Bear.hpp"
 #include "Beaver.hpp"
+#include "Camera.hpp"
 #include "CreatureRenderer.hpp"
 #include "FurryRenderer.hpp"
 #include "GameRules.hpp"
@@ -194,10 +195,11 @@ class Scene : public render::RenderableScene {
   unsigned int mishkaUploaded = 0;
   physics::BodyHandle mishkaBody = physics::INVALID_BODY;
   int mishkaPool = -1;
-  int carriedPool =
-      -1;  // the salmon in the mouth of the bear is from this pool, -1 if none
-  int eatenPool = -1;  // the bear ate up a salmon of this pool (for the next
-                       // update of the salmon quest)
+  // the salmon in the mouth of the bear is from this pool, -1 if none
+  int carriedPool = -1;
+  // the bear ate up a salmon of this pool (for the next update of the salmon
+  // quest)
+  int eatenPool = -1;
   // Chonk, the raccoon at the trailhead, and the raccoons that come out of the
   // woods to cheer
   unique_ptr<Raccoon> chonk;
@@ -205,12 +207,12 @@ class Scene : public render::RenderableScene {
   unique_ptr<FurryRenderer> chonkRenderer;
   unique_ptr<RaccoonFans> fans;
   unique_ptr<FurryRenderer> fansRenderer;
-  vector<bool> fansHidden;  // the fan is drawn under the island (its pose need
-                            // not change)
+  // the fan is drawn under the island (its pose need not change)
+  vector<bool> fansHidden;
   bool chonkPosed = false;
-  float cheerLinger = 0.0f;  // the raccoons go on cheering for a while after a
-                             // quest was completed
-  int raccoonChatters = 0;   // for takeRaccoonChatters
+  // the raccoons go on cheering for a while after a quest was completed
+  float cheerLinger = 0.0f;
+  int raccoonChatters = 0;  // for takeRaccoonChatters
 
   // Physics
   physics::PhysicsWorld* physicsWorld;
@@ -224,8 +226,9 @@ class Scene : public render::RenderableScene {
   unique_ptr<RaceQuest> raceQuest;
   RaceQuest::Stage lastStage = RaceQuest::Stage::IDLE;
   bool atStart = false;  // the bear reached the starting line in the cutscene
-  bool jumpBlocked = false;  // after a conversation until the jump button is
-                             // released (it may have answered)
+  // after a conversation until the jump button is released (it may have
+  // answered)
+  bool jumpBlocked = false;
   TalkPartner talkPartner = TalkPartner::NONE;
   vector<RaceQuest::Event> events;  // for takeEvents
   // Fishing in all pools

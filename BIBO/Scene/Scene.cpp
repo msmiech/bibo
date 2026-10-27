@@ -119,8 +119,8 @@ Scene::Scene(GLFWwindow* window, Shader* shader,
   lightShader = make_unique<Shader>("Shader/light_source_shader.vert",
                                     "Shader/light_source_shader.frag");
 
-  textures.push_back(Texture::createCheckerboard(
-      256, 8, 0));  // chequered flag (generated, no image file)
+  // chequered flag (generated, no image file)
+  textures.push_back(Texture::createCheckerboard(256, 8, 0));
   Texture* checkerboard = textures.back().get();
   textures.push_back(make_unique<Texture>("Texture/wood16.jpg", 0));
   Texture* wood = textures.back().get();
@@ -907,8 +907,8 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
   }
   bear->setInput(bearInput(player));
 
-  for (unsigned int i = 0; i < geometries.size(); ++i) {
-    geometries[i]->update(time_delta);
+  for (const unique_ptr<Geometry>& geometry : geometries) {
+    geometry->update(time_delta);
   }
   updateAnimals(time_delta);
   // The bear splashes into the water

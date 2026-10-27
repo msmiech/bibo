@@ -153,8 +153,8 @@ void Hedgehog::update(float timeDelta) {
                              next.y);
         gaitPhase += speed * timeDelta / STRIDE_LENGTH;
       } else {
-        walking = scurrying =
-            false;  // e.g. the edge of the water: it looks for another way
+        // e.g. the edge of the water: it looks for another way
+        walking = scurrying = false;
         waitTime = uniform(0.5f, 1.5f);
       }
     }

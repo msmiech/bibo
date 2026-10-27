@@ -210,8 +210,8 @@ TEST_CASE("Springs settle at their target, also with long frames",
   }
   CHECK_THAT(point.position, IsNear(target, 1e-3f));
   CHECK_THAT(value.value, WithinAbs(1.0f, 1e-3f));
-  CHECK(maxDistance <
-        2.0f * glm::length(target));  // overshoots a bit, but does not explode
+  // overshoots a bit, but does not explode
+  CHECK(maxDistance < 2.0f * glm::length(target));
 }
 
 TEST_CASE("Smoothing does not depend on the frame rate", "[animation]") {

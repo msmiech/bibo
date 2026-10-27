@@ -186,10 +186,12 @@ TEST_CASE("A geometry is visible if its bounding sphere is in the view frustum",
   };
 
   CHECK(rock.isVisible(frustumLookingAt(rockCenter)));
-  CHECK_FALSE(rock.isVisible(
-      frustumLookingAt(camera + vec3(0.0f, 0.0f, 1.0f))));  // behind the camera
-  CHECK_FALSE(rock.isVisible(frustumLookingAt(
-      camera + vec3(1.0f, 0.0f, 0.0f))));  // next to the camera
+  // behind the camera
+  CHECK_FALSE(
+      rock.isVisible(frustumLookingAt(camera + vec3(0.0f, 0.0f, 1.0f))));
+  // next to the camera
+  CHECK_FALSE(
+      rock.isVisible(frustumLookingAt(camera + vec3(1.0f, 0.0f, 0.0f))));
 
   SECTION("The scale of the model matrix enlarges the bounding sphere") {
     // Scaled up so much that it surrounds the camera, which looks away from the

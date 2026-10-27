@@ -11,13 +11,13 @@ namespace TextureUnit {
 const int COLOR = 0;        // legacy geometries: their texture
 const int SHADOW_MAPS = 1;  // cascaded shadow maps (sampler2DArrayShadow)
 const int NORMAL_MAP = 2;   // legacy geometries: their normal map
-const int MATERIAL_ALBEDO =
-    3;  // generated materials (sampler2DArray): color and roughness
-const int MATERIAL_NORMAL =
-    4;                      // generated materials: normal, height and occlusion
+// generated materials (sampler2DArray): color and roughness
+const int MATERIAL_ALBEDO = 3;
+// generated materials: normal, height and occlusion
+const int MATERIAL_NORMAL = 4;
 const int ENVIRONMENT = 5;  // sky cube map
-const int WORLD_MAP =
-    6;  // top view of the island: height of the ground and of the cave roofs
+// top view of the island: height of the ground and of the cave roofs
+const int WORLD_MAP = 6;
 }  // namespace TextureUnit
 
 /**
@@ -40,8 +40,8 @@ class FullscreenTriangle {
   void draw() const;
 
  private:
-  GLuint vertexArray = 0;  // the core profile needs one, even without
-                           // attributes
+  // the core profile needs one, even without attributes
+  GLuint vertexArray = 0;
 };
 
 /**

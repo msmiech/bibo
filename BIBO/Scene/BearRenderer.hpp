@@ -73,10 +73,10 @@ class BearRenderer {
   std::unique_ptr<Shader> skinShader;
   std::unique_ptr<Shader> furShader;
   GLuint vertexArray = 0;
-  GLuint strandVertexArray =
-      0;  // no attributes, but core profile needs a bound vertex array
-  GLuint skinBuffer =
-      0;  // per vertex: position, normal, fur bend, comb direction (vec4 each)
+  // no attributes, but core profile needs a bound vertex array
+  GLuint strandVertexArray = 0;
+  // per vertex: position, normal, fur bend, comb direction (vec4 each)
+  GLuint skinBuffer = 0;
   GLuint colorBuffer = 0;
   GLuint surfaceBuffer = 0;
   GLuint indexBuffer = 0;

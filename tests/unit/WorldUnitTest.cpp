@@ -176,8 +176,8 @@ TEST_CASE("Every shadow cascade covers its slice of the view frustum",
     CHECK(cascade.splitFar == splits[i]);
     CHECK(cascade.texelSize > 0.0f);
     if (i > 0) {
-      CHECK(cascade.texelSize >
-            cascades[i - 1].texelSize);  // further away, coarser
+      // further away, coarser
+      CHECK(cascade.texelSize > cascades[i - 1].texelSize);
     }
     // The corners of the slice are inside of the shadow map (in normalized
     // device coordinates)

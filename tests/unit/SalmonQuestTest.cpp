@@ -121,8 +121,8 @@ TEST_CASE(
     CHECK(quest.getDialog().isPassing());  // Mishka says something in passing
     int before = q.count(SalmonQuest::Event::BEAR_SOUND);
     q.update(0.5f);
-    CHECK(q.count(SalmonQuest::Event::BEAR_SOUND) >
-          before);  // and grumbles meanwhile
+    // and grumbles meanwhile
+    CHECK(q.count(SalmonQuest::Event::BEAR_SOUND) > before);
   }
   SECTION("Yes: every salmon of a new pool counts, until all pools are done") {
     q.accept();

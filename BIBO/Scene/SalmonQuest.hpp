@@ -54,12 +54,13 @@ class SalmonQuest {
    * What the bear does in this frame
    */
   struct Situation {
-    bool nearMishka = false;  // within TALK_DISTANCE, and the bear can talk
-                              // (not tumbling, swimming or eating)
+    // within TALK_DISTANCE, and the bear can talk (not tumbling, swimming or
+    // eating)
+    bool nearMishka = false;
     bool interact = false;  // the player wants to talk (pressed in this frame)
     bool busy = false;      // on another quest, the quest is not offered
-    int eatenPool =
-        -1;  // the bear ate up a salmon of this pool in this frame, -1 if none
+    // the bear ate up a salmon of this pool in this frame, -1 if none
+    int eatenPool = -1;
     DialogInput dialog;
   };
 

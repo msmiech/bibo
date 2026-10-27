@@ -13,9 +13,8 @@ namespace {
 // Up to this distance from the camera all strands are drawn (like the bear)
 const float FULL_DETAIL_DISTANCE = 24.0f;
 const float MIN_DETAIL = 0.12f;
-const GLsizei VERTEX_SIZE =
-    4 * sizeof(glm::vec4);  // position, normal, bend, comb (like the skin
-                            // buffer of the bear)
+// position, normal, bend, comb (like the skin buffer of the bear)
+const GLsizei VERTEX_SIZE = 4 * sizeof(glm::vec4);
 
 void setMatrix(Shader* shader, const char* name, const glm::mat4& matrix) {
   glUniformMatrix4fv(shader->getUniformLocation(name), 1, GL_FALSE,

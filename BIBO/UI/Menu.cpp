@@ -95,8 +95,8 @@ struct Menu::Impl : public Rml::EventListener {
   RenderInterface_GL3 renderInterface;
   Rml::Context* context = nullptr;
   Rml::DataModelHandle model;
-  int modifiers = 0;  // GLFW only passes the modifier keys to the key and mouse
-                      // button callbacks
+  // GLFW only passes the modifier keys to the key and mouse button callbacks
+  int modifiers = 0;
 
   Rml::ElementDocument* mainMenu = nullptr;
   Rml::ElementDocument* pauseMenu = nullptr;
@@ -349,8 +349,8 @@ void Menu::Impl::refreshDisplayOptions() {
   resolutionNames.clear();
   for (const auto& entry : resolutions) {
     resolutionNames.push_back(
-        to_string(entry.width) + " \xC3\x97 " +
-        to_string(entry.height));  // multiplication sign (UTF-8)
+        // multiplication sign (UTF-8)
+        to_string(entry.width) + " \xC3\x97 " + to_string(entry.height));
   }
   resolution =
       static_cast<int>(find(resolutions.begin(), resolutions.end(), current) -
@@ -497,8 +497,8 @@ void Menu::update() {
   for (MenuAction action : actions) {
     menu.onAction(action);
     if (action == MenuAction::ApplyDisplay) {
-      menu.refreshDisplayOptions();  // e.g. the window may be on another
-                                     // monitor now
+      // e.g. the window may be on another monitor now
+      menu.refreshDisplayOptions();
     }
   }
 

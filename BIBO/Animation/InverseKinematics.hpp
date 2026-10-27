@@ -8,9 +8,10 @@ namespace animation {
  */
 struct TwoBoneSolution {
   glm::vec3 joint;  // new position of the middle joint (knee, elbow)
-  glm::vec3 end;    // new position of the end of the chain (the target, moved
-                    // closer if it is out of reach)
-  bool reached;     // false if the target was too far away or too close
+  // new position of the end of the chain (the target, moved closer if it is out
+  // of reach)
+  glm::vec3 end;
+  bool reached;  // false if the target was too far away or too close
 };
 
 /**

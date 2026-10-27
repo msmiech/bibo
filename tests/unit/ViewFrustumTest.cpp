@@ -127,16 +127,19 @@ TEST_CASE("Spheres are inside, intersecting or outside of the view frustum",
 
   CHECK(view.sphereInFrustum(vec3(0.0f, 0.0f, -10.0f), 1.0f) ==
         ViewFrustum::INSIDE);
+  // on the right border
   CHECK(view.sphereInFrustum(vec3(halfWidth, 0.0f, -10.0f), 1.0f) ==
-        ViewFrustum::INTERSECT);  // on the right border
+        ViewFrustum::INTERSECT);
   CHECK(view.sphereInFrustum(vec3(halfWidth + 2.0f, 0.0f, -10.0f), 1.0f) ==
         ViewFrustum::OUTSIDE);
+  // behind the camera
   CHECK(view.sphereInFrustum(vec3(0.0f, 0.0f, 5.0f), 4.0f) ==
-        ViewFrustum::OUTSIDE);  // behind the camera
-  CHECK(view.sphereInFrustum(vec3(0.0f), 1.0f) ==
-        ViewFrustum::INTERSECT);  // around the camera
+        ViewFrustum::OUTSIDE);
+  // around the camera
+  CHECK(view.sphereInFrustum(vec3(0.0f), 1.0f) == ViewFrustum::INTERSECT);
+  // larger than the frustum
   CHECK(view.sphereInFrustum(vec3(0.0f, 0.0f, -100.0f), 500.0f) ==
-        ViewFrustum::INTERSECT);  // larger than the frustum
+        ViewFrustum::INTERSECT);
 }
 
 TEST_CASE(
@@ -156,8 +159,8 @@ TEST_CASE(
     do {
       direction = vec3(unit(random), unit(random), unit(random));
     } while (glm::length(direction) < 0.1f ||
-             std::abs(glm::normalize(direction).y) >
-                 0.95f);  // not parallel to up
+             // not parallel to up
+             std::abs(glm::normalize(direction).y) > 0.95f);
     float ratio = aspectRatio(random);
 
     const ViewFrustum view = frustum(position, position + direction, ratio);

@@ -102,9 +102,9 @@ class WorldStreamer {
     int lod = -1;        // of the current mesh (-1: none yet)
     int requested = -1;  // lod of the job in progress
     int target = -1;
-    std::uint64_t generation =
-        0;  // results of jobs started before ensureCollision meshed the chunk
-            // are ignored
+    // results of jobs started before ensureCollision meshed the chunk are
+    // ignored
+    std::uint64_t generation = 0;
     bool needsCollision = false;
     std::shared_ptr<physics::CollisionShape> shape;  // of the lod 0 mesh
     physics::BodyHandle body = physics::INVALID_BODY;

@@ -52,8 +52,8 @@ inline std::size_t passCheckpoint(glm::vec3 playerPosition,
  */
 struct FinishLine {
   glm::vec3 center;
-  glm::vec3
-      across;  // horizontal direction along the finish line, across the track
+  // horizontal direction along the finish line, across the track
+  glm::vec3 across;
   float halfWidth = 0.0f;
 };
 const float FINISH_LINE_HALF_DEPTH = 1.5f;

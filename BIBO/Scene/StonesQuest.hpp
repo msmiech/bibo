@@ -22,9 +22,9 @@ namespace scene {
 class StonesQuest {
  public:
   enum class Stage {
-    IDLE,        // Chonk offers the quest (or it was completed)
-    TALKING,     // conversation with Chonk (before, during or at the end of the
-                 // quest)
+    IDLE,  // Chonk offers the quest (or it was completed)
+    // conversation with Chonk (before, during or at the end of the quest)
+    TALKING,
     EXPLORING,   // on the way to the stones, inspects the flat stone there
     INSPECTING,  // looks at the flat stone (a conversation with the stones)
     RETURNING    // on the way back to Chonk with the report
@@ -61,11 +61,12 @@ class StonesQuest {
    * What the bear does in this frame
    */
   struct Situation {
-    bool nearChonk = false;  // within TALK_DISTANCE, and the bear can talk (not
-                             // tumbling, swimming or eating)
-    bool atStones = false;   // in the stone circle
-    bool nearStone =
-        false;  // within INSPECT_DISTANCE of the flat stone, and it can talk
+    // within TALK_DISTANCE, and the bear can talk (not tumbling, swimming or
+    // eating)
+    bool nearChonk = false;
+    bool atStones = false;  // in the stone circle
+    // within INSPECT_DISTANCE of the flat stone, and it can talk
+    bool nearStone = false;
     bool interact = false;  // the player wants to talk (pressed in this frame)
     bool busy = false;      // on another quest, the quest is not offered
     DialogInput dialog;
@@ -141,8 +142,8 @@ class StonesQuest {
   Stage stage = Stage::IDLE;
   bool active = false;
   bool arrived = false;
-  bool reporting = false;  // Chonk answers the report, the quest is complete at
-                           // the end of it
+  // Chonk answers the report, the quest is complete at the end of it
+  bool reporting = false;
   bool nearChonk = false, nearStone = false, busy = false;
   Outcome outcome = Outcome::NONE;
   float outcomeAge = 0.0f;

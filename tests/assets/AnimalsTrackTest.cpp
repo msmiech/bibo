@@ -64,14 +64,14 @@ TEST_CASE(
   REQUIRE(bibo::scene::findShoreSpot(generator, pool, spot, look));
   CAPTURE(spot, look, pool.center);
   CHECK(spot.y > sea + 0.1f);  // dry
-  CHECK(std::abs(generator.height(vec2(spot.x, spot.z)) - spot.y) <
-        1e-4f);  // on the ground
+  // on the ground
+  CHECK(std::abs(generator.height(vec2(spot.x, spot.z)) - spot.y) < 1e-4f);
   bibo::world::TrackPath::Nearest nearest =
       generator.getPath().nearest(vec2(spot.x, spot.z));
   REQUIRE(nearest.found);
   CHECK(std::abs(nearest.lateral) <=
-        nearest.floorHalfWidth +
-            4.0f);  // on the floor of the track or at the foot of its walls
+        // on the floor of the track or at the foot of its walls
+        nearest.floorHalfWidth + 4.0f);
   CHECK(
       glm::distance(vec2(spot.x, spot.z), vec2(pool.center.x, pool.center.z)) <
       pool.radius + 8.0f);  // it can see the salmon
@@ -112,8 +112,8 @@ TEST_CASE("The route of runners goes along the trail and around the water",
       CHECK(generator.getPath().nearest(point).found);
     }
     CAPTURE(pool.center, wet);
-    CHECK(wet <= static_cast<int>(route.size()) /
-                     10);  // only where it cuts a corner of the water
+    // only where it cuts a corner of the water
+    CHECK(wet <= static_cast<int>(route.size()) / 10);
     for (std::size_t i = 1; i < route.size(); ++i) {
       CHECK(glm::distance(route[i], route[i - 1]) < 2.0f);  // no jumps
     }
@@ -138,8 +138,8 @@ TEST_CASE(
 
   Hedgehog hedgehog(home, Hedgehog::startDirection(index),
                     Hedgehog::seedOf(index), ground);
-  CHECK(std::abs(hedgehog.getPosition().y - height) <
-        1e-4f);  // on the ground, not floating like the rocks
+  // on the ground, not floating like the rocks
+  CHECK(std::abs(hedgehog.getPosition().y - height) < 1e-4f);
   for (int i = 0; i < 60 * 60; ++i) {
     hedgehog.update(1.0f / 60.0f);
     vec3 position = hedgehog.getPosition();

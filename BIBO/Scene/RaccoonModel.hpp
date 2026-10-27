@@ -7,16 +7,16 @@ namespace bibo {
 namespace scene {
 // Joints of the parts of the raccoon (model space of the body, the jaw: of the
 // head) when it stands on all fours
-constexpr glm::vec3 RACCOON_HIPS(
-    0.0f, 0.3f, -0.12f);  // it rears up around this point (on the middle line)
+// it rears up around this point (on the middle line)
+constexpr glm::vec3 RACCOON_HIPS(0.0f, 0.3f, -0.12f);
 constexpr glm::vec3 RACCOON_NECK(0.0f, 0.37f, 0.25f);
 constexpr glm::vec3 RACCOON_JAW(0.0f, 0.0f, 0.1f);
-constexpr glm::vec3 RACCOON_TAIL(
-    0.0f, 0.36f, -0.24f);  // where the tail grows out of the body
-constexpr glm::vec3 RACCOON_SHOULDER(
-    0.085f, 0.27f, 0.17f);  // left, the right one mirrored (inside the chest)
-constexpr glm::vec3 RACCOON_HIP(
-    0.09f, 0.3f, -0.12f);  // left hip joint, the right one mirrored
+// where the tail grows out of the body
+constexpr glm::vec3 RACCOON_TAIL(0.0f, 0.36f, -0.24f);
+// left, the right one mirrored (inside the chest)
+constexpr glm::vec3 RACCOON_SHOULDER(0.085f, 0.27f, 0.17f);
+// left hip joint, the right one mirrored
+constexpr glm::vec3 RACCOON_HIP(0.09f, 0.3f, -0.12f);
 // Length of the legs from their joint to the ground
 constexpr float RACCOON_FRONT_LEG = 0.27f, RACCOON_HIND_LEG = 0.3f;
 // Height of the back when it stands on all fours

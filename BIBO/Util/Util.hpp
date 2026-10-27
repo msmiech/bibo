@@ -5,20 +5,15 @@
 #include <assimp/scene.h>
 
 #include <assimp/Importer.hpp>
+#include <glm/glm.hpp>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "../Resources/Shader.hpp"
-#include "../Scene/Light.hpp"
-
 using namespace std;
-using namespace bibo::scene;
 
 namespace bibo {
-const bool DEBUG = true;
-
 namespace util {
 struct SceneDeleter {
   void operator()(const aiScene* scene) const { aiReleaseImport(scene); }
@@ -30,9 +25,6 @@ using ScenePtr = unique_ptr<const aiScene, SceneDeleter>;
  * @return The loaded scene or nullptr
  */
 ScenePtr loadSceneFromFile(const char* file);
-vector<unique_ptr<Light>> retrieveLightFromScene(GLFWwindow& window,
-                                                 Shader* shader,
-                                                 const aiScene* scene);
-mat4 ConvertMatrix(aiMatrix4x4 in);
+glm::mat4 ConvertMatrix(aiMatrix4x4 in);
 }  // namespace util
 }  // namespace bibo

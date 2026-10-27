@@ -73,8 +73,8 @@ TEST_CASE("Fur on a resting body stands still", "[fur]") {
   patch.run(2.0f);
 
   for (const vec3& offset : patch.hairs.getOffsets()) {
-    CHECK(glm::length(offset) <
-          0.05f);  // on top of the body the fur does not hang to a side
+    // on top of the body the fur does not hang to a side
+    CHECK(glm::length(offset) < 0.05f);
   }
 
   SECTION("On a side of the body the fur hangs down") {
@@ -159,10 +159,10 @@ TEST_CASE("A hit ruffles the fur where it happens", "[fur]") {
   patch.hairs.addImpulse(vec3(0.0f), vec3(6.0f, 2.0f, 0.0f), 0.25f);
   patch.run(2.0f * FRAME);
 
-  float near =
-      glm::length(patch.hairs.getOffsets()[0]);  // the corner where the hit was
-  float far = glm::length(
-      patch.hairs.getOffsets().back());  // the opposite corner, 0.57 away
+  // the corner where the hit was
+  float near = glm::length(patch.hairs.getOffsets()[0]);
+  // the opposite corner, 0.57 away
+  float far = glm::length(patch.hairs.getOffsets().back());
   CHECK(near > 0.1f);
   CHECK(far < 0.01f);
 }

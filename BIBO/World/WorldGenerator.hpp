@@ -204,8 +204,8 @@ class WorldGenerator {
   std::unique_ptr<TrackTerrain> track;
   std::unique_ptr<TrackPath> path;
   std::vector<Cave> caves;
-  std::unique_ptr<Landmarks> landmarks;  // null while they are made (the height
-                                         // is the natural height then)
+  // null while they are made (the height is the natural height then)
+  std::unique_ptr<Landmarks> landmarks;
   std::vector<KeepClear> keepClear;
   float seaLevel;
   glm::vec2 center;

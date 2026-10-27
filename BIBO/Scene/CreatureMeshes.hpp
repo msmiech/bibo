@@ -13,13 +13,14 @@ namespace scene {
 enum class CreatureModel {
   SALMON_HEAD,  // from the gills to the snout (eaten first)
   SALMON_BODY,
-  SALMON_TAIL,  // origin at the joint to the body (z = SALMON_TAIL_JOINT of the
-                // whole fish), it wiggles
-  DROPLET,      // splash of water, radius 1
-  QUEST_MARKER,  // glowing golden exclamation mark, 1 high, the origin at its
-                 // bottom
-  QUEST_MARKER_REPEATABLE,  // the same in blue: a quest that was completed and
-                            // can be done again
+  // origin at the joint to the body (z = SALMON_TAIL_JOINT of the whole fish),
+  // it wiggles
+  SALMON_TAIL,
+  DROPLET,  // splash of water, radius 1
+  // glowing golden exclamation mark, 1 high, the origin at its bottom
+  QUEST_MARKER,
+  // the same in blue: a quest that was completed and can be done again
+  QUEST_MARKER_REPEATABLE,
   COUNT
 };
 constexpr int CREATURE_MODEL_COUNT = static_cast<int>(CreatureModel::COUNT);

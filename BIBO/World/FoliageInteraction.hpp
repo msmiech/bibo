@@ -30,10 +30,10 @@ class FoliageInteraction {
   struct Imprint {
     glm::vec3 center = glm::vec3(0.0f);
     float radius = 0.0f;
-    glm::vec2 motion =
-        glm::vec2(0.0f);  // direction of the movement (xz), 1: running
-    float age = 0.0f;  // seconds since the body left it (negative: the body is
-                       // here now)
+    // direction of the movement (xz), 1: running
+    glm::vec2 motion = glm::vec2(0.0f);
+    // seconds since the body left it (negative: the body is here now)
+    float age = 0.0f;
   };
 
   // How long the plants stay pressed down after a body left, how long they

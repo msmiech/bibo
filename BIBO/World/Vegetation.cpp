@@ -59,10 +59,10 @@ struct Site {
   float snow = 0.0f;
   float forest = 0.0f;   // density of the forest (0: clearing)
   bool onFloor = false;  // on the floor of the race track
-  float trailDistance =
-      1e6f;  // from the edge of the trail (negative on the trail)
-  float pathDistance =
-      1e6f;  // from the edge of the closest foot path (negative on it)
+  // from the edge of the trail (negative on the trail)
+  float trailDistance = 1e6f;
+  // from the edge of the closest foot path (negative on it)
+  float pathDistance = 1e6f;
   bool clearing = false;  // in a point of interest
 };
 
@@ -156,8 +156,8 @@ class Scatterer {
       solid(Model::STONE_FLAT, foot + jitter,
             orientation(random.range(0.0f, 6.2831853f), UP, 0.0f), scale, UP,
             false, random);
-      foot.y += 0.36f * scale;  // a flat stone is 0.5 high at scale 1, they lie
-                                // a bit in each other
+      // a flat stone is 0.5 high at scale 1, they lie a bit in each other
+      foot.y += 0.36f * scale;
     }
   }
 
@@ -223,8 +223,8 @@ class Scatterer {
         landmarks.pathDistance(point) - Landmarks::PATH_HALF_WIDTH;
     result.clearing = landmarks.pointAt(point) >= 0;
     result.forest *=
-        1.0f -
-        smoothstep(34.0f, 50.0f, result.position.y);  // bare mountain tops
+        // bare mountain tops
+        1.0f - smoothstep(34.0f, 50.0f, result.position.y);
     result.snow =
         world.snowCover(result.position, result.normal, 1.0f, result.material);
     return true;

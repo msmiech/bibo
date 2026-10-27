@@ -11,13 +11,14 @@
 namespace bibo {
 namespace ui {
 enum class MenuAction {
-  Start,            // Main menu: start the game
-  Resume,           // Pause menu: continue the game
-  Quit,             // Main and pause menu: quit the game
-  Restart,          // Pause menu: start again at the start
-  MainMenu,         // Pause menu: back to the main menu
-  GraphicsChanged,  // Settings menu: a graphics setting was changed (they are
-                    // applied immediately)
+  Start,     // Main menu: start the game
+  Resume,    // Pause menu: continue the game
+  Quit,      // Main and pause menu: quit the game
+  Restart,   // Pause menu: start again at the start
+  MainMenu,  // Pause menu: back to the main menu
+  // Settings menu: a graphics setting was changed (they are applied
+  // immediately)
+  GraphicsChanged,
   ApplyDisplay,   // Settings menu: a new window mode or resolution was applied
   SettingsClosed  // Settings menu: closed with Back or ESC
 };

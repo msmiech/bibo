@@ -31,16 +31,6 @@ using namespace bibo;
 
 using namespace scene;
 
-// Only registered in debug builds
-[[maybe_unused]] static void GLAPIENTRY
-DebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity,
-              GLsizei length, const GLchar* message, const GLvoid* userParam);
-[[maybe_unused]] static void GLAPIENTRY
-DebugCallbackAMD(GLuint id, GLenum category, GLenum severity, GLsizei length,
-                 const GLchar* message, GLvoid* userParam);
-static string FormatDebugOutput(GLenum source, GLenum type, GLuint id,
-                                GLenum severity, const char* msg);
-
 unique_ptr<physics::PhysicsWorld> physicsWorld;
 
 void initialize();
@@ -57,7 +47,7 @@ void draw();
 void update(float time_delta);
 void gameLoop();
 void playDemoFrame(int frame);
-void renderText(Shader* shader, string text, GLfloat x, GLfloat y,
+void renderText(Shader* shader, const string& text, GLfloat x, GLfloat y,
                 GLfloat scale, vec3 color);
 void resizeScreenBuffers();
 render::RenderSettings renderSettings();
@@ -79,8 +69,8 @@ void joystickCallback(int joystick, int event);
 void handleGamepad();
 
 // vars
-const char* const SETTINGS_FILE =
-    "settings.cfg";  // in the working directory, like the assets
+// in the working directory, like the assets
+const char* const SETTINGS_FILE = "settings.cfg";
 Settings settings;
 unsigned int windowWidth = 800;  // Size of the framebuffer in pixels
 unsigned int windowHeight = 600;
@@ -113,8 +103,8 @@ unique_ptr<Scene> gameScene;
 // The music and the sounds (not while recording: the game runs faster or slower
 // than real time then)
 unique_ptr<audio::MusicPlayer> music;
-unsigned int beaverSound =
-    0;  // the beaver does not make the same sound twice in a row
+// the beaver does not make the same sound twice in a row
+unsigned int beaverSound = 0;
 unsigned int bearSound = 0;     // neither does Mishka
 unsigned int raccoonSound = 0;  // nor the raccoons
 // Shadow maps, HDR image, bloom, auto exposure and tone mapping
@@ -239,7 +229,7 @@ int main(int argc, char** argv) {
 
   if (recorder) {
     cout << "Recorded " << recorder->getFrameCount() << " frames" << endl;
-    recorder.reset(nullptr);
+    recorder.reset();
   }
 
   cleanup();
@@ -298,10 +288,10 @@ void initialize() {
                                  menu->onMouseButton(button, action, mods);
                              });
   glfwSetScrollCallback(window, [](GLFWwindow*, double, double yOffset) {
-    if (menu && menu->isVisible())
-      menu->onScroll(yOffset);
+    if (menu && menu->isVisible()) menu->onScroll(yOffset);
+    // zooms the camera
     else if (controls)
-      controls->onScroll(yOffset);  // zooms the camera
+      controls->onScroll(yOffset);
   });
   // The menu always knows where the mouse is, so that it highlights the right
   // button as soon as it opens. During the game the mouse is captured and turns
@@ -352,157 +342,81 @@ void initialize() {
   init(window);
 }
 
-void initDebug() {
-  // Following if code is from wiki
 #ifndef NDEBUG
-  // GLEW already loaded the debug output functions (if the driver supports
-  // them). Register your callback function.
-  if (glDebugMessageCallback != nullptr) {
-    glDebugMessageCallback(DebugCallback, nullptr);
-  } else if (glDebugMessageCallbackARB != nullptr) {
-    glDebugMessageCallbackARB(DebugCallback, nullptr);
-  } else if (glDebugMessageCallbackAMD != nullptr) {
-    glDebugMessageCallbackAMD(DebugCallbackAMD, nullptr);
+namespace {
+const char* debugSourceName(GLenum source) {
+  switch (source) {
+    case GL_DEBUG_SOURCE_API:
+      return "API";
+    case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
+      return "Window System";
+    case GL_DEBUG_SOURCE_SHADER_COMPILER:
+      return "Shader Compiler";
+    case GL_DEBUG_SOURCE_THIRD_PARTY:
+      return "Third Party";
+    case GL_DEBUG_SOURCE_APPLICATION:
+      return "Application";
+    default:
+      return "Other";
   }
+}
 
-  // Enable synchronous callback. This ensures that your callback function is
-  // called right after an error has occurred. This capability is not defined in
-  // the AMD version.
-  if ((glDebugMessageCallback != nullptr) ||
-      (glDebugMessageCallbackARB != nullptr)) {
+const char* debugTypeName(GLenum type) {
+  switch (type) {
+    case GL_DEBUG_TYPE_ERROR:
+      return "Error";
+    case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+      return "Deprecated Behavior";
+    case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+      return "Undefined Behavior";
+    case GL_DEBUG_TYPE_PORTABILITY:
+      return "Portability";
+    case GL_DEBUG_TYPE_PERFORMANCE:
+      return "Performance";
+    default:
+      return "Other";
+  }
+}
+
+const char* debugSeverityName(GLenum severity) {
+  switch (severity) {
+    case GL_DEBUG_SEVERITY_HIGH:
+      return "High";
+    case GL_DEBUG_SEVERITY_MEDIUM:
+      return "Medium";
+    case GL_DEBUG_SEVERITY_LOW:
+      return "Low";
+    default:
+      return "Unknown";
+  }
+}
+
+void GLAPIENTRY debugCallback(GLenum source, GLenum type, GLuint id,
+                              GLenum severity, GLsizei, const GLchar* message,
+                              const void*) {
+  // Notifications come e.g. where the driver keeps a buffer, for every chunk of
+  // the streamed world
+  if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
+    return;
+  }
+  cout << "OpenGL DEBUG: " << message
+       << " [Source = " << debugSourceName(source)
+       << ", Type = " << debugTypeName(type)
+       << ", Severity = " << debugSeverityName(severity) << ", ID = " << id
+       << "]" << endl;
+}
+}  // namespace
+#endif
+
+void initDebug() {
+#ifndef NDEBUG
+  // Core in OpenGL 4.3, which the game needs. Synchronous: the callback runs
+  // right where the error happens.
+  if (glDebugMessageCallback != nullptr) {
+    glDebugMessageCallback(debugCallback, nullptr);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
   }
 #endif
-}
-
-// The following debug callbacks are from wiki:
-// https://lva.cg.tuwien.ac.at/cgue/wiki/doku.php?id=students:debugcontext
-static void GLAPIENTRY DebugCallbackAMD(GLuint id, GLenum category,
-                                        GLenum severity, GLsizei length,
-                                        const GLchar* message,
-                                        GLvoid* userParam) {
-  string error = FormatDebugOutput(category, category, id, severity, message);
-  cout << error << endl;
-}
-
-static void GLAPIENTRY DebugCallback(GLenum source, GLenum type, GLuint id,
-                                     GLenum severity, GLsizei length,
-                                     const GLchar* message,
-                                     const GLvoid* userParam) {
-  if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
-    return;  // e.g. where the driver keeps a buffer, for every chunk of the
-             // streamed world
-  }
-  string error = FormatDebugOutput(source, type, id, severity, message);
-  cout << error << endl;
-}
-
-static string FormatDebugOutput(GLenum source, GLenum type, GLuint id,
-                                GLenum severity, const char* msg) {
-  stringstream stringStream;
-  string sourceString;
-  string typeString;
-  string severityString;
-
-  // The AMD variant of this extension provides a less detailed classification
-  // of the error, which is why some arguments might be "Unknown".
-  switch (source) {
-    case GL_DEBUG_CATEGORY_API_ERROR_AMD:
-    case GL_DEBUG_SOURCE_API: {
-      sourceString = "API";
-      break;
-    }
-    case GL_DEBUG_CATEGORY_APPLICATION_AMD:
-    case GL_DEBUG_SOURCE_APPLICATION: {
-      sourceString = "Application";
-      break;
-    }
-    case GL_DEBUG_CATEGORY_WINDOW_SYSTEM_AMD:
-    case GL_DEBUG_SOURCE_WINDOW_SYSTEM: {
-      sourceString = "Window System";
-      break;
-    }
-    case GL_DEBUG_CATEGORY_SHADER_COMPILER_AMD:
-    case GL_DEBUG_SOURCE_SHADER_COMPILER: {
-      sourceString = "Shader Compiler";
-      break;
-    }
-    case GL_DEBUG_SOURCE_THIRD_PARTY: {
-      sourceString = "Third Party";
-      break;
-    }
-    case GL_DEBUG_CATEGORY_OTHER_AMD:
-    case GL_DEBUG_SOURCE_OTHER: {
-      sourceString = "Other";
-      break;
-    }
-    default: {
-      sourceString = "Unknown";
-      break;
-    }
-  }
-
-  switch (type) {
-    case GL_DEBUG_TYPE_ERROR: {
-      typeString = "Error";
-      break;
-    }
-    case GL_DEBUG_CATEGORY_DEPRECATION_AMD:
-    case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: {
-      typeString = "Deprecated Behavior";
-      break;
-    }
-    case GL_DEBUG_CATEGORY_UNDEFINED_BEHAVIOR_AMD:
-    case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: {
-      typeString = "Undefined Behavior";
-      break;
-    }
-    case GL_DEBUG_TYPE_PORTABILITY_ARB: {
-      typeString = "Portability";
-      break;
-    }
-    case GL_DEBUG_CATEGORY_PERFORMANCE_AMD:
-    case GL_DEBUG_TYPE_PERFORMANCE: {
-      typeString = "Performance";
-      break;
-    }
-    case GL_DEBUG_CATEGORY_OTHER_AMD:
-    case GL_DEBUG_TYPE_OTHER: {
-      typeString = "Other";
-      break;
-    }
-    default: {
-      typeString = "Unknown";
-      break;
-    }
-  }
-
-  switch (severity) {
-    case GL_DEBUG_SEVERITY_HIGH: {
-      severityString = "High";
-      break;
-    }
-    case GL_DEBUG_SEVERITY_MEDIUM: {
-      severityString = "Medium";
-      break;
-    }
-    case GL_DEBUG_SEVERITY_LOW: {
-      severityString = "Low";
-      break;
-    }
-    default: {
-      severityString = "Unknown";
-      break;
-    }
-  }
-
-  stringStream << "OpenGL DEBUG: " << msg;
-  stringStream << " [Source = " << sourceString;
-  stringStream << ", Type = " << typeString;
-  stringStream << ", Severity = " << severityString;
-  stringStream << ", ID = " << id << "]";
-
-  return stringStream.str();
 }
 
 void initShaders() {
@@ -537,8 +451,8 @@ void init(GLFWwindow* window) {
   cout << "Loading assets from files via assimp and setting up scene..."
        << endl;
   if (!recording) {
-    music = make_unique<audio::MusicPlayer>();  // synthesizes the music while
-                                                // the scene loads
+    // synthesizes the music while the scene loads
+    music = make_unique<audio::MusicPlayer>();
   }
   gameScene = make_unique<Scene>(window, mainShader.get(), physicsWorld.get());
   gameScene->setViewportSize(windowWidth, windowHeight);
@@ -603,8 +517,8 @@ void onMenuAction(ui::MenuAction action) {
       // The new framebuffer size arrives in framebufferSizeCallback
       display::applyWindowMode(window, settings.windowMode, settings.width,
                                settings.height);
-      applyGraphicsSettings();  // the swap interval (VSync) may be reset by a
-                                // new video mode
+      // the swap interval (VSync) may be reset by a new video mode
+      applyGraphicsSettings();
       [[fallthrough]];
     case ui::MenuAction::SettingsClosed:
       if (useSavedSettings && !settings.save(SETTINGS_FILE)) {
@@ -721,8 +635,8 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action,
     switch (gameState) {
       case PLAYING:
         if (!pauseGame()) {
-          glfwSetWindowShouldClose(
-              window, true);  // without menus ESC quits as in earlier versions
+          // without menus ESC quits as in earlier versions
+          glfwSetWindowShouldClose(window, true);
         }
         break;
       case PAUSED:
@@ -1217,22 +1131,22 @@ void cleanup() {
   cout << "Cleaning up memory..." << endl;
   // Releases the OpenGL resources of the menus, so it must happen before the
   // window (and its context) is destroyed
-  menu.reset(nullptr);
-  music.reset(nullptr);
-  gameScene.reset(nullptr);
-  renderer.reset(nullptr);
+  menu.reset();
+  music.reset();
+  gameScene.reset();
+  renderer.reset();
   // The glyphs and the quad of the text
-  for (const auto& glyph : Characters) {
-    glDeleteTextures(1, &glyph.second.textureID);
+  for (const auto& [c, glyph] : Characters) {
+    glDeleteTextures(1, &glyph.textureID);
   }
   Characters.clear();
   glDeleteBuffers(1, &textVBO);
   glDeleteVertexArrays(1, &textVAO);
-  textShader.reset(nullptr);
-  mainShader.reset(nullptr);
+  textShader.reset();
+  mainShader.reset();
   // The scene (and the character controller of the bear) must be released
   // before the physics world
-  physicsWorld.reset(nullptr);
+  physicsWorld.reset();
 }
 
 void initPhysics() {
@@ -1240,117 +1154,84 @@ void initPhysics() {
   physicsWorld = make_unique<physics::PhysicsWorld>();
 }
 
-// Based on:
+// Based on
 // http://learnopengl.com/code_viewer.php?code=in-practice/text_rendering
 void initFreeType() {
-  // FreeType
   FT_Library ft;
-  // All functions return a value different than 0 whenever an error occurred
   if (FT_Init_FreeType(&ft)) {
-    cout << "ERROR::FREETYPE: Could not init FreeType Library" << endl;
+    cout << "ERROR: Could not initialize FreeType" << endl;
     return;
   }
-
-  // Load font as face (without a font the game still runs, just without HUD
-  // text)
+  // Without the font the game still runs, just without the HUD text
   FT_Face face;
   if (FT_New_Face(ft, "Font/DejaVuSans.ttf", 0, &face)) {
-    cout << "ERROR::FREETYPE: Failed to load font" << endl;
+    cout << "ERROR: Could not load the font" << endl;
     FT_Done_FreeType(ft);
     return;
   }
-
-  // Set size to load glyphs as
   FT_Set_Pixel_Sizes(face, 0, 48);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);  // the glyphs have 1 byte per pixel
 
-  // Disable byte-alignment restriction
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-  // Load first 128 characters of ASCII set
+  // A texture for each ASCII character
   for (GLubyte c = 0; c < 128; c++) {
-    // Load character glyph
     if (FT_Load_Char(face, c, FT_LOAD_RENDER)) {
-      cout << "ERROR::FREETYTPE: Failed to load Glyph" << endl;
+      cout << "ERROR: Could not load the glyph " << static_cast<int>(c) << endl;
       continue;
     }
-    // Generate texture
+    const FT_GlyphSlot glyph = face->glyph;
     GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, face->glyph->bitmap.width,
-                 face->glyph->bitmap.rows, 0, GL_RED, GL_UNSIGNED_BYTE,
-                 face->glyph->bitmap.buffer);
-    // Set texture options
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, glyph->bitmap.width,
+                 glyph->bitmap.rows, 0, GL_RED, GL_UNSIGNED_BYTE,
+                 glyph->bitmap.buffer);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // Now store character for later use
-    Character character = {
-        texture, ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
-        ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-        static_cast<GLuint>(face->glyph->advance.x)};
-    Characters.insert(pair<GLchar, Character>(c, character));
+    Characters.emplace(
+        c, Character{texture, ivec2(glyph->bitmap.width, glyph->bitmap.rows),
+                     ivec2(glyph->bitmap_left, glyph->bitmap_top),
+                     static_cast<GLuint>(glyph->advance.x)});
   }
   glBindTexture(GL_TEXTURE_2D, 0);
-  // Destroy FreeType once we're finished
   FT_Done_Face(face);
   FT_Done_FreeType(ft);
 }
 
-// Based on:
-// http://learnopengl.com/code_viewer.php?code=in-practice/text_rendering
-void renderText(Shader* shader, string text, GLfloat x, GLfloat y,
+void renderText(Shader* shader, const string& text, GLfloat x, GLfloat y,
                 GLfloat scale, vec3 color) {
   glEnable(GL_CULL_FACE);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glDisable(GL_DEPTH_TEST);  // The text is always in front of the scene
-
-  // Activate corresponding render state
+  glDisable(GL_DEPTH_TEST);  // the text is always in front of the scene
   shader->enable();
   glUniform3f(shader->getUniformLocation("textColor"), color.x, color.y,
               color.z);
   glActiveTexture(GL_TEXTURE0);
   glBindVertexArray(textVAO);
-
-  // Iterate through all characters
-  string::const_iterator c;
-  for (c = text.begin(); c != text.end(); ++c) {
-    auto glyph = Characters.find(*c);
+  for (char c : text) {
+    auto glyph = Characters.find(c);
     if (glyph == Characters.end()) {
       continue;  // e.g. non-ASCII characters in the name of a gamepad
     }
     const Character& ch = glyph->second;
-
-    GLfloat xpos = x + ch.bearing.x * scale;
-    GLfloat ypos = y - (ch.size.y - ch.bearing.y) * scale;
-
-    GLfloat w = ch.size.x * scale;
-    GLfloat h = ch.size.y * scale;
-    // Update VBO for each character
+    GLfloat left = x + ch.bearing.x * scale;
+    GLfloat bottom = y - (ch.size.y - ch.bearing.y) * scale;
+    GLfloat right = left + ch.size.x * scale;
+    GLfloat top = bottom + ch.size.y * scale;
+    // Two triangles: x, y, u, v
     GLfloat vertices[6][4] = {
-        {xpos, ypos + h, 0.0, 0.0},    {xpos, ypos, 0.0, 1.0},
-        {xpos + w, ypos, 1.0, 1.0},
-
-        {xpos, ypos + h, 0.0, 0.0},    {xpos + w, ypos, 1.0, 1.0},
-        {xpos + w, ypos + h, 1.0, 0.0}};
-    // Render glyph texture over quad
+        {left, top, 0.0f, 0.0f},     {left, bottom, 0.0f, 1.0f},
+        {right, bottom, 1.0f, 1.0f}, {left, top, 0.0f, 0.0f},
+        {right, bottom, 1.0f, 1.0f}, {right, top, 1.0f, 0.0f}};
     glBindTexture(GL_TEXTURE_2D, ch.textureID);
-    // Update content of VBO memory
     glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-    glBufferSubData(
-        GL_ARRAY_BUFFER, 0, sizeof(vertices),
-        vertices);  // Be sure to use glBufferSubData and not glBufferData
-
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    // Render quad
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    // Now advance cursors for next glyph (note that advance is number of 1/64
-    // pixels)
-    x += (ch.advance >> 6) *
-         scale;  // Bitshift by 6 to get value in pixels (2^6 = 64 (divide
-                 // amount of 1/64th pixels by 64 to get amount of pixels))
+    // On to the next glyph (the advance is in 1/64 pixels)
+    x += (ch.advance >> 6) * scale;
   }
   glBindVertexArray(0);
   glBindTexture(GL_TEXTURE_2D, 0);
@@ -1365,33 +1246,20 @@ void textRendering() {
     return;  // the main menu covers the HUD
   }
   if (settings.showHelp) {
-    renderText(textShader.get(), "WASD or arrow keys / left stick to run",
-               windowWidth / 10.f, windowHeight - 2.f * windowHeight / 10.f,
-               0.6f, vec3(0.5, 0.8f, 0.2f));
-    renderText(textShader.get(),
-               "Mouse / right stick to look around, wheel to zoom",
-               windowWidth / 10.f, windowHeight - 3.f * windowHeight / 10.f,
-               0.6f, vec3(0.5, 0.8f, 0.2f));
-    renderText(textShader.get(),
-               "SPACE / Cross or A to jump (hold to jump higher)",
-               windowWidth / 10.f, windowHeight - 4.f * windowHeight / 10.f,
-               0.6f, vec3(0.5, 0.8f, 0.2f));
-    renderText(textShader.get(), "E / Square or X to talk, R to restart",
-               windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f,
-               0.6f, vec3(0.5, 0.8f, 0.2f));
-    renderText(textShader.get(),
-               "Bober the beaver at the start has a race for you!",
-               windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f,
-               0.6f, vec3(0.5, 0.8f, 0.2f));
-    renderText(textShader.get(),
-               "Mishka at the largest pool wants you to go fishing",
-               windowWidth / 10.f, windowHeight - 7.f * windowHeight / 10.f,
-               0.6f, vec3(0.5, 0.8f, 0.2f));
-    renderText(
-        textShader.get(),
-        "Chonk the raccoon at the trailhead wonders about the standing stones",
-        windowWidth / 10.f, windowHeight - 8.f * windowHeight / 10.f, 0.6f,
-        vec3(0.5, 0.8f, 0.2f));
+    const char* const HELP[] = {
+        "WASD or arrow keys / left stick to run",
+        "Mouse / right stick to look around, wheel to zoom",
+        "SPACE / Cross or A to jump (hold to jump higher)",
+        "E / Square or X to talk, R to restart",
+        "Bober the beaver at the start has a race for you!",
+        "Mishka at the largest pool wants you to go fishing",
+        "Chonk the raccoon at the trailhead wonders about the standing stones"};
+    // A line per tenth of the window, below the frame time
+    for (int line = 0; line < 7; ++line) {
+      renderText(textShader.get(), HELP[line], windowWidth / 10.f,
+                 windowHeight - (2.f + line) * windowHeight / 10.f, 0.6f,
+                 vec3(0.5, 0.8f, 0.2f));
+    }
   }
   if (settings.showFrameTime) {
     renderText(textShader.get(),

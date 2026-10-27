@@ -26,8 +26,8 @@ const float REACH = 12.0f;
 // Parts of a path that are further apart along it than this are different legs
 // (e.g. the two sides of a hairpin bend)
 const int LEG_LENGTH = 30;
-const int PATH_STRIDE =
-    1000000;  // index of a point of a path: path * PATH_STRIDE + point
+// index of a point of a path: path * PATH_STRIDE + point
+const int PATH_STRIDE = 1000000;
 // No path joins the track close to the start and finish
 const float START_CLEARANCE = 30.0f;
 // Paths leave the track at least this far apart. A path branches off from
@@ -310,8 +310,8 @@ float Landmarks::leveled(const WorldGenerator& world,
 void Landmarks::choosePoints(const WorldGenerator& world) {
   const glm::vec2 center = world.getCenter();
   const float sea = world.getSeaLevel();
-  std::vector<float>
-      angles;  // of the chosen points, seen from the middle of the island
+  // of the chosen points, seen from the middle of the island
+  std::vector<float> angles;
   auto add = [&](PointOfInterest point) {
     glm::vec2 at = ground(point.position);
     point.position.y = naturalGround(world, at);

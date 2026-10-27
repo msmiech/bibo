@@ -10,10 +10,12 @@
 #include "GameRules.hpp"
 #include "Hedgehog.hpp"
 #include "HedgehogRenderer.hpp"
+#include "Raccoon.hpp"
 #include "RaceQuest.hpp"
 #include "RestingBear.hpp"
 #include "Salmon.hpp"
 #include "SalmonQuest.hpp"
+#include "StonesQuest.hpp"
 #include "../Render/Renderer.hpp"
 #include "../Util/Input.hpp"
 #include "../Util/Util.hpp"
@@ -33,11 +35,20 @@ namespace bibo
 		* on the track, salmon that jump out of the water, the beaver at the start who offers the race as a quest, Mishka the bear
 		* at the largest pool who offers the salmon as a quest) and the world around it (World: the island with its forest, caves,
 		* sky, water and snow). The bear roams freely, swims in the water and catches and eats salmon; the race around the track
-		* (RaceQuest) and fishing in all pools (SalmonQuest) are quests, one at a time. During their conversations and the
-		* cutscene of the race the scene moves the bear and the camera. No salmon jump during the race.
+		* (RaceQuest) and fishing in all pools (SalmonQuest) are quests, so is exploring the standing stones for Chonk, the raccoon at
+		* the trailhead of the foot paths (StonesQuest), one at a time. On the race and while fishing raccoons come out of the woods
+		* to cheer (RaccoonFans). The player talks to the closest animal. During the conversations and the cutscene of the race the
+		* scene moves the bear and the camera. No salmon jump during the race.
 		*/
 		class Scene : public render::RenderableScene
 		{
+		public:
+			/**
+			* Who the player talks to (or would talk to when it presses the button)
+			*/
+			enum class TalkPartner { NONE, BEAVER, MISHKA, CHONK, STONES };
+
+		private:
 			void initPhysicsBodies();
 			void initWorld(const aiScene& track);
 			/**
@@ -57,10 +68,28 @@ namespace bibo
 			*/
 			void initMishka();
 			/**
+			* Chonk at the trailhead of the paths to the standing stones, the stones quest and the raccoons that cheer
+			*/
+			void initChonk();
+			/**
 			* What the bear does for the quest in this frame (where it is, whether it talks to the beaver, ...)
 			*/
 			RaceQuest::Situation questSituation(const input::PlayerInput& player);
 			SalmonQuest::Situation salmonSituation(const input::PlayerInput& player);
+			StonesQuest::Situation stonesSituation(const input::PlayerInput& player);
+			/**
+			* Who the player talks to when it presses the button: the closest animal it can talk to (or the one it talks to)
+			*/
+			void updateTalkPartner();
+			/**
+			* Can a raccoon walk there (dry land, not in a cave)?
+			*/
+			bool raccoonGround(glm::vec2 position, float& height) const;
+			/**
+			* A spot for a raccoon that cheers, ahead of the bear beside its way (not on the trail), and where it comes from: further
+			* out to the side, out of sight of the camera, with nothing in the way (RaccoonFans::Finder)
+			*/
+			bool findFanSpot(vec3 bear, vec3 heading, std::mt19937& random, vec2& from, vec2& spot);
 			/**
 			* @return true if the bear can talk now (standing, not swimming or eating) and is within the distance of a point
 			*/
@@ -68,7 +97,7 @@ namespace bibo
 			/**
 			* @return true while the player moves the bear (not in a conversation or the cutscene)
 			*/
-			bool isPlayerInControl() const { return raceQuest->isPlayerInControl() && salmonQuest->isPlayerInControl(); }
+			bool isPlayerInControl() const { return raceQuest->isPlayerInControl() && salmonQuest->isPlayerInControl() && stonesQuest->isPlayerInControl(); }
 			/**
 			* The input of the bear: from the player, or from the cutscene and the conversation
 			*/
@@ -144,6 +173,14 @@ namespace bibo
 			int mishkaPool = -1;
 			int carriedPool = -1; //the salmon in the mouth of the bear is from this pool, -1 if none
 			int eatenPool = -1; //the bear ate up a salmon of this pool (for the next update of the salmon quest)
+			//Chonk, the raccoon at the trailhead, and the raccoons that come out of the woods to cheer
+			unique_ptr<Raccoon> chonk;
+			physics::BodyHandle chonkBody = physics::INVALID_BODY;
+			unique_ptr<FurryRenderer> chonkRenderer;
+			unique_ptr<RaccoonFans> fans;
+			unique_ptr<FurryRenderer> fansRenderer;
+			float cheerLinger = 0.0f; //the raccoons go on cheering for a while after a quest was completed
+			int raccoonChatters = 0; //for takeRaccoonChatters
 
 			//Physics
 			physics::PhysicsWorld* physicsWorld;
@@ -158,10 +195,17 @@ namespace bibo
 			RaceQuest::Stage lastStage = RaceQuest::Stage::IDLE;
 			bool atStart = false; //the bear reached the starting line in the cutscene
 			bool jumpBlocked = false; //after a conversation until the jump button is released (it may have answered)
+			TalkPartner talkPartner = TalkPartner::NONE;
 			vector<RaceQuest::Event> events; //for takeEvents
 			//Fishing in all pools
 			unique_ptr<SalmonQuest> salmonQuest;
 			vector<SalmonQuest::Event> salmonEvents; //for takeSalmonEvents
+			//Exploring the standing stones for Chonk
+			unique_ptr<StonesQuest> stonesQuest;
+			vector<StonesQuest::Event> stonesEvents; //for takeStonesEvents
+			vec3 stonesCenter = vec3(0.0f); //the flat stone in the middle of the circle
+			float stonesRadius = 0.0f;
+			float markerTime = 0.0f; //the mark above the stone circle bobs up and down
 			int splashes = 0;
 
 			//Dynamic bodies and their start poses, which they are moved back to by restart()
@@ -204,6 +248,14 @@ namespace bibo
 			* @return The pool where Mishka lies (the largest one)
 			*/
 			int getMishkaPool() const { return mishkaPool; }
+			const StonesQuest& getStonesQuest() const { return *stonesQuest; }
+			const Raccoon& getChonk() const { return *chonk; }
+			const RaccoonFans& getFans() const { return *fans; }
+			/**
+			* @return The flat stone in the middle of the stone circle (on the ground)
+			*/
+			vec3 getStonesCenter() const { return stonesCenter; }
+			TalkPartner getTalkPartner() const { return talkPartner; }
 			/**
 			* @return true if the bear is in the water (swimming or wading deep), the race is lost then
 			*/
@@ -213,6 +265,11 @@ namespace bibo
 			*/
 			vector<RaceQuest::Event> takeEvents();
 			vector<SalmonQuest::Event> takeSalmonEvents();
+			vector<StonesQuest::Event> takeStonesEvents();
+			/**
+			* @return How often the raccoons chattered since the last call (Chonk while it talks, the fans when they cheer)
+			*/
+			int takeRaccoonChatters();
 			/**
 			* @return How often the bear fell into the water since the last call
 			*/

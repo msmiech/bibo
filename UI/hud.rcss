@@ -64,6 +64,30 @@ div, p
 	color: #93a7bb;
 }
 
+/* ---------- The goal of a quest: at the top in the middle ---------- */
+
+.objective
+{
+	position: absolute;
+	top: 26dp;
+	left: 0;
+	right: 0;
+	text-align: center;
+}
+.objective .title
+{
+	font-size: 22dp;
+	color: #ffffff;
+	font-effect: shadow(0dp 2dp #000000b0);
+}
+.objective .details
+{
+	margin-top: 4dp;
+	font-size: 17dp;
+	color: #ffd27a;
+	font-effect: shadow(0dp 1dp #000000c0);
+}
+
 /* ---------- 3, 2, 1, GO! in the middle ---------- */
 
 .countdown

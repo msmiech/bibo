@@ -18,7 +18,7 @@ namespace bibo
 	{
 		/**
 		* A large hedgehog that strolls around its home on the track: it walks to a spot nearby, sniffs around for a while
-		* and walks on. The bear is knocked over when it runs into one (an obstacle). Only the behavior, the scene draws it
+		* and walks on. When the bear comes close it scurries away from it. The bear is knocked over when it runs into one (an obstacle). Only the behavior, the scene draws it
 		* (HedgehogRenderer) and moves its collision sphere.
 		*/
 		class Hedgehog
@@ -45,6 +45,8 @@ namespace bibo
 			static constexpr float WALK_SPEED = 1.1f;
 			//How far it goes from its home
 			static constexpr float HOME_RADIUS = 4.5f;
+			//It scurries away from the bear when it comes this close, this much faster than it walks
+			static constexpr float SHY_DISTANCE = 4.0f, SCURRY_FACTOR = 1.8f;
 
 			/**
 			* @param home Where it lives (it starts there, looking along startDirection)
@@ -60,6 +62,10 @@ namespace bibo
 			* The bear ran into it: it hops up in surprise
 			*/
 			void startle();
+			/**
+			* Where the bear is: when it comes close, the hedgehog scurries away from it (in the next update)
+			*/
+			void watch(glm::vec3 bear);
 
 			/**
 			* On the ground under the middle of the hedgehog
@@ -72,6 +78,7 @@ namespace bibo
 			glm::vec3 getColliderCenter() const;
 			float getColliderRadius() const;
 			bool isWalking() const { return walking; }
+			bool isScurrying() const { return scurrying; }
 
 			/**
 			* What is drawn: the body and the feet
@@ -99,6 +106,8 @@ namespace bibo
 			float yaw = 0.0f; //0: looking along +z
 			glm::vec2 target;
 			bool walking = false;
+			bool scurrying = false; //away from the bear
+			glm::vec2 bear = glm::vec2(1e9f);
 			float waitTime = 0.0f; //sniffing before it walks on
 			float gaitPhase = 0.0f; //steps (1 per stride)
 			float stride = 0.0f; //0 standing, 1 walking (blends the steps in and out)

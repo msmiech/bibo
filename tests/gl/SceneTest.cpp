@@ -8,6 +8,7 @@
 
 #include "Physics/Physics.hpp"
 #include "Scene/Scene.hpp"
+#include "World/Landmarks.hpp"
 #include "TestSupport.hpp"
 
 using namespace bibo::test;
@@ -438,5 +439,100 @@ TEST_CASE("Mishka lies at the largest pool and offers fishing, no salmon jump du
 			REQUIRE(scene.getSalmon().getJumps().empty());
 		}
 		CHECK(race.getStage() == RaceQuest::Stage::RACING);
+	}
+}
+
+TEST_CASE("Chonk at the trailhead sends the bear to the stone circle and gets a report", "[gl][scene][quest][stones]")
+{
+	using bibo::scene::Raccoon;
+	using bibo::scene::StonesQuest;
+	GlContext gl;
+	AssetWorkingDirectory assets;
+	Shader mainShader("Shader/main_shader.vert", "Shader/main_shader.frag");
+	PhysicsWorld physicsWorld;
+	Scene scene(&gl.window(), &mainShader, &physicsWorld);
+	const float frame = 1.0f / 60.0f;
+	const StonesQuest& quest = scene.getStonesQuest();
+	const bibo::world::WorldGenerator& generator = scene.getWorld().getGenerator();
+	CHECK(quest.isOffered());
+	CHECK(scene.getChonk().getActivity() == Raccoon::Activity::SITTING);
+	//Chonk sits beside the first part of a foot path, on dry land
+	glm::vec3 chonk = scene.getChonk().getPosition();
+	CHECK(generator.getLandmarks().pathDistance(glm::vec2(chonk.x, chonk.z)) < bibo::world::Landmarks::PATH_HALF_WIDTH + 4.0f);
+	CHECK(chonk.y > generator.getSeaLevel());
+
+	//Puts the bear on the ground at a distance from a point, looking at it
+	auto putBear = [&](glm::vec3 target, float distance) {
+		for (int i = 0; i < 32; ++i)
+		{
+			float angle = static_cast<float>(i) * glm::two_pi<float>() / 32.0f;
+			glm::vec2 point = glm::vec2(target.x, target.z) + distance * glm::vec2(std::cos(angle), std::sin(angle));
+			float height = generator.height(point);
+			if (height > generator.getSeaLevel() + 0.3f && generator.getLandmarks().pathDistance(point) < 6.0f)
+			{
+				glm::vec3 place(point.x, height + bibo::scene::BearCharacter::groundOffset() + 0.05f, point.y);
+				scene.getWorld().ensureCollision(place, scene.getCamera().getPosition());
+				scene.getBear().getCharacter().placeAt(place, target - place);
+				for (int k = 0; k < 60; ++k)
+				{
+					scene.update(frame);
+				}
+				return true;
+			}
+		}
+		return false;
+	};
+	bibo::input::PlayerInput press;
+	press.confirm = true;
+	auto talk = [&]() {
+		bibo::input::PlayerInput input;
+		input.interact = input.confirm = true;
+		scene.update(frame, input);
+		for (int i = 0; i < 60 * 60 && !quest.isPlayerInControl(); ++i)
+		{
+			scene.update(frame, i % 30 == 0 ? press : bibo::input::PlayerInput());
+		}
+		scene.update(frame); //the other quests learn that this one is on (or over)
+	};
+
+	REQUIRE(putBear(chonk, 3.5f));
+	REQUIRE(scene.getTalkPartner() == Scene::TalkPartner::CHONK);
+	CHECK(quest.canTalk());
+	talk();
+	REQUIRE(quest.getStage() == StonesQuest::Stage::EXPLORING);
+	std::vector<StonesQuest::Event> events = scene.takeStonesEvents();
+	CHECK(std::count(events.begin(), events.end(), StonesQuest::Event::ACCEPTED) == 1);
+	CHECK(scene.takeRaccoonChatters() > 3); //Chonk chitters while its words appear
+	CHECK_FALSE(scene.getRaceQuest().isOffered()); //one quest at a time
+	//The bear faced Chonk from close by while they talked
+	glm::vec3 offset = chonk - scene.getBear().getPosition();
+	CHECK(glm::length(glm::vec2(offset.x, offset.z)) < 4.2f);
+
+	//At the stones: the flat stone in the middle
+	glm::vec3 stones = scene.getStonesCenter();
+	REQUIRE(putBear(stones, 2.5f));
+	CHECK(quest.hasArrived());
+	REQUIRE(scene.getTalkPartner() == Scene::TalkPartner::STONES);
+	talk();
+	REQUIRE(quest.getStage() == StonesQuest::Stage::RETURNING);
+	CHECK(quest.hasReport());
+
+	//Back to Chonk with the report
+	REQUIRE(putBear(chonk, 3.5f));
+	talk();
+	CHECK(quest.hasCompleted());
+	CHECK_FALSE(quest.isActive());
+	CHECK(quest.getReport() == StonesQuest::Report::TRUTH);
+	events = scene.takeStonesEvents();
+	CHECK(std::count(events.begin(), events.end(), StonesQuest::Event::COMPLETED) == 1);
+	CHECK(scene.getRaceQuest().isOffered());
+
+	SECTION("Restarting keeps the completed quest, Chonk is back at its place")
+	{
+		scene.restart();
+		scene.update(frame);
+		CHECK(quest.hasCompleted());
+		CHECK_FALSE(quest.isOffered());
+		CHECK(scene.getChonk().getPosition() == chonk);
 	}
 }

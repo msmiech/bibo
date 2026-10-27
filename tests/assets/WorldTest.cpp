@@ -392,7 +392,7 @@ TEST_CASE("Foot paths lead from the race track to the points of interest: beache
 				CHECK(closest < 0.01f);
 			}
 		}
-		CHECK(fromTrack >= 2);
+		CHECK(fromTrack >= 1); //where the side of the canyon is gentle, the others branch off
 		for (std::size_t i = 0; i < points.size(); ++i)
 		{
 			CAPTURE(i);
@@ -423,6 +423,39 @@ TEST_CASE("Foot paths lead from the race track to the points of interest: beache
 				CHECK(normal.y > 0.75f);
 				SurfaceMaterial material = world.material(surface, normal);
 				CHECK(material.trail + material.sand > 0.5f);
+			}
+		}
+	}
+
+	SECTION("The paths climb gently, also out of the canyon of the track, and do not run along crags")
+	{
+		for (const FootPath& path : landmarks.getPaths())
+		{
+			for (std::size_t i = 1; i < path.points.size(); ++i)
+			{
+				vec2 from = ground(path.points[i - 1]), to = ground(path.points[i]);
+				CAPTURE(to);
+				TrackPath::Nearest nearest = track.nearest(to);
+				if (nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth)
+				{
+					continue; //on the floor of the track
+				}
+				//The ground the bear walks on (not only the middle line of the path). Right at the edge of the floor the side of
+				//the canyon is not cut (the track terrain), it may be steeper there, but far less than the bear can climb.
+				bool edge = nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth + 2.5f;
+				CHECK(std::abs(world.height(to) - world.height(from)) <= (edge ? 0.75f : 0.5f) * glm::distance(from, to) + 0.02f);
+				//Beside the path: no walls of rock
+				vec2 along = glm::normalize(to - from), side(-along.y, along.x);
+				float steepest = 0.0f;
+				for (float sign : { -1.0f, 1.0f })
+				{
+					for (float distance = 1.5f; distance < 5.5f; distance += 0.5f)
+					{
+						float h0 = world.height(to + side * (sign * distance)), h1 = world.height(to + side * (sign * (distance + 0.5f)));
+						steepest = std::max(steepest, std::abs(h1 - h0) / 0.5f);
+					}
+				}
+				CHECK(steepest < 2.6f);
 			}
 		}
 	}

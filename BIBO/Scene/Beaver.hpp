@@ -11,7 +11,7 @@ namespace bibo
 	{
 		/**
 		* Bober, the beaver at the start of the race track, who offers the race to the bear (RaceQuest). It sits upright at the side of
-		* the track, turns to the bear when it comes close and looks at it. While it talks its mouth moves with every sound
+		* the track, turns to the bear when it comes close, waves at it and looks at it. While it talks its mouth moves with every sound
 		* it makes, it nods and gestures with its arms; between the conversations it nibbles at something and slaps its tail
 		* on the ground every now and then. Only the behavior, the scene draws it (FurryRenderer with the BeaverModel).
 		*/
@@ -77,6 +77,10 @@ namespace bibo
 			*/
 			float getMouthOpen() const { return mouth; }
 			bool isTalking() const { return talking; }
+			/**
+			* @return true while it waves at the bear (when the bear comes close)
+			*/
+			bool isWaving() const { return waveTime >= 0.0f; }
 
 			/**
 			* Model matrices of the parts of the BeaverModel (with the scale), indexed by BeaverModel::Part
@@ -104,6 +108,8 @@ namespace bibo
 			float nibbleTime = -1.0f, nextNibble = 3.0f;
 			float cheerTime = -1.0f;
 			float slapTime = -1.0f, nextSlap = 8.0f;
+			float waveTime = -1.0f; //waves at the bear when it comes close
+			bool attentive = false;
 		};
 	}
 }

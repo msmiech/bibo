@@ -5,6 +5,7 @@
 #include <functional>
 #include <limits>
 #include <queue>
+
 #include "Noise.hpp"
 #include "WorldGenerator.hpp"
 
@@ -24,6 +25,17 @@ namespace
 	const int PATH_STRIDE = 1000000; //index of a point of a path: path * PATH_STRIDE + point
 	//No path joins the track close to the start and finish
 	const float START_CLEARANCE = 30.0f;
+	//Paths leave the track at least this far apart. A path branches off from another one if that is much cheaper than the
+	//way from the track.
+	const float TRAILHEAD_SPACING = 25.0f, BRANCH_RATIO = 0.45f;
+	//Beside the floor of the track (on the side of its canyon) a step costs this much more per unit
+	const float CANYON_BAND = 6.0f, CANYON_PENALTY = 10.0f;
+	//Along a path the search prefers to climb at most this much per unit (the paths may go up to MAX_GRADE)
+	const float PREFERRED_GRADE = 0.3f;
+	//The ground around the summit is blurred over this distance, the crags fade out within this radius
+	const float SOFTENING_BLUR = 3.0f, SUMMIT_SOFTENING = 34.0f;
+	//Ground steeper than this within STEEP_REACH (and twice as far) of a cell makes a path through it more expensive
+	const float STEEP_SLOPE = 0.7f, STEEP_REACH = 2.5f;
 
 	float smoothstep(float edge0, float edge1, float x)
 	{
@@ -170,7 +182,8 @@ struct Landmarks::Grid
 				}
 				float length = ROUTE_CELL * std::sqrt(static_cast<float>(DI[n] * DI[n] + DJ[n] * DJ[n]));
 				float grade = std::abs(height[neighbor] - height[cell]) / length;
-				float factor = 1.0f + 20.0f * grade * grade + (grade > MAX_GRADE ? 150.0f * (grade - MAX_GRADE) : 0.0f);
+				//Steeper than the paths may go it is very expensive: a longer way in bends up the hill is cheaper
+				float factor = 1.0f + 30.0f * grade * grade + (grade > PREFERRED_GRADE ? 400.0f * (grade - PREFERRED_GRADE) : 0.0f);
 				float step = length * (factor + 0.5f * (penalty[cell] + penalty[neighbor]));
 				if (total + step < best[neighbor])
 				{
@@ -201,6 +214,73 @@ Landmarks::Landmarks(const WorldGenerator& world)
 	}
 }
 
+void Landmarks::soften(const WorldGenerator& world, glm::vec2 center, float radius)
+{
+	//The natural ground on a grid (with a margin for the blur), blurred with a box filter a few times (about a Gaussian)
+	Softened area;
+	area.center = center;
+	area.radius = radius;
+	const int blur = static_cast<int>(SOFTENING_BLUR / RASTER_CELL);
+	const float half = radius + static_cast<float>(blur) * RASTER_CELL * 3.0f;
+	area.origin = center - glm::vec2(half);
+	area.columns = static_cast<int>(2.0f * half / RASTER_CELL) + 1;
+	const int n = area.columns;
+	area.heights.resize(static_cast<std::size_t>(n) * n);
+	for (int j = 0; j < n; ++j)
+	{
+		for (int i = 0; i < n; ++i)
+		{
+			area.heights[static_cast<std::size_t>(j) * n + i] = world.naturalHeight(area.origin + RASTER_CELL * glm::vec2(static_cast<float>(i), static_cast<float>(j)));
+		}
+	}
+	std::vector<float> next(area.heights.size());
+	for (int pass = 0; pass < 3; ++pass)
+	{
+		for (int axis = 0; axis < 2; ++axis)
+		{
+			for (int j = 0; j < n; ++j)
+			{
+				for (int i = 0; i < n; ++i)
+				{
+					float sum = 0.0f;
+					for (int k = -blur; k <= blur; ++k)
+					{
+						int si = axis == 0 ? std::clamp(i + k, 0, n - 1) : i, sj = axis == 1 ? std::clamp(j + k, 0, n - 1) : j;
+						sum += area.heights[static_cast<std::size_t>(sj) * n + si];
+					}
+					next[static_cast<std::size_t>(j) * n + i] = sum / static_cast<float>(2 * blur + 1);
+				}
+			}
+			area.heights.swap(next);
+		}
+	}
+	softened.push_back(std::move(area));
+}
+
+float Landmarks::applySoftening(glm::vec2 position, float natural) const
+{
+	for (const Softened& area : softened)
+	{
+		float distance = glm::distance(position, area.center);
+		if (distance >= area.radius)
+		{
+			continue;
+		}
+		glm::vec2 cell = (position - area.origin) / RASTER_CELL;
+		int i = std::clamp(static_cast<int>(cell.x), 0, area.columns - 2), j = std::clamp(static_cast<int>(cell.y), 0, area.columns - 2);
+		float fx = cell.x - static_cast<float>(i), fz = cell.y - static_cast<float>(j);
+		auto at = [&](int di, int dj) { return area.heights[static_cast<std::size_t>(j + dj) * area.columns + i + di]; };
+		float smooth = glm::mix(glm::mix(at(0, 0), at(1, 0), fx), glm::mix(at(0, 1), at(1, 1), fx), fz);
+		natural = glm::mix(natural, smooth, 1.0f - smoothstep(0.55f * area.radius, area.radius, distance));
+	}
+	return natural;
+}
+
+float Landmarks::naturalGround(const WorldGenerator& world, glm::vec2 position) const
+{
+	return applySoftening(position, world.naturalHeight(position));
+}
+
 float Landmarks::applyLeveling(glm::vec2 position, float height) const
 {
 	for (const PointOfInterest& point : points)
@@ -221,7 +301,7 @@ float Landmarks::applyLeveling(glm::vec2 position, float height) const
 
 float Landmarks::leveled(const WorldGenerator& world, glm::vec2 position) const
 {
-	return applyLeveling(position, world.naturalHeight(position));
+	return applyLeveling(position, naturalGround(world, position));
 }
 
 void Landmarks::choosePoints(const WorldGenerator& world)
@@ -231,7 +311,7 @@ void Landmarks::choosePoints(const WorldGenerator& world)
 	std::vector<float> angles; //of the chosen points, seen from the middle of the island
 	auto add = [&](PointOfInterest point) {
 		glm::vec2 at = ground(point.position);
-		point.position.y = world.naturalHeight(at);
+		point.position.y = naturalGround(world, at);
 		points.push_back(point);
 		angles.push_back(angleOf(at - center));
 	};
@@ -262,11 +342,14 @@ void Landmarks::choosePoints(const WorldGenerator& world)
 			}
 		}
 	}
+	//The crags around it are worn down a bit (the path winds up between rocks, not along walls), its top is a small plateau
+	soften(world, summit, SUMMIT_SOFTENING);
 	PointOfInterest lookout;
 	lookout.kind = PointOfInterest::Kind::SUMMIT;
 	lookout.position = glm::vec3(summit.x, 0.0f, summit.y);
 	lookout.facing = glm::normalize(summit - center);
 	lookout.radius = 7.0f;
+	lookout.level = true;
 	add(lookout);
 
 	//2. The coast in stretches of directions with beaches or cliffs
@@ -335,7 +418,7 @@ void Landmarks::choosePoints(const WorldGenerator& world)
 		}
 		glm::vec2 direction = directionOf(stretch.middle);
 		float distance = coastDistance[stretch.middle] - 9.0f;
-		for (int step = 0; step < 15 && world.naturalHeight(center + direction * distance) < sea + 0.8f; ++step)
+		for (int step = 0; step < 15 && naturalGround(world, center + direction * distance) < sea + 0.8f; ++step)
 		{
 			distance -= 1.0f;
 		}
@@ -361,7 +444,7 @@ void Landmarks::choosePoints(const WorldGenerator& world)
 		}
 		glm::vec2 direction = directionOf(stretch.middle);
 		float distance = coastDistance[stretch.middle] - 13.0f;
-		for (int step = 0; step < 10 && world.naturalHeight(center + direction * distance) < sea + 10.0f; ++step)
+		for (int step = 0; step < 10 && naturalGround(world, center + direction * distance) < sea + 10.0f; ++step)
 		{
 			distance -= 2.0f;
 		}
@@ -380,13 +463,13 @@ void Landmarks::choosePoints(const WorldGenerator& world)
 	//3. A camp on flat ground in the forest and a circle of standing stones on a hill, between the track and the coast
 	const TrackPath& track = world.getPath();
 	auto roughness = [&](glm::vec2 at, float radius) {
-		float middle = world.naturalHeight(at), most = 0.0f;
+		float middle = naturalGround(world, at), most = 0.0f;
 		for (int k = 0; k < 8; ++k)
 		{
 			float angle = 2.0f * PI * static_cast<float>(k) / 8.0f;
 			for (float r : { 0.5f * radius, radius })
 			{
-				most = std::max(most, std::abs(world.naturalHeight(at + r * glm::vec2(std::cos(angle), std::sin(angle))) - middle));
+				most = std::max(most, std::abs(naturalGround(world, at + r * glm::vec2(std::cos(angle), std::sin(angle))) - middle));
 			}
 		}
 		return most;
@@ -394,7 +477,7 @@ void Landmarks::choosePoints(const WorldGenerator& world)
 	auto inForest = [&](glm::vec2 at) {
 		float inland, cliff;
 		world.coast(at, inland, cliff);
-		float h = world.naturalHeight(at);
+		float h = naturalGround(world, at);
 		TrackPath::Nearest nearest = track.nearest(at);
 		return inland > 45.0f && h > sea + 5.0f && h < sea + 26.0f && (!nearest.found || std::abs(nearest.lateral) > nearest.floorHalfWidth + 25.0f)
 			&& world.caveRoofTop(at) < -1000.0f;
@@ -426,12 +509,12 @@ void Landmarks::choosePoints(const WorldGenerator& world)
 				else
 				{
 					//The top of a hill: higher than the ground around it
-					float h = world.naturalHeight(at);
+					float h = naturalGround(world, at);
 					bool top = roughness(at, 7.0f) < 2.5f;
 					for (int k = 0; k < 8 && top; ++k)
 					{
 						float angle = 2.0f * PI * static_cast<float>(k) / 8.0f;
-						top = world.naturalHeight(at + 14.0f * glm::vec2(std::cos(angle), std::sin(angle))) < h - 0.8f;
+						top = naturalGround(world, at + 14.0f * glm::vec2(std::cos(angle), std::sin(angle))) < h - 0.8f;
 					}
 					if (!top)
 					{
@@ -475,7 +558,7 @@ void Landmarks::findPaths(const WorldGenerator& world)
 	for (std::size_t c = 0; c < cellCount; ++c)
 	{
 		glm::vec2 at = grid.position(static_cast<int>(c));
-		float natural = world.naturalHeight(at);
+		float natural = naturalGround(world, at);
 		grid.height[c] = applyLeveling(at, natural);
 		float inland, cliff;
 		world.coast(at, inland, cliff);
@@ -487,6 +570,22 @@ void Landmarks::findPaths(const WorldGenerator& world)
 		if (cliff > 0.3f && inland < 22.0f)
 		{
 			grid.penalty[c] = 30.0f * cliff; //the edge of the cliffs
+		}
+		//Steep ground around the cell (also across the way): a path there would be a ledge under a crag or above a drop
+		float steepest = 0.0f;
+		for (int k = 0; k < 8; ++k)
+		{
+			float angle = PI * static_cast<float>(k) / 4.0f;
+			glm::vec2 direction(std::cos(angle), std::sin(angle));
+			for (float reach : { STEEP_REACH, 2.0f * STEEP_REACH })
+			{
+				steepest = std::max(steepest, std::abs(naturalGround(world, at + reach * direction) - natural) / reach);
+			}
+		}
+		if (steepest > STEEP_SLOPE)
+		{
+			float excess = steepest - STEEP_SLOPE;
+			grid.penalty[c] += 40.0f * excess * excess + 8.0f * excess;
 		}
 		for (const KeepClear& object : world.getKeepClear())
 		{
@@ -500,10 +599,15 @@ void Landmarks::findPaths(const WorldGenerator& world)
 			grid.penalty[c] = FORBIDDEN;
 		}
 		TrackPath::Nearest nearest = track.nearest(at);
-		if (grid.penalty[c] < FORBIDDEN && nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth - 1.0f && natural < nearest.floorHeight + 1.0f
+		if (grid.penalty[c] < FORBIDDEN && steepest < STEEP_SLOPE && nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth - 1.0f && natural < nearest.floorHeight + 1.0f
 			&& nearest.distance > START_CLEARANCE && nearest.distance < track.getLength() - START_CLEARANCE)
 		{
 			grid.network[c] = Grid::TRACK;
+		}
+		else if (grid.penalty[c] < FORBIDDEN && nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth + CANYON_BAND)
+		{
+			//A path climbs out of the canyon of the track, it does not go along its side next to the floor
+			grid.penalty[c] += CANYON_PENALTY;
 		}
 	}
 
@@ -546,13 +650,7 @@ void Landmarks::findPaths(const WorldGenerator& world)
 		float trackCost = std::numeric_limits<float>::max(), pathCost = std::numeric_limits<float>::max();
 		std::vector<int> cells = grid.route(grid.cellOf(target), Grid::TRACK, trackCost);
 		std::vector<int> branch = paths.empty() ? std::vector<int>() : grid.route(grid.cellOf(target), Grid::PATH, pathCost);
-		//A second path from the same place of the track would go next to the first one: it branches off from it instead
-		bool crowded = false;
-		for (const FootPath& other : paths)
-		{
-			crowded = crowded || (other.fromTrack && !cells.empty() && glm::distance(ground(other.points.front()), grid.position(cells.front())) < 25.0f);
-		}
-		if (branch.size() >= 2 && (cells.size() < 2 || crowded || pathCost < 0.6f * trackCost))
+		if (branch.size() >= 2 && (cells.size() < 2 || pathCost < BRANCH_RATIO * trackCost))
 		{
 			cells.swap(branch);
 		}
@@ -570,7 +668,7 @@ void Landmarks::findPaths(const WorldGenerator& world)
 		}
 		line.back() = target;
 		//A branch starts exactly on the path it branches off from
-		float startHeight = world.naturalHeight(line.front());
+		float startHeight = naturalGround(world, line.front());
 		if (!path.fromTrack)
 		{
 			float closest = std::numeric_limits<float>::max();
@@ -608,6 +706,16 @@ void Landmarks::findPaths(const WorldGenerator& world)
 		}
 		heights.front() = startHeight;
 		smoothValues(heights, 4, 4);
+		//On the floor of the track (which the path does not change) it is as high as the floor, so that it does not start with a
+		//step where it leaves the floor (smoothed, the side of the canyon would lift it)
+		for (std::size_t i = 0; i < line.size(); ++i)
+		{
+			TrackPath::Nearest nearest = track.nearest(line[i]);
+			if (nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth + 0.5f)
+			{
+				heights[i] = leveled(world, line[i]);
+			}
+		}
 		for (std::size_t i = 1; i < heights.size(); ++i)
 		{
 			heights[i] = std::min(heights[i], heights[i - 1] + MAX_GRADE);
@@ -627,6 +735,18 @@ void Landmarks::findPaths(const WorldGenerator& world)
 			path.points.push_back(glm::vec3(line[i].x, heights[i], line[i].y));
 		}
 
+		//A second path from the same place of the track would go next to this one: the later paths leave the track elsewhere
+		//(or branch off from this one)
+		if (path.fromTrack)
+		{
+			for (std::size_t c = 0; c < cellCount; ++c)
+			{
+				if (grid.network[c] == Grid::TRACK && glm::distance(grid.position(static_cast<int>(c)), line.front()) < TRAILHEAD_SPACING)
+				{
+					grid.network[c] = Grid::NONE;
+				}
+			}
+		}
 		//The later paths may branch off from this one
 		for (const glm::vec2& p : line)
 		{
@@ -781,7 +901,8 @@ void Landmarks::rasterize(const WorldGenerator& world)
 		TrackPath::Nearest nearest = track.nearest(at);
 		if (nearest.found)
 		{
-			cell.allowed = smoothstep(1.5f, 3.5f, std::abs(nearest.lateral) - nearest.floorHalfWidth);
+			//Right from the edge of the floor: where a path climbs out of the canyon, the wall is cut too (no steep step up)
+			cell.allowed = smoothstep(1.5f, 2.5f, std::abs(nearest.lateral) - nearest.floorHalfWidth);
 		}
 		if (world.caveRoofTop(at) > -1000.0f)
 		{
@@ -822,7 +943,7 @@ Landmarks::Cell Landmarks::cellAt(glm::vec2 position) const
 
 float Landmarks::height(glm::vec2 position, float natural) const
 {
-	float result = applyLeveling(position, natural);
+	float result = applyLeveling(position, applySoftening(position, natural));
 	Cell cell = cellAt(position);
 	if (cell.distance >= REACH)
 	{
@@ -831,7 +952,7 @@ float Landmarks::height(glm::vec2 position, float natural) const
 	//Flat across the middle of the path, the slopes at its sides are wider where it is cut deeper (or filled higher)
 	auto cut = [&](float ground, float distance, float pathHeight) {
 		float depth = std::abs(ground - pathHeight);
-		float shoulder = std::min(1.2f + 0.9f * depth, REACH - PATH_HALF_WIDTH - 0.5f);
+		float shoulder = std::min(1.2f + 1.5f * depth, REACH - PATH_HALF_WIDTH - 0.5f);
 		float weight = 1.0f - smoothstep(0.75f * PATH_HALF_WIDTH, PATH_HALF_WIDTH + shoulder, distance);
 		return glm::mix(ground, pathHeight, weight * cell.allowed);
 	};

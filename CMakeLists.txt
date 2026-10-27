@@ -259,6 +259,10 @@ add_library(bibo_core STATIC
 	BIBO/Scene/HedgehogRenderer.hpp
 	BIBO/Scene/Light.cpp
 	BIBO/Scene/Light.hpp
+	BIBO/Scene/RaccoonModel.cpp
+	BIBO/Scene/RaccoonModel.hpp
+	BIBO/Scene/Raccoon.cpp
+	BIBO/Scene/Raccoon.hpp
 	BIBO/Scene/RaceQuest.cpp
 	BIBO/Scene/RaceQuest.hpp
 	BIBO/Scene/RestingBear.cpp
@@ -271,6 +275,8 @@ add_library(bibo_core STATIC
 	BIBO/Scene/Scene.hpp
 	BIBO/Scene/SceneObject.cpp
 	BIBO/Scene/SceneObject.hpp
+	BIBO/Scene/StonesQuest.cpp
+	BIBO/Scene/StonesQuest.hpp
 	BIBO/Scene/ViewFrustum.cpp
 	BIBO/Scene/ViewFrustum.hpp
 	BIBO/UI/Menu.cpp

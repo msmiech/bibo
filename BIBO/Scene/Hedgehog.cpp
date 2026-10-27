@@ -54,7 +54,8 @@ void Hedgehog::reset()
 	position = glm::vec3(home.x, height, home.y);
 	yaw = std::atan2(startHeading.x, startHeading.y);
 	target = home;
-	walking = false;
+	walking = scurrying = false;
+	bear = glm::vec2(1e9f);
 	waitTime = uniform(0.5f, 3.0f);
 	gaitPhase = stride = time = 0.0f;
 	hopTime = -1.0f;
@@ -66,6 +67,11 @@ void Hedgehog::startle()
 	{
 		hopTime = 0.0f;
 	}
+}
+
+void Hedgehog::watch(glm::vec3 bear)
+{
+	this->bear = glm::vec2(bear.x, bear.z);
 }
 
 void Hedgehog::chooseTarget()
@@ -104,13 +110,34 @@ void Hedgehog::update(float timeDelta)
 		}
 	}
 
+	//The bear comes close: away from it (not too far from home), a bit to the side if straight away is not possible
+	glm::vec2 fromBear = glm::vec2(position.x, position.z) - bear;
+	float bearDistance = glm::length(fromBear);
+	if (!scurrying && hopTime < 0.0f && bearDistance < SHY_DISTANCE && bearDistance > 1e-3f)
+	{
+		glm::vec2 here(position.x, position.z);
+		for (float turn : { 0.0f, 0.6f, -0.6f, 1.2f, -1.2f })
+		{
+			glm::vec2 away = fromBear / bearDistance;
+			away = glm::vec2(away.x * std::cos(turn) - away.y * std::sin(turn), away.x * std::sin(turn) + away.y * std::cos(turn));
+			glm::vec2 candidate = here + away * 2.5f;
+			float height;
+			if (glm::distance(candidate, home) < 1.5f * HOME_RADIUS && ground(candidate, height))
+			{
+				target = candidate;
+				walking = scurrying = true;
+				break;
+			}
+		}
+	}
+
 	if (walking)
 	{
 		glm::vec2 here(position.x, position.z);
 		glm::vec2 toTarget = target - here;
 		if (glm::length(toTarget) < 0.3f)
 		{
-			walking = false;
+			walking = scurrying = false;
 			waitTime = uniform(1.5f, 4.5f); //sniffs around
 		}
 		else
@@ -118,7 +145,13 @@ void Hedgehog::update(float timeDelta)
 			//Turns towards the target, walks slower while it is not looking there
 			float difference = wrapAngle(std::atan2(toTarget.x, toTarget.y) - yaw);
 			yaw = wrapAngle(yaw + std::clamp(difference, -TURN_RATE * timeDelta, TURN_RATE * timeDelta));
-			float speed = WALK_SPEED * std::clamp(std::cos(difference), 0.0f, 1.0f);
+			float speed = WALK_SPEED * (scurrying ? SCURRY_FACTOR : 1.0f) * std::clamp(std::cos(difference), 0.0f, 1.0f);
+			if (scurrying)
+			{
+				//Turns twice as fast
+				float rest = wrapAngle(std::atan2(toTarget.x, toTarget.y) - yaw);
+				yaw = wrapAngle(yaw + std::clamp(rest, -TURN_RATE * timeDelta, TURN_RATE * timeDelta));
+			}
 			glm::vec2 next = here + glm::vec2(std::sin(yaw), std::cos(yaw)) * (speed * timeDelta);
 			float height;
 			if (ground(next, height))
@@ -128,7 +161,7 @@ void Hedgehog::update(float timeDelta)
 			}
 			else
 			{
-				walking = false; //e.g. the edge of the water: it looks for another way
+				walking = scurrying = false; //e.g. the edge of the water: it looks for another way
 				waitTime = uniform(0.5f, 1.5f);
 			}
 		}

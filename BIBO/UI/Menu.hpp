@@ -44,6 +44,8 @@ namespace bibo
 			//Fishing for Mishka: the time, the salmon eaten of all ("2/6") and the points
 			bool fishing = false;
 			std::string fishingTime, salmon, score;
+			//The goal of the quest that is on (e.g. "Explore the stone circle on the hill") and the way there ("120 m" with an arrow)
+			std::string objective, objectiveDetail;
 			//The result of the race or of fishing for a while after it ended (empty: none)
 			std::string banner, bannerDetail;
 			bool bannerSuccess = false;

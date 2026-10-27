@@ -10,6 +10,7 @@ namespace
 	const float TAU = 6.28318531f;
 	const int BEAVER_VARIANTS = 8;
 	const int BEAR_VARIANTS = 6;
+	const int RACCOON_VARIANTS = 6;
 
 	float smooth(float t)
 	{
@@ -138,6 +139,38 @@ namespace
 			samples[i] = std::tanh(1.4f * samples[i] * 0.25f) * envelope * chatter + 0.05f * (noise - low) * envelope;
 		}
 		normalize(samples, 0.55f);
+		return samples;
+	}
+
+	/**
+	* Raccoons chitter and trill: a high, bright voice that quickly rises or falls, broken up by a fast trill, with a hiss of breath
+	*/
+	std::vector<float> raccoon(int sampleRate, int variant)
+	{
+		Random random(static_cast<std::uint32_t>(variant) * 6151u + 41u);
+		float duration = 0.09f + 0.08f * random.next();
+		float base = 820.0f + 420.0f * random.next();
+		float trillRate = 34.0f + 16.0f * random.next();
+		float sweep = random.next() < 0.5f ? 0.35f : -0.25f;
+		std::size_t count = static_cast<std::size_t>(duration * static_cast<float>(sampleRate));
+		std::vector<float> samples(count, 0.0f);
+		addHarmonics(samples, sampleRate, 0, count, 8, [&](float t) { return base * (1.0f + sweep * t / duration) * (1.0f + 0.04f * std::sin(TAU * trillRate * t)); },
+			[&](float frequency, float, int k) {
+				float formants = 0.3f + peak(frequency, 1700.0f, 400.0f) + 0.5f * peak(frequency, 3400.0f, 600.0f);
+				return formants / static_cast<float>(k);
+			});
+		Random breath(static_cast<std::uint32_t>(variant) + 307u);
+		float low = 0.0f;
+		for (std::size_t i = 0; i < count; ++i)
+		{
+			float t = static_cast<float>(i) / static_cast<float>(sampleRate);
+			float envelope = smooth(t / 0.008f) * (1.0f - smooth((t - 0.6f * duration) / (0.4f * duration)));
+			float trill = 0.55f + 0.45f * std::sin(TAU * trillRate * t);
+			float noise = breath.noise();
+			low += (noise - low) * 0.5f;
+			samples[i] = std::tanh(0.4f * samples[i]) * envelope * trill + 0.06f * (noise - low) * envelope;
+		}
+		normalize(samples, 0.5f);
 		return samples;
 	}
 
@@ -317,6 +350,8 @@ int bibo::audio::soundEffectVariants(SoundEffect effect)
 		return BEAVER_VARIANTS;
 	case SoundEffect::BEAR:
 		return BEAR_VARIANTS;
+	case SoundEffect::RACCOON:
+		return RACCOON_VARIANTS;
 	default:
 		return 1;
 	}
@@ -330,6 +365,8 @@ std::vector<float> bibo::audio::synthesizeSoundEffect(SoundEffect effect, int va
 		return beaver(sampleRate, std::clamp(variant, 0, BEAVER_VARIANTS - 1));
 	case SoundEffect::BEAR:
 		return bear(sampleRate, std::clamp(variant, 0, BEAR_VARIANTS - 1));
+	case SoundEffect::RACCOON:
+		return raccoon(sampleRate, std::clamp(variant, 0, RACCOON_VARIANTS - 1));
 	case SoundEffect::COUNTDOWN:
 	{
 		std::vector<float> samples(static_cast<std::size_t>(0.35f * static_cast<float>(sampleRate)), 0.0f);

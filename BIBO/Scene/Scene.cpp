@@ -4,8 +4,10 @@
 #include <iostream>
 #include <limits>
 #include "BeaverModel.hpp"
+#include "RaccoonModel.hpp"
 #include "../Util/Console.hpp"
 #include "../Util/Input.hpp"
+#include "../World/Landmarks.hpp"
 #include "../World/MaterialTextures.hpp"
 #include "../World/TrackTerrain.hpp"
 
@@ -40,6 +42,20 @@ namespace
 	const float MISHKA_ATTENTION_DISTANCE = 12.0f;
 	//The bear pushes the plants aside within this distance of the center of its capsule (about down to its paws)
 	const float BEAR_FOLIAGE_RADIUS = 1.3f;
+	//Chonk is a well fed raccoon
+	const float CHONK_GIRTH = 1.45f;
+	const std::size_t CHONK_FUR_COUNT = 16000, FAN_FUR_COUNT = 9000;
+	//The bear talks to Chonk from a bit closer than to the others (it is smaller), it inspects the flat stone from closer still
+	const float CHONK_SPACING = 3.2f, STONE_SPACING = 2.4f;
+	//The exclamation mark above the stone circle (the goal of the stones quest) is larger, to be seen from afar
+	const float GOAL_MARKER_SCALE = 1.8f, GOAL_MARKER_HEIGHT = 3.2f;
+	//The raccoons go on cheering this long after a quest was completed
+	const float CHEER_LINGER = 4.5f;
+	//Where the raccoons that cheer stand: ahead of the bear and beside its way (in the canyon of the track also up on its rim);
+	//they come from this far further out
+	const float FAN_AHEAD_MIN = 8.0f, FAN_AHEAD_MAX = 24.0f, FAN_SIDE_MIN = 4.5f, FAN_SIDE_MAX = 16.0f, FAN_WOODS_MIN = 9.0f, FAN_WOODS_MAX = 14.0f;
+	//Hidden raccoons are drawn far under the island (out of every view)
+	const vec3 HIDDEN_PLACE(0.0f, -1000.0f, 0.0f);
 
 	//The vertices of the meshes of a geometry in model space (the model matrix is not applied)
 	vector<vec3> modelVertices(Geometry* geometry)
@@ -124,6 +140,7 @@ Scene::Scene(GLFWwindow* window, Shader* shader, physics::PhysicsWorld* physicsW
 	initAnimals();
 	initQuest();
 	initMishka();
+	initChonk();
 	camera->snapBehind(cameraTarget());
 	world->finishLoading(camera->getPosition(), bear->getPosition(), WORLD_LOADING_TIMEOUT);
 	placeAnimals();
@@ -262,6 +279,238 @@ void Scene::initMishka()
 	cout << "Mishka lies at pool " << mishkaPool + 1 << " of " << salmon->getPools().size() << endl;
 }
 
+void Scene::initChonk()
+{
+	const world::WorldGenerator& generator = world->getGenerator();
+	const world::Landmarks& landmarks = generator.getLandmarks();
+	const vector<world::PointOfInterest>& points = landmarks.getPointsOfInterest();
+	const vector<world::FootPath>& paths = landmarks.getPaths();
+	int stones = -1;
+	for (std::size_t i = 0; i < points.size(); ++i)
+	{
+		stones = points[i].kind == world::PointOfInterest::Kind::STANDING_STONES ? static_cast<int>(i) : stones;
+	}
+	if (stones < 0)
+	{
+		util::fatalError("The island has no circle of standing stones for Chonk's quest");
+	}
+	stonesCenter = points[stones].position;
+	stonesRadius = points[stones].radius;
+
+	//The path to the stones, back along the paths it branches off from to the one that leaves the track: Chonk sits at its
+	//trailhead, across the path from the cairn, looking at the path
+	int path = -1;
+	for (std::size_t p = 0; p < paths.size(); ++p)
+	{
+		path = paths[p].pointOfInterest == stones ? static_cast<int>(p) : path;
+	}
+	for (int step = 0; path >= 0 && !paths[path].fromTrack && step < static_cast<int>(paths.size()); ++step)
+	{
+		vec2 start(paths[path].points.front().x, paths[path].points.front().z);
+		int parent = -1;
+		for (int p = 0; p < path && parent < 0; ++p)
+		{
+			for (const vec3& point : paths[p].points)
+			{
+				parent = distance(vec2(point.x, point.z), start) < 0.05f ? p : parent;
+			}
+		}
+		path = parent;
+	}
+	if (path < 0 || static_cast<std::size_t>(path) >= landmarks.getMarkers().size())
+	{
+		util::fatalError("There is no foot path from the track to the standing stones for Chonk");
+	}
+	const vector<vec3>& line = paths[path].points;
+	vec2 cairn(landmarks.getMarkers()[path].x, landmarks.getMarkers()[path].z);
+	std::size_t marked = 0;
+	for (std::size_t i = 0; i < line.size(); ++i)
+	{
+		marked = distance(vec2(line[i].x, line[i].z), cairn) < distance(vec2(line[marked].x, line[marked].z), cairn) ? i : marked;
+	}
+	vec3 seat(0.0f), look(0.0f);
+	bool found = false;
+	const world::TrackPath& track = generator.getPath();
+	for (int offset = 0; offset < 12 && !found; ++offset)
+	{
+		std::size_t i = std::min(line.size() - 2, marked + static_cast<std::size_t>(offset));
+		vec2 middle(line[i].x, line[i].z);
+		vec2 along = normalize(vec2(line[i + 1].x, line[i + 1].z) - middle);
+		vec2 across(-along.y, along.x);
+		//On the other side than the cairn first
+		float away = dot(cairn - middle, across) > 0.0f ? -1.0f : 1.0f;
+		for (float side : { away, -away })
+		{
+			vec2 at = middle + across * (side * (world::Landmarks::PATH_HALF_WIDTH + 2.4f));
+			float height, east, north;
+			world::TrackPath::Nearest nearest = track.nearest(at);
+			bool beside = !nearest.found || std::abs(nearest.trailLateral) > world::TrackPath::TRAIL_HALF_WIDTH + 2.0f;
+			if (beside && raccoonGround(at, height) && raccoonGround(at + vec2(0.8f, 0.0f), east) && raccoonGround(at + vec2(0.0f, 0.8f), north)
+				&& std::abs(east - height) < 0.5f && std::abs(north - height) < 0.5f)
+			{
+				seat = vec3(at.x, height, at.y);
+				//Looks across the path, a bit towards the track
+				vec2 back(line[std::max<std::size_t>(i, 4) - 4].x - middle.x, line[std::max<std::size_t>(i, 4) - 4].z - middle.y);
+				vec2 facing = (middle - at) + 0.5f * (length(back) > 1e-3f ? normalize(back) : vec2(0.0f)) * length(middle - at);
+				look = vec3(facing.x, 0.0f, facing.y);
+				found = true;
+				break;
+			}
+		}
+	}
+	if (!found)
+	{
+		util::fatalError("There is no place for Chonk at the trailhead of the paths");
+	}
+	Raccoon::Ground ground = [this](vec2 at, float& height) { return raccoonGround(at, height); };
+	chonk = make_unique<Raccoon>(ground, 2024u, CHONK_GIRTH);
+	chonk->sitAt(seat, look);
+	chonkBody = physicsWorld->createKinematicSphere(chonk->getColliderCenter(), chonk->getColliderRadius());
+	FurryRenderer::Strands strands;
+	strands.furCount = CHONK_FUR_COUNT;
+	strands.furSeed = 133;
+	FurryRenderer::Bounds bounds;
+	bounds.center = vec3(0.0f, 0.35f, 0.0f);
+	bounds.radius = 0.8f;
+	chonkRenderer = make_unique<FurryRenderer>(RaccoonModel::build(CHONK_GIRTH), 1, strands, bounds);
+	stonesQuest = make_unique<StonesQuest>();
+
+	fans = make_unique<RaccoonFans>(ground, [this](vec3 bear, vec3 heading, std::mt19937& random, vec2& from, vec2& spot) {
+		return findFanSpot(bear, heading, random, from, spot);
+	});
+	strands.furCount = FAN_FUR_COUNT;
+	strands.furSeed = 177;
+	fansRenderer = make_unique<FurryRenderer>(RaccoonModel::build(), RaccoonFans::COUNT, strands, bounds);
+	cout << "Chonk sits at the trailhead (" << seat.x << ", " << seat.z << "), the standing stones are at (" << stonesCenter.x << ", " << stonesCenter.z << ")" << endl;
+}
+
+bool Scene::raccoonGround(vec2 position, float& height) const
+{
+	const world::WorldGenerator& generator = world->getGenerator();
+	height = generator.height(position);
+	return height > generator.getSeaLevel() + 0.3f && generator.caveRoofTop(position) < -1000.0f;
+}
+
+bool Scene::findFanSpot(vec3 bear, vec3 heading, std::mt19937& random, vec2& from, vec2& spot)
+{
+	const world::WorldGenerator& generator = world->getGenerator();
+	std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+	vec2 forward = normalize(vec2(heading.x, heading.z));
+	vec2 right(-forward.y, forward.x);
+	ViewFrustum frustum = camera->getViewFrustum();
+	//Of the spots that work the one closest to the height of the bear (it sees it there, not only up on the rim of a canyon)
+	float best = numeric_limits<float>::max();
+	for (int attempt = 0; attempt < 16; ++attempt)
+	{
+		float side = unit(random) < 0.5f ? -1.0f : 1.0f;
+		vec2 out = right * side;
+		vec2 at = vec2(bear.x, bear.z) + forward * glm::mix(FAN_AHEAD_MIN, FAN_AHEAD_MAX, unit(random)) + out * glm::mix(FAN_SIDE_MIN, FAN_SIDE_MAX, unit(random));
+		//On level ground (not on the side of the canyon)
+		float height, east, north;
+		if (!raccoonGround(at, height) || !raccoonGround(at + vec2(0.7f, 0.0f), east) || !raccoonGround(at + vec2(0.0f, 0.7f), north)
+			|| std::abs(east - height) > 0.4f || std::abs(north - height) > 0.4f)
+		{
+			continue;
+		}
+		//Not on the trail of the race (the raccoons have no collision, the bear would run through them)
+		world::TrackPath::Nearest nearest = generator.getPath().nearest(at);
+		if (nearest.found && std::abs(nearest.trailLateral) < world::TrackPath::TRAIL_HALF_WIDTH + 1.5f)
+		{
+			continue;
+		}
+		float turn = (unit(random) - 0.5f) * 0.8f;
+		vec2 woods = out * std::cos(turn) + forward * std::sin(turn);
+		vec2 start = at + woods * glm::mix(FAN_WOODS_MIN, FAN_WOODS_MAX, unit(random));
+		float startHeight;
+		if (!raccoonGround(start, startHeight))
+		{
+			continue;
+		}
+		//It can walk all the way (on land, not too steep)
+		bool walkable = true;
+		float last = startHeight;
+		float steps = std::ceil(distance(start, at));
+		for (float k = 1.0f; k <= steps && walkable; k += 1.0f)
+		{
+			float h;
+			walkable = raccoonGround(glm::mix(start, at, k / steps), h) && std::abs(h - last) < 0.9f;
+			last = h;
+		}
+		if (!walkable)
+		{
+			continue;
+		}
+		//Nothing in the way (trees, rocks): a hit is in the way when it is clearly above the ground
+		vec3 high(start.x, startHeight + 0.9f, start.y), low(at.x, height + 0.9f, at.y);
+		physics::RayHit hit;
+		if (physicsWorld->castSphere(high, low - high, 0.3f, hit, true) && hit.position.y > generator.height(vec2(hit.position.x, hit.position.z)) + 0.45f)
+		{
+			continue;
+		}
+		//It comes out of the woods where the camera does not see it appear (out of the view, or behind something)
+		vec3 eye = camera->getPosition();
+		bool unseen = frustum.sphereInFrustum(high, 1.2f) == ViewFrustum::OUTSIDE
+			|| (physicsWorld->castRay(eye, high - eye, hit, true) && hit.fraction < 0.97f);
+		if (!unseen)
+		{
+			continue;
+		}
+		float score = std::abs(height - bear.y) + 0.1f * distance(at, vec2(bear.x, bear.z));
+		if (score < best)
+		{
+			best = score;
+			from = start;
+			spot = at;
+		}
+	}
+	return best < numeric_limits<float>::max();
+}
+
+void Scene::updateTalkPartner()
+{
+	//In a conversation: the one it talks to
+	if (raceQuest->getStage() == RaceQuest::Stage::TALKING)
+	{
+		talkPartner = TalkPartner::BEAVER;
+		return;
+	}
+	if (salmonQuest->getStage() == SalmonQuest::Stage::TALKING)
+	{
+		talkPartner = TalkPartner::MISHKA;
+		return;
+	}
+	if (stonesQuest->getStage() == StonesQuest::Stage::TALKING || stonesQuest->isInspecting())
+	{
+		talkPartner = stonesQuest->isInspecting() ? TalkPartner::STONES : TalkPartner::CHONK;
+		return;
+	}
+	//Otherwise the closest one it could talk to
+	struct Candidate
+	{
+		TalkPartner partner;
+		bool possible;
+		vec3 position;
+	};
+	const Candidate candidates[] = {
+		{ TalkPartner::BEAVER, raceQuest->canTalk(), beaver->getPosition() },
+		{ TalkPartner::MISHKA, salmonQuest->canTalk(), mishka->getPosition() },
+		{ TalkPartner::CHONK, stonesQuest->canTalk(), chonk->getPosition() },
+		{ TalkPartner::STONES, stonesQuest->canInspect(), stonesCenter },
+	};
+	talkPartner = TalkPartner::NONE;
+	float closest = numeric_limits<float>::max();
+	vec3 here = bear->getPosition();
+	for (const Candidate& candidate : candidates)
+	{
+		float away = length(vec2(candidate.position.x - here.x, candidate.position.z - here.z));
+		if (candidate.possible && away < closest)
+		{
+			closest = away;
+			talkPartner = candidate.partner;
+		}
+	}
+}
+
 vec3 Scene::groundAt(vec3 position) const
 {
 	return vec3(position.x, world->getGenerator().height(vec2(position.x, position.z)), position.z);
@@ -286,11 +535,11 @@ RaceQuest::Situation Scene::questSituation(const input::PlayerInput& player)
 	RaceQuest::Situation situation;
 	situation.bear = bear->getPosition();
 	situation.nearBeaver = canTalkAt(beaver->getPosition(), RaceQuest::TALK_DISTANCE);
-	situation.busy = salmonQuest->isActive();
+	situation.busy = salmonQuest->isActive() || stonesQuest->isActive();
 	situation.swimming = isBearInWater();
 	situation.onTrack = RaceQuest::isOnTrack(world->getGenerator().getPath(), situation.bear);
 	situation.atStart = atStart;
-	situation.interact = player.interact;
+	situation.interact = player.interact && talkPartner == TalkPartner::BEAVER;
 	situation.dialog.confirm = player.confirm;
 	situation.dialog.navigate = player.navigate;
 	situation.dialog.cancel = player.cancel;
@@ -301,10 +550,25 @@ SalmonQuest::Situation Scene::salmonSituation(const input::PlayerInput& player)
 {
 	SalmonQuest::Situation situation;
 	situation.nearMishka = canTalkAt(mishka->getPosition(), SalmonQuest::TALK_DISTANCE);
-	situation.busy = raceQuest->getStage() != RaceQuest::Stage::IDLE;
+	situation.busy = raceQuest->getStage() != RaceQuest::Stage::IDLE || stonesQuest->isActive();
 	situation.eatenPool = eatenPool;
 	eatenPool = -1;
-	situation.interact = player.interact;
+	situation.interact = player.interact && talkPartner == TalkPartner::MISHKA;
+	situation.dialog.confirm = player.confirm;
+	situation.dialog.navigate = player.navigate;
+	situation.dialog.cancel = player.cancel;
+	return situation;
+}
+
+StonesQuest::Situation Scene::stonesSituation(const input::PlayerInput& player)
+{
+	StonesQuest::Situation situation;
+	situation.nearChonk = canTalkAt(chonk->getPosition(), StonesQuest::TALK_DISTANCE);
+	vec3 offset = stonesCenter - bear->getPosition();
+	situation.atStones = length(vec2(offset.x, offset.z)) < stonesRadius;
+	situation.nearStone = canTalkAt(stonesCenter, StonesQuest::INSPECT_DISTANCE);
+	situation.busy = raceQuest->getStage() != RaceQuest::Stage::IDLE || salmonQuest->isActive();
+	situation.interact = player.interact && (talkPartner == TalkPartner::CHONK || talkPartner == TalkPartner::STONES);
 	situation.dialog.confirm = player.confirm;
 	situation.dialog.navigate = player.navigate;
 	situation.dialog.cancel = player.cancel;
@@ -347,15 +611,30 @@ BearInput Scene::bearInput(const input::PlayerInput& player)
 		return input;
 	}
 	jumpBlocked = true;
-	if (stage == RaceQuest::Stage::TALKING || salmonQuest->getStage() == SalmonQuest::Stage::TALKING)
+	if (talkPartner != TalkPartner::NONE && !(stage == RaceQuest::Stage::WALKING_TO_START || stage == RaceQuest::Stage::COUNTDOWN))
 	{
-		//It turns to the animal it talks to and steps back a little if it came too close
-		vec3 partner = stage == RaceQuest::Stage::TALKING ? beaver->getPosition() : mishka->getPosition();
+		//It turns to the animal it talks to (or the flat stone), steps back a little if it came too close and walks up to it
+		//if it is too far away, so that they talk face to face
+		vec3 partner = bear->getPosition();
+		float spacing = TALK_SPACING;
+		switch (talkPartner)
+		{
+		case TalkPartner::BEAVER: partner = beaver->getPosition(); break;
+		case TalkPartner::MISHKA: partner = mishka->getPosition(); break;
+		case TalkPartner::CHONK: partner = chonk->getPosition(); spacing = CHONK_SPACING; break;
+		case TalkPartner::STONES: partner = stonesCenter; spacing = STONE_SPACING; break;
+		case TalkPartner::NONE: break;
+		}
 		vec3 toPartner = partner - bear->getPosition();
+		float away = length(vec2(toPartner.x, toPartner.z));
 		bool facing = turnTowards(toPartner, input);
-		if (facing && length(vec2(toPartner.x, toPartner.z)) < TALK_SPACING - 0.2f)
+		if (facing && away < spacing - 0.2f)
 		{
 			input.forward = -0.35f;
+		}
+		else if (facing && away > spacing + 0.6f)
+		{
+			input.forward = std::clamp(0.3f * (away - spacing), 0.15f, 0.35f);
 		}
 	}
 	else if (stage == RaceQuest::Stage::WALKING_TO_START)
@@ -379,12 +658,20 @@ BearInput Scene::bearInput(const input::PlayerInput& player)
 void Scene::updateCamera(float time_delta)
 {
 	RaceQuest::Stage stage = raceQuest->getStage();
-	bool talkingToMishka = salmonQuest->getStage() == SalmonQuest::Stage::TALKING;
-	if (camera->isLocked() && (stage == RaceQuest::Stage::TALKING || talkingToMishka))
+	bool talking = stage == RaceQuest::Stage::TALKING || salmonQuest->getStage() == SalmonQuest::Stage::TALKING
+		|| stonesQuest->getStage() == StonesQuest::Stage::TALKING || stonesQuest->isInspecting();
+	if (camera->isLocked() && talking)
 	{
 		//Both from the side, a bit behind the bear (the animal it talks to faces the camera), from the side with more room
 		vec3 bearHead = bear->getPosition() + UP * 0.4f;
-		vec3 partnerHead = talkingToMishka ? mishka->getFacePosition() : beaver->getHeadPosition();
+		vec3 partnerHead = beaver->getHeadPosition();
+		switch (talkPartner)
+		{
+		case TalkPartner::MISHKA: partnerHead = mishka->getFacePosition(); break;
+		case TalkPartner::CHONK: partnerHead = chonk->getFacePosition(); break;
+		case TalkPartner::STONES: partnerHead = stonesCenter + UP * 0.8f; break;
+		default: break;
+		}
 		vec3 across = partnerHead - bearHead;
 		across.y = 0.0f;
 		across = length(across) > 1e-3f ? normalize(across) : START_DIRECTION;
@@ -432,6 +719,10 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 		}
 	}
 
+	markerTime += time_delta;
+	//The button starts a conversation with the closest animal only
+	updateTalkPartner();
+
 	//The race quest: the conversation with the beaver, the cutscene, the countdown and the race
 	raceQuest->update(time_delta, questSituation(player));
 	for (RaceQuest::Event event : raceQuest->takeEvents())
@@ -443,6 +734,15 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 		else if (event == RaceQuest::Event::ACCEPTED || event == RaceQuest::Event::COMPLETED)
 		{
 			beaver->cheer();
+		}
+		//The raccoons beside the track cheer at every checkpoint and at the finish
+		if (event == RaceQuest::Event::CHECKPOINT || event == RaceQuest::Event::COMPLETED)
+		{
+			fans->celebrate();
+		}
+		if (event == RaceQuest::Event::COMPLETED)
+		{
+			cheerLinger = CHEER_LINGER;
 		}
 		events.push_back(event);
 	}
@@ -461,16 +761,20 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 	}
 	lastStage = stage;
 	beaver->setTalking(raceQuest->getDialog().isOpen());
-	//During the race Mishka is no obstacle (it lies beside the route, but a racer may cut close past it)
+	//During the race Mishka and Chonk are no obstacles (they are beside the route, but a racer may cut close past them)
 	bool racing = stage != RaceQuest::Stage::IDLE;
-	if (racing && mishkaBody != physics::INVALID_BODY)
+	for (auto [body, animal] : { std::pair<physics::BodyHandle*, vec4>(&mishkaBody, vec4(mishka->getColliderCenter(), mishka->getColliderRadius())),
+		std::pair<physics::BodyHandle*, vec4>(&chonkBody, vec4(chonk->getColliderCenter(), chonk->getColliderRadius())) })
 	{
-		physicsWorld->removeBody(mishkaBody);
-		mishkaBody = physics::INVALID_BODY;
-	}
-	else if (!racing && mishkaBody == physics::INVALID_BODY)
-	{
-		mishkaBody = physicsWorld->createKinematicSphere(mishka->getColliderCenter(), mishka->getColliderRadius());
+		if (racing && *body != physics::INVALID_BODY)
+		{
+			physicsWorld->removeBody(*body);
+			*body = physics::INVALID_BODY;
+		}
+		else if (!racing && *body == physics::INVALID_BODY)
+		{
+			*body = physicsWorld->createKinematicSphere(vec3(animal), animal.w);
+		}
 	}
 
 	//Fishing for Mishka: the conversation and the salmon the bear eats up
@@ -481,21 +785,44 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 		{
 			mishka->speak();
 		}
+		//The raccoons cheer for every salmon of the quest
+		if (event == SalmonQuest::Event::EATEN || event == SalmonQuest::Event::COMPLETED)
+		{
+			fans->celebrate();
+		}
+		if (event == SalmonQuest::Event::COMPLETED)
+		{
+			cheerLinger = CHEER_LINGER;
+		}
 		salmonEvents.push_back(event);
 	}
 
-	//The bear looks at the animal it talks to (and when it comes to talk), the beaver and Mishka look at the bear when it is close
-	if (stage == RaceQuest::Stage::TALKING || raceQuest->canTalk())
+	//The standing stones for Chonk: the conversations, the stone circle and the report
+	stonesQuest->update(time_delta, stonesSituation(player));
+	for (StonesQuest::Event event : stonesQuest->takeEvents())
 	{
-		bear->getCharacter().lookAt(beaver->getFacePosition());
+		if (event == StonesQuest::Event::CHONK_SOUND)
+		{
+			chonk->speak();
+			++raccoonChatters;
+		}
+		else if (event == StonesQuest::Event::ACCEPTED || event == StonesQuest::Event::COMPLETED)
+		{
+			chonk->cheer();
+		}
+		stonesEvents.push_back(event);
 	}
-	else if (salmonQuest->getStage() == SalmonQuest::Stage::TALKING || salmonQuest->canTalk())
+	const Dialog& stonesDialog = stonesQuest->getDialog();
+	chonk->setTalking(stonesDialog.isOpen() && stonesDialog.getSpeaker() == StonesQuest::SPEAKER);
+
+	//The bear looks at the animal it talks to (and the one it would talk to), the animals look at the bear when it is close
+	switch (talkPartner)
 	{
-		bear->getCharacter().lookAt(mishka->getFacePosition());
-	}
-	else
-	{
-		bear->getCharacter().stopLooking();
+	case TalkPartner::BEAVER: bear->getCharacter().lookAt(beaver->getFacePosition()); break;
+	case TalkPartner::MISHKA: bear->getCharacter().lookAt(mishka->getFacePosition()); break;
+	case TalkPartner::CHONK: bear->getCharacter().lookAt(chonk->getFacePosition()); break;
+	case TalkPartner::STONES: bear->getCharacter().lookAt(stonesCenter + UP * 0.3f); break;
+	case TalkPartner::NONE: bear->getCharacter().stopLooking(); break;
 	}
 	bear->setInput(bearInput(player));
 
@@ -518,6 +845,14 @@ void Scene::update(float time_delta, const input::PlayerInput& player) {
 	bodies.push_back({ bear->getCharacter().getPosition(), BEAR_FOLIAGE_RADIUS });
 	bodies.push_back({ beaver->getColliderCenter(), beaver->getColliderRadius() });
 	bodies.push_back({ mishka->getColliderCenter(), mishka->getColliderRadius() });
+	bodies.push_back({ chonk->getColliderCenter(), chonk->getColliderRadius() });
+	for (const Raccoon& fan : fans->getRaccoons())
+	{
+		if (fan.isVisible())
+		{
+			bodies.push_back({ fan.getColliderCenter(), 0.8f * fan.getColliderRadius() });
+		}
+	}
 	for (const Hedgehog& hedgehog : hedgehogs)
 	{
 		bodies.push_back({ hedgehog.getColliderCenter(), hedgehog.getColliderRadius() });
@@ -540,6 +875,20 @@ vector<SalmonQuest::Event> Scene::takeSalmonEvents()
 	return result;
 }
 
+vector<StonesQuest::Event> Scene::takeStonesEvents()
+{
+	vector<StonesQuest::Event> result;
+	result.swap(stonesEvents);
+	return result;
+}
+
+int Scene::takeRaccoonChatters()
+{
+	int result = raccoonChatters;
+	raccoonChatters = 0;
+	return result;
+}
+
 int Scene::takeSplashes()
 {
 	int result = splashes;
@@ -550,9 +899,11 @@ int Scene::takeSplashes()
 void Scene::updateAnimals(float time_delta)
 {
 	//The hedgehogs stroll around, their collision spheres follow them (in the next update of the physics)
+	//They scurry away when the bear comes close
 	vector<fur::SphereCollider> obstacles;
 	for (std::size_t i = 0; i < hedgehogs.size(); ++i)
 	{
+		hedgehogs[i].watch(bear->getPosition());
 		hedgehogs[i].update(time_delta);
 		physicsWorld->moveKinematic(hedgehogBodies[i], hedgehogs[i].getColliderCenter(), quat(1.0f, 0.0f, 0.0f, 0.0f), time_delta);
 		obstacles.push_back({ hedgehogs[i].getColliderCenter(), hedgehogs[i].getColliderRadius() + SPINE_LENGTH });
@@ -562,6 +913,23 @@ void Scene::updateAnimals(float time_delta)
 	//The beaver at the start turns to the bear and looks at its face
 	beaver->update(time_delta, bear->getCharacter().getHeadPosition());
 	physicsWorld->moveKinematic(beaverBody, beaver->getColliderCenter(), quat(1.0f, 0.0f, 0.0f, 0.0f), time_delta);
+
+	//Chonk sits at the trailhead. On the race and while fishing raccoons come out of the woods to cheer (and for a while after
+	//a quest was completed).
+	vec3 bearHead = bear->getCharacter().getHeadPosition();
+	chonk->update(time_delta, bearHead);
+	raccoonChatters += chonk->takeChatters();
+	if (chonkBody != physics::INVALID_BODY)
+	{
+		physicsWorld->moveKinematic(chonkBody, chonk->getColliderCenter(), quat(1.0f, 0.0f, 0.0f, 0.0f), time_delta);
+	}
+	cheerLinger = std::max(0.0f, cheerLinger - time_delta);
+	bool cheering = raceQuest->getStage() == RaceQuest::Stage::RACING || salmonQuest->getStage() == SalmonQuest::Stage::FISHING || cheerLinger > 0.0f;
+	vec3 heading = bear->getCharacter().getVelocity();
+	heading.y = 0.0f;
+	heading = length(heading) > 1.0f ? normalize(heading) : bear->getDirection();
+	fans->update(time_delta, cheering, bear->getPosition(), bearHead, heading);
+	raccoonChatters += fans->takeChatters();
 
 	//Salmon jump out of the water when the bear comes close and it catches them. Not during the race (the bear has no time
 	//to eat), on the salmon quest not out of the pools that are done.
@@ -671,6 +1039,31 @@ void Scene::placeAnimals()
 		CreatureModel marker = salmonQuest->hasCompleted() ? CreatureModel::QUEST_MARKER_REPEATABLE : CreatureModel::QUEST_MARKER;
 		creatures->add(marker, mishka->getMarkerPosition(), mishka->getMarkerRotation(), MARKER_SCALE);
 	}
+
+	//Chonk offers its quest and waits for the report (the mark above it), a large mark shows the way to the stone circle
+	chonkRenderer->setPose(0, chonk->getPose());
+	if (stonesQuest->isOffered() || stonesQuest->hasReport())
+	{
+		creatures->add(CreatureModel::QUEST_MARKER, chonk->getMarkerPosition(), chonk->getMarkerRotation(), MARKER_SCALE);
+	}
+	if (stonesQuest->getStage() == StonesQuest::Stage::EXPLORING)
+	{
+		float bob = 0.15f * std::sin(2.0f * markerTime);
+		creatures->add(CreatureModel::QUEST_MARKER, stonesCenter + UP * (GOAL_MARKER_HEIGHT + bob), chonk->getMarkerRotation(), GOAL_MARKER_SCALE);
+	}
+	const vector<Raccoon>& raccoons = fans->getRaccoons();
+	for (std::size_t i = 0; i < raccoons.size(); ++i)
+	{
+		vector<mat4> pose = raccoons[i].getPose();
+		if (!raccoons[i].isVisible())
+		{
+			for (mat4& part : pose)
+			{
+				part = glm::translate(mat4(1.0f), HIDDEN_PLACE) * glm::scale(mat4(1.0f), vec3(Raccoon::SCALE));
+			}
+		}
+		fansRenderer->setPose(i, pose);
+	}
 }
 
 Camera::FollowTarget Scene::cameraTarget()
@@ -711,6 +1104,13 @@ void Scene::restart()
 	splashes = 0;
 	beaver->reset();
 	physicsWorld->moveKinematic(beaverBody, beaver->getColliderCenter(), quat(1.0f, 0.0f, 0.0f, 0.0f), 0.0f);
+	stonesQuest->abort();
+	stonesEvents.clear();
+	chonk->reset();
+	fans->reset();
+	cheerLinger = 0.0f;
+	raccoonChatters = 0;
+	talkPartner = TalkPartner::NONE;
 	placeAnimals();
 }
 
@@ -753,6 +1153,11 @@ void Scene::drawShadowCasters(const render::ShadowCascade& cascade)
 	glUniformMatrix4fv(depthShader->getUniformLocation("lightSpaceMatrix"), 1, GL_FALSE, value_ptr(cascade.lightSpace));
 	hedgehogRenderer->drawSurfaces(depthShader.get());
 	beaverRenderer->drawSurfaces(depthShader.get());
+	chonkRenderer->drawSurfaces(depthShader.get());
+	if (std::any_of(fans->getRaccoons().begin(), fans->getRaccoons().end(), [](const Raccoon& fan) { return fan.isVisible(); }))
+	{
+		fansRenderer->drawSurfaces(depthShader.get());
+	}
 	if (cascade.contains(mishka->getBoundsCenter(), mishka->getBoundsRadius()))
 	{
 		uploadMishka();
@@ -813,6 +1218,8 @@ void Scene::drawMain(const render::RenderSettings& settings)
 	}
 	hedgehogRenderer->drawShaded(context, frustum);
 	beaverRenderer->drawShaded(context, frustum);
+	chonkRenderer->drawShaded(context, frustum);
+	fansRenderer->drawShaded(context, frustum);
 	if (!viewFrustumCullingEnabled || frustum.sphereInFrustum(mishka->getBoundsCenter(), mishka->getBoundsRadius()) != ViewFrustum::OUTSIDE)
 	{
 		uploadMishka();

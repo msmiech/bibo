@@ -59,7 +59,7 @@ void applyGraphicsSettings();
 bool pauseGame();
 void resumeGame();
 void restartGame();
-void playSounds(const vector<SalmonQuest::Event>& salmonEvents);
+void playSounds(const vector<SalmonQuest::Event>& salmonEvents, const vector<StonesQuest::Event>& stonesEvents);
 void updateHud();
 void onMenuAction(ui::MenuAction action);
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -107,6 +107,7 @@ unique_ptr<Scene> gameScene;
 unique_ptr<audio::MusicPlayer> music;
 unsigned int beaverSound = 0; //the beaver does not make the same sound twice in a row
 unsigned int bearSound = 0; //neither does Mishka
+unsigned int raccoonSound = 0; //nor the raccoons
 //Shadow maps, HDR image, bloom, auto exposure and tone mapping
 unique_ptr<render::Renderer> renderer;
 
@@ -816,7 +817,21 @@ void gameLoop()
 					messageTimeLeft = 3;
 				}
 			}
-			playSounds(salmonEvents);
+			vector<StonesQuest::Event> stonesEvents = gameScene->takeStonesEvents();
+			for (StonesQuest::Event event : stonesEvents)
+			{
+				if (event == StonesQuest::Event::ARRIVED)
+				{
+					lastMessage = "You found the stone circle! Inspect the flat stone in the middle.";
+					messageTimeLeft = 4;
+				}
+				else if (event == StonesQuest::Event::INSPECTED)
+				{
+					lastMessage = string("Go back and tell ") + StonesQuest::SPEAKER + " what is happening at the stones.";
+					messageTimeLeft = 4;
+				}
+			}
+			playSounds(salmonEvents, stonesEvents);
 		}
 		updateHud();
 		//Do drawing of game here
@@ -868,10 +883,11 @@ void update(float time_delta) {
 }
 
 //The sounds of what happened in the scene
-void playSounds(const vector<SalmonQuest::Event>& salmonEvents)
+void playSounds(const vector<SalmonQuest::Event>& salmonEvents, const vector<StonesQuest::Event>& stonesEvents)
 {
 	vector<RaceQuest::Event> events = gameScene->takeEvents();
 	int splashes = gameScene->takeSplashes();
+	int chatters = gameScene->takeRaccoonChatters();
 	if (!music)
 	{
 		return;
@@ -923,6 +939,26 @@ void playSounds(const vector<SalmonQuest::Event>& salmonEvents)
 			break;
 		}
 	}
+	for (StonesQuest::Event event : stonesEvents)
+	{
+		switch (event)
+		{
+		case StonesQuest::Event::ARRIVED:
+			music->play(audio::SoundEffect::CHECKPOINT, 0, 0.7f);
+			break;
+		case StonesQuest::Event::COMPLETED:
+			music->play(audio::SoundEffect::SUCCESS);
+			break;
+		default:
+			break;
+		}
+	}
+	//Chonk chitters while its words appear, the raccoons that cheer when they hop
+	for (int i = 0; i < std::min(chatters, 2); ++i)
+	{
+		raccoonSound += 1 + (raccoonSound * 3u + 2u) % 3u;
+		music->play(audio::SoundEffect::RACCOON, static_cast<int>(raccoonSound % audio::soundEffectVariants(audio::SoundEffect::RACCOON)), 0.7f);
+	}
 	if (splashes > 0)
 	{
 		music->play(audio::SoundEffect::SPLASH, 0, 0.8f);
@@ -930,13 +966,68 @@ void playSounds(const vector<SalmonQuest::Event>& salmonEvents)
 }
 
 /**
-* @return The conversation that is shown: with the beaver or with Mishka (a real conversation before a line in passing)
+* @return The conversation that is shown: with the beaver, Mishka, Chonk or at the stones (a real conversation before a line in passing)
 */
 const Dialog& shownDialog()
 {
-	const Dialog& race = gameScene->getRaceQuest().getDialog();
-	const Dialog& salmon = gameScene->getSalmonQuest().getDialog();
-	return salmon.isOpen() && (!race.isOpen() || (race.isPassing() && !salmon.isPassing())) ? salmon : race;
+	const Dialog* dialogs[] = { &gameScene->getRaceQuest().getDialog(), &gameScene->getSalmonQuest().getDialog(), &gameScene->getStonesQuest().getDialog() };
+	for (const Dialog* dialog : dialogs)
+	{
+		if (dialog->isOpen() && !dialog->isPassing())
+		{
+			return *dialog;
+		}
+	}
+	for (const Dialog* dialog : dialogs)
+	{
+		if (dialog->isOpen())
+		{
+			return *dialog;
+		}
+	}
+	return *dialogs[0];
+}
+
+/**
+* @return What the button does near an animal (or the flat stone), empty if there is nothing to talk to
+*/
+string talkPrompt()
+{
+	switch (gameScene->getTalkPartner())
+	{
+	case Scene::TalkPartner::BEAVER: return string("Talk to ") + RaceQuest::SPEAKER;
+	case Scene::TalkPartner::MISHKA: return string("Talk to ") + SalmonQuest::SPEAKER;
+	case Scene::TalkPartner::CHONK: return string("Talk to ") + StonesQuest::SPEAKER;
+	case Scene::TalkPartner::STONES: return "Inspect the flat stone";
+	case Scene::TalkPartner::NONE: break;
+	}
+	return "";
+}
+
+/**
+* @return Where the goal of the stones quest is: how far and an arrow in its direction, seen from the camera
+*/
+string objectiveWay()
+{
+	const StonesQuest& stones = gameScene->getStonesQuest();
+	vec3 goal = stones.getStage() == StonesQuest::Stage::RETURNING ? gameScene->getChonk().getPosition() : gameScene->getStonesCenter();
+	vec3 offset = goal - gameScene->getBear().getPosition();
+	offset.y = 0.0f;
+	float distance = length(offset);
+	if (distance < 3.0f)
+	{
+		return "";
+	}
+	vec3 forward = gameScene->getCamera().getForward();
+	forward.y = 0.0f;
+	forward = length(forward) > 1e-4f ? normalize(forward) : vec3(0.0f, 0.0f, -1.0f);
+	vec3 right(-forward.z, 0.0f, forward.x);
+	//Clockwise from ahead: up, up right, right, ...
+	float angle = std::atan2(dot(offset, right), dot(offset, forward));
+	const char* const ARROWS[] = { "\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196" };
+	int sector = static_cast<int>(std::floor(angle / (glm::pi<float>() / 4.0f) + 0.5f));
+	sector = ((sector % 8) + 8) % 8;
+	return string(ARROWS[sector]) + "  " + to_string(static_cast<int>(std::round(distance))) + " m";
 }
 
 /**
@@ -951,10 +1042,16 @@ void updateHud()
 	const SalmonQuest& fishing = gameScene->getSalmonQuest();
 	const Dialog& dialog = shownDialog();
 	bool gamepad = controls->hasGamepad();
-	if (quest.canTalk() || fishing.canTalk())
+	const StonesQuest& stones = gameScene->getStonesQuest();
+	hud.prompt = talkPrompt();
+	if (!hud.prompt.empty())
 	{
-		hud.prompt = string("Talk to ") + (quest.canTalk() ? RaceQuest::SPEAKER : SalmonQuest::SPEAKER);
 		hud.promptKey = gamepad ? "X" : "E";
+	}
+	hud.objective = stones.getObjective();
+	if (!hud.objective.empty())
+	{
+		hud.objectiveDetail = objectiveWay();
 	}
 	if (dialog.isOpen())
 	{
@@ -1004,6 +1101,21 @@ void updateHud()
 		{
 			hud.banner = "Stopped fishing";
 			hud.bannerDetail = to_string(fishing.getScore()) + " points. " + again;
+		}
+	}
+	else if (stones.getStage() == StonesQuest::Stage::IDLE && stones.getOutcome() != StonesQuest::Outcome::NONE && stones.getOutcomeAge() < BANNER_TIME
+		&& (quest.getOutcome() == RaceQuest::Outcome::NONE || stones.getOutcomeAge() < quest.getOutcomeAge()))
+	{
+		if (stones.getOutcome() == StonesQuest::Outcome::COMPLETED)
+		{
+			hud.banner = "Quest complete!";
+			hud.bannerSuccess = true;
+			hud.bannerDetail = stones.getReport() == StonesQuest::Report::TRUTH ? "Chonk found its long lost snack stash" : "Chonk will go and see for itself";
+		}
+		else
+		{
+			hud.banner = "Stopped exploring";
+			hud.bannerDetail = string("Talk to ") + StonesQuest::SPEAKER + " to go to the stones again.";
 		}
 	}
 	else if (quest.getStage() == RaceQuest::Stage::IDLE && quest.getOutcomeAge() < BANNER_TIME)
@@ -1283,6 +1395,7 @@ void textRendering()
 		renderText(textShader.get(), "E / Square or X to talk, R to restart", windowWidth / 10.f, windowHeight - 5.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Bober the beaver at the start has a race for you!", windowWidth / 10.f, windowHeight - 6.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 		renderText(textShader.get(), "Mishka at the largest pool wants you to go fishing", windowWidth / 10.f, windowHeight - 7.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
+		renderText(textShader.get(), "Chonk the raccoon at the trailhead wonders about the standing stones", windowWidth / 10.f, windowHeight - 8.f * windowHeight / 10.f, 0.6f, vec3(0.5, 0.8f, 0.2f));
 	}
 	if (settings.showFrameTime)
 	{
@@ -1330,10 +1443,13 @@ void textRendering()
 			}
 			renderText(textShader.get(), choices, windowWidth / 10.f, 2.5f * windowHeight / 10.f, 0.45f, color);
 		}
-		else if (quest.canTalk() || fishing.canTalk())
+		else if (!talkPrompt().empty())
 		{
-			string speaker = quest.canTalk() ? RaceQuest::SPEAKER : SalmonQuest::SPEAKER;
-			renderText(textShader.get(), "E: Talk to " + speaker, windowWidth / 10.f, 3.f * windowHeight / 10.f, 0.45f, color);
+			renderText(textShader.get(), "E: " + talkPrompt(), windowWidth / 10.f, 3.f * windowHeight / 10.f, 0.45f, color);
+		}
+		if (!gameScene->getStonesQuest().getObjective().empty())
+		{
+			renderText(textShader.get(), gameScene->getStonesQuest().getObjective(), windowWidth / 10.f, 2.f * windowHeight / 10.f, 0.5f, color);
 		}
 		if (fishing.isActive())
 		{

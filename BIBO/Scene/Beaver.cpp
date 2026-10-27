@@ -19,6 +19,7 @@ namespace
 	const float NIBBLE_DURATION = 2.4f;
 	const float CHEER_DURATION = 1.0f;
 	const float SLAP_DURATION = 0.7f;
+	const float WAVE_DURATION = 1.6f;
 	//The arms hang a bit forward, raised this far the hands are at the mouth (radians around the shoulder)
 	const float ARM_REST = 0.45f, ARM_AT_MOUTH = 1.95f;
 	//Height of the marker above the head (world units)
@@ -79,7 +80,8 @@ void Beaver::reset()
 	time = 0.0f;
 	talking = false;
 	talkBlend = mouth = nod = 0.0f;
-	mouthTime = nibbleTime = cheerTime = slapTime = -1.0f;
+	mouthTime = nibbleTime = cheerTime = slapTime = waveTime = -1.0f;
+	attentive = false;
 	nextNibble = uniform(2.0f, 5.0f);
 	nextSlap = uniform(7.0f, 12.0f);
 }
@@ -116,7 +118,14 @@ void Beaver::update(float timeDelta, glm::vec3 bear)
 	//Turns to the bear when it is close and looks at it, otherwise it looks along the track and around a bit
 	glm::vec3 toBear = bear - position;
 	float horizontal = glm::length(glm::vec2(toBear.x, toBear.z));
-	bool attentive = horizontal < ATTENTION_DISTANCE && horizontal > 0.1f;
+	bool noticed = horizontal < ATTENTION_DISTANCE && horizontal > 0.1f;
+	//Waves when the bear comes (not when it was just here)
+	if (noticed && !attentive && !talking && cheerTime < 0.0f)
+	{
+		waveTime = 0.0f;
+		nibbleTime = -1.0f;
+	}
+	attentive = noticed;
 	float wantedYaw = attentive ? std::atan2(toBear.x, toBear.z) : std::atan2(homeDirection.x, homeDirection.z);
 	float turn = wrapAngle(wantedYaw - yaw);
 	yaw = wrapAngle(yaw + std::clamp(turn, -TURN_RATE * timeDelta, TURN_RATE * timeDelta));
@@ -160,7 +169,7 @@ void Beaver::update(float timeDelta, glm::vec3 bear)
 			nibbleTime = -1.0f;
 		}
 	}
-	else if (!talking && cheerTime < 0.0f)
+	else if (!talking && cheerTime < 0.0f && waveTime < 0.0f)
 	{
 		nextNibble -= timeDelta;
 		if (nextNibble <= 0.0f)
@@ -172,6 +181,14 @@ void Beaver::update(float timeDelta, glm::vec3 bear)
 	float nibble = envelope(nibbleTime, NIBBLE_DURATION, 0.35f);
 	mouth = std::max(sound, nibble * 0.35f * std::abs(std::sin(time * 19.0f)));
 
+	if (waveTime >= 0.0f)
+	{
+		waveTime += timeDelta;
+		if (waveTime > WAVE_DURATION || talking)
+		{
+			waveTime = -1.0f;
+		}
+	}
 	if (cheerTime >= 0.0f)
 	{
 		cheerTime += timeDelta;
@@ -271,8 +288,11 @@ std::vector<glm::mat4> Beaver::getPose() const
 		float sign = side == 0 ? 1.0f : -1.0f;
 		float phase = side == 0 ? 0.0f : 2.2f;
 		float gesture = talkBlend * (0.45f + 0.4f * std::sin(time * 2.9f + phase));
-		float raise = ARM_REST + gesture + (ARM_AT_MOUTH - ARM_REST) * nibble + 2.3f * cheer;
-		float out = talkBlend * 0.25f * (0.5f + 0.5f * std::sin(time * 2.1f + phase)) - 0.3f * nibble + 0.45f * cheer;
+		//It waves with its right paw
+		float wave = side == 1 ? envelope(waveTime, WAVE_DURATION, 0.25f) : 0.0f;
+		float raise = ARM_REST + gesture + (ARM_AT_MOUTH - ARM_REST) * nibble + 2.3f * cheer + 2.0f * wave;
+		float out = talkBlend * 0.25f * (0.5f + 0.5f * std::sin(time * 2.1f + phase)) - 0.3f * nibble + 0.45f * cheer
+			+ wave * (0.35f + 0.3f * std::sin(waveTime * 11.0f));
 		glm::vec3 shoulder = BEAVER_SHOULDER * glm::vec3(sign, 1.0f, 1.0f) * SCALE;
 		parts[side == 0 ? BeaverModel::ARM_LEFT : BeaverModel::ARM_RIGHT] = frame * glm::translate(glm::mat4(1.0f), shoulder)
 			* glm::rotate(glm::mat4(1.0f), sign * out, FORWARD) * rotationX(-raise) * scale;

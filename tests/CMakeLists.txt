@@ -25,6 +25,7 @@ add_executable(bibo_tests
 	unit/QuestTest.cpp
 	unit/RagdollTest.cpp
 	unit/SalmonQuestTest.cpp
+	unit/StonesQuestTest.cpp
 	unit/TextureGeneratorTest.cpp
 	unit/ViewFrustumTest.cpp
 	unit/WorldUnitTest.cpp

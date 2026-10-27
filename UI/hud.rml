@@ -17,6 +17,12 @@
 		<div class="details">Salmon {{ salmon }}<span class="separator">|</span>Score {{ score }}</div>
 	</div>
 
+	<!-- The goal of Chonk's quest and the way there at the top -->
+	<div class="objective" data-if="objective != ''">
+		<div class="title">{{ objective }}</div>
+		<div class="details" data-if="objective_detail != ''">{{ objective_detail }}</div>
+	</div>
+
 	<!-- 3, 2, 1, GO! -->
 	<div class="countdown" data-if="countdown != ''" data-class-go="countdown == 'GO!'">{{ countdown }}</div>
 

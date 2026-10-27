@@ -8,7 +8,7 @@
 	<div class="side">
 		<h1 class="title">Bear-In<br/>Bear-Out</h1>
 		<div class="accent"></div>
-		<p class="tagline">Roam the island, swim and catch salmon. Bober the beaver at the start has a race around the track for you, Mishka at the largest pool wants you to go fishing.</p>
+		<p class="tagline">Roam the island, swim and catch salmon. Bober the beaver at the start has a race around the track for you, Mishka at the largest pool wants you to go fishing, and Chonk the raccoon wonders about the standing stones.</p>
 
 		<button autofocus data-event-click="start">Start</button>
 		<button data-event-click="settings">Settings</button>

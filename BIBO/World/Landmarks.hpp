@@ -35,7 +35,8 @@ namespace bibo
 		/**
 		* The points of interest of the island and the foot paths to them. The paths are found in the natural ground: the
 		* cheapest way from the point of interest to the race track or to a path that is already there (so they branch),
-		* where steep steps are expensive (they wind up the hills), the sea, the caves and the cliffs are avoided.
+		* where steep steps are expensive (they wind up the hills) and so is steep ground beside the way (no ledges under crags),
+		* the sea, the caves and the cliffs are avoided. The crags around the summit are worn down a bit.
 		* They are cut into the ground with an even slope (WorldGenerator::height), a bit wider where the cut is deeper.
 		* Deterministic like the rest of the world.
 		*/
@@ -83,7 +84,23 @@ namespace bibo
 			void rasterize(const WorldGenerator& world);
 			float leveled(const WorldGenerator& world, glm::vec2 position) const;
 			float applyLeveling(glm::vec2 position, float height) const;
+			/**
+			* Wears the ground down around a point: the natural ground is blurred, fading out towards the radius
+			*/
+			void soften(const WorldGenerator& world, glm::vec2 center, float radius);
+			float applySoftening(glm::vec2 position, float natural) const;
+			//The natural ground, worn down where it is softened
+			float naturalGround(const WorldGenerator& world, glm::vec2 position) const;
 
+			//The blurred natural ground around a point (on a grid of RASTER_CELL)
+			struct Softened
+			{
+				glm::vec2 center = glm::vec2(0.0f), origin = glm::vec2(0.0f);
+				float radius = 0.0f;
+				int columns = 0; //as many rows
+				std::vector<float> heights;
+			};
+			std::vector<Softened> softened;
 			std::vector<PointOfInterest> points;
 			std::vector<FootPath> paths;
 			std::vector<glm::vec3> markers;

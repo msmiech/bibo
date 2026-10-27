@@ -36,6 +36,17 @@ already configured (`<checkout>/build/_deps/<name>-src`) for each of ASSIMP, CAT
 MINIAUDIO, RMLUI and STB, e.g. `-DFETCHCONTENT_SOURCE_DIR_GLFW=<checkout>/build/_deps/glfw-src` (add `-DCMAKE_CXX_COMPILER=c++ -DCMAKE_C_COMPILER=cc` with LLVM-MinGW).
 A dependency that is new in the branch is not there yet: leave its option out and let CMake download it.
 
+## Format
+The C++ code is in the Google style (`.clang-format`). Format before committing, with the pinned clang-format of the
+pre-commit hook (a different clang-format version may format differently, and the CI checks it):
+
+```bash
+uvx --python 3.13 pre-commit run --all-files    # or only the changed files: --files <file>...
+```
+
+`--python 3.13`: PyYAML, which pre-commit needs, may have no prebuilt package for the newest Python yet.
+Includes are sorted within their group; one that must stay first (`<Jolt/Jolt.h>`) is wrapped in `// clang-format off`/`on`.
+
 ## Tests
 ```bash
 ctest --test-dir build -j4 --output-on-failure      # everything (~30 s with a GPU; [gl] tests are skipped without OpenGL 4.3)

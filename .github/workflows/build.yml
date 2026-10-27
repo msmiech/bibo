@@ -21,6 +21,16 @@ permissions:
   contents: read
 
 jobs:
+  # The code must be formatted like the pre-commit hook does it (.pre-commit-config.yaml, .clang-format)
+  format:
+    name: Code format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the format
+        run: pipx run pre-commit==4.7.0 run --all-files --show-diff-on-failure --color always
+
   linux:
     name: Ubuntu (${{ matrix.name }})
     runs-on: ubuntu-24.04

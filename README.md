@@ -233,6 +233,22 @@ cmake --build build-asan --parallel
 UBSAN_OPTIONS=halt_on_error=1 xvfb-run -a ctest --test-dir build-asan --output-on-failure
 ```
 
+## Code style
+The C++ code is formatted in the [Google C++ style](https://google.github.io/styleguide/cppguide.html) by [clang-format](https://clang.llvm.org/docs/ClangFormat.html) (`.clang-format`).
+A [pre-commit](https://pre-commit.com) hook formats the staged files before every commit, always with the same clang-format version (`.pre-commit-config.yaml`), and the CI checks the format of all files.
+Set it up once per clone (needs Python, e.g. installed with [uv](https://docs.astral.sh/uv/)):
+
+```bash
+uv tool install --python 3.13 pre-commit
+pre-commit install
+```
+
+(`--python 3.13`: PyYAML, which pre-commit needs, may not have a prebuilt package for the newest Python yet.)
+
+If the hook changed files, the commit stops: look at the changes, `git add` them and commit again.
+All files can be formatted with `pre-commit run --all-files`. Most editors pick up `.clang-format` and `.editorconfig` by themselves.
+The commit that reformatted the whole code is listed in `.git-blame-ignore-revs`, so that `git blame` skips it (`git config blame.ignoreRevsFile .git-blame-ignore-revs`; GitHub does this by itself).
+
 ## Implementation Details
 ### Language and Compiler
 This project was originally written in C++11 using Microsoft Visual Studio 2013.

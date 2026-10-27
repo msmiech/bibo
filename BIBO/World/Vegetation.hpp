@@ -51,7 +51,7 @@ namespace bibo
 		struct ColumnKey
 		{
 			int x = 0, z = 0;
-			bool operator==(const ColumnKey& other) const { return x == other.x && z == other.z; }
+			bool operator==(const ColumnKey&) const = default;
 		};
 
 		struct ColumnKeyHash

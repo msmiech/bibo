@@ -385,7 +385,7 @@ int SalmonPools::update(float timeDelta, glm::vec3 bearCenter, glm::vec3 bearMou
 			continue;
 		}
 		nextJump[p] -= timeDelta;
-		int inAir = static_cast<int>(std::count_if(jumps.begin(), jumps.end(), [p](const Jump& jump) { return jump.pool == static_cast<int>(p); }));
+		int inAir = static_cast<int>(std::ranges::count(jumps, static_cast<int>(p), &Jump::pool));
 		if (nextJump[p] <= 0.0f && inAir < MAX_JUMPS_PER_POOL)
 		{
 			startJump(static_cast<int>(p), bearCenter);

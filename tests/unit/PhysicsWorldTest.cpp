@@ -134,7 +134,7 @@ TEST_CASE("Every body gets its own valid handle", "[physics]")
 	handles.insert(world.createStaticBox(vec3(0.0f, 0.0f, 3.0f), vec3(7.0f, 7.0f, 0.01f)));
 
 	CHECK(handles.size() == 11);
-	CHECK(handles.count(INVALID_BODY) == 0);
+	CHECK_FALSE(handles.contains(INVALID_BODY));
 }
 
 TEST_CASE("A triangle mesh is scaled, rotated and placed", "[physics]")

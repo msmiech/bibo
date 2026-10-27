@@ -75,7 +75,7 @@ namespace
 			bool supported = false;
 
 			vec3 end() const { return path.back(); }
-			bool touched(BodyHandle body) const { return std::find(touchedBodies.begin(), touchedBodies.end(), body) != touchedBodies.end(); }
+			bool touched(BodyHandle body) const { return std::ranges::find(touchedBodies, body) != touchedBodies.end(); }
 		};
 
 		/**

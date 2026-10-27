@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <functional>
+#include <numbers>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -157,7 +158,7 @@ namespace bibo
 			int windowWidth, windowHeight;
 
 			vec3 position, direction, up;
-			float yaw = 3.14159265f;
+			float yaw = std::numbers::pi_v<float>;
 			float pitch = 0.0f;
 			float speed = 3.0f; //unlocked
 			float aperture = 60.0f; //vertical field of view in degrees

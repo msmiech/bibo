@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <numbers>
 #include <sstream>
 
 using namespace bibo::audio;
@@ -94,7 +95,7 @@ namespace
 		{
 			std::size_t first = static_cast<std::size_t>(std::lround(start * static_cast<float>(sampleRate))) % frames;
 			std::size_t count = std::min(static_cast<std::size_t>(duration * static_cast<float>(sampleRate)), frames);
-			float angle = (std::clamp(pan, -1.0f, 1.0f) + 1.0f) * 0.25f * 3.14159265f;
+			float angle = (std::clamp(pan, -1.0f, 1.0f) + 1.0f) * 0.25f * std::numbers::pi_v<float>;
 			float leftGain = std::cos(angle) * gain, rightGain = std::sin(angle) * gain;
 			float step = 1.0f / static_cast<float>(sampleRate);
 			for (std::size_t i = 0; i < count; ++i)

@@ -159,7 +159,7 @@ int main(int argc, char** argv)
 				util::fatalError("--fps needs the number of frames per second");
 			}
 		}
-		else if (argument.rfind("--", 0) == 0)
+		else if (argument.starts_with("--"))
 		{
 			util::fatalError("Unknown option " + argument + " (BIBO [--demo <script>] [--record <file>] [--fps <frames per second>] [width height [fullscreen]])");
 		}

@@ -16,8 +16,8 @@ namespace bibo
 	{
 		/**
 		* Draws animals made of rigid parts (FurryModel) like the bear (the shaders of the BearRenderer): the skin with the eyes
-		* and the nose, the fur and the spines (stiff, banded strands). The vertices of all animals are moved on the CPU (setPose)
-		* and uploaded once per frame, the strands are generated on the GPU. Far away fewer, wider strands are drawn.
+		* and the nose, the fur and the spines (stiff, banded strands). The vertices of all animals are moved on the CPU when they
+		* are drawn (as setPose placed them last) and uploaded once per frame, the strands are generated on the GPU. Far away fewer, wider strands are drawn.
 		* Needs an OpenGL context.
 		*/
 		class FurryRenderer
@@ -70,6 +70,15 @@ namespace bibo
 			const FurryModel& getModel() const { return model; }
 
 		private:
+			//The pose an animal was given and whether its vertices have been moved there yet
+			struct Pose
+			{
+				std::vector<glm::mat4> parts;
+				float bristle = 0.0f;
+				bool moved = true;
+			};
+
+			void moveVertices(std::size_t index);
 			void upload();
 			void bindVertices(std::size_t index);
 
@@ -87,6 +96,7 @@ namespace bibo
 			std::size_t spineCount = 0, furCount = 0;
 			GLsizei indexCount = 0;
 			std::vector<glm::vec4> staging; //position, normal, bend, comb per vertex, a block per animal
+			std::vector<Pose> poses;
 			std::vector<glm::vec3> centers;
 			std::vector<float> radii;
 			bool uploaded = false;

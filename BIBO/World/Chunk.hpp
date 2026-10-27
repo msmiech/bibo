@@ -22,8 +22,7 @@ namespace bibo
 		struct ChunkKey
 		{
 			int x = 0, y = 0, z = 0;
-			bool operator==(const ChunkKey& other) const { return x == other.x && y == other.y && z == other.z; }
-			bool operator!=(const ChunkKey& other) const { return !(*this == other); }
+			bool operator==(const ChunkKey&) const = default;
 		};
 
 		struct ChunkKeyHash

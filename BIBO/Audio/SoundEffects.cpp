@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <numbers>
 
 using namespace bibo::audio;
 
@@ -116,7 +117,7 @@ namespace
 			float shape;
 			switch (contour)
 			{
-			case 0: shape = 1.0f + 0.25f * std::sin(3.14159265f * u); break; //up and down
+			case 0: shape = 1.0f + 0.25f * std::sin(std::numbers::pi_v<float> * u); break; //up and down
 			case 1: shape = 1.25f - 0.35f * u; break; //down
 			default: shape = 0.9f + 0.4f * u * u; break; //up, like a question
 			}
@@ -194,7 +195,7 @@ namespace
 			float shape;
 			switch (contour)
 			{
-			case 0: shape = 1.0f + 0.12f * std::sin(3.14159265f * u); break; //"mhm"
+			case 0: shape = 1.0f + 0.12f * std::sin(std::numbers::pi_v<float> * u); break; //"mhm"
 			case 1: shape = 1.1f - 0.2f * u; break; //down, content
 			default: shape = 0.92f + 0.22f * u * u; break; //up, asking
 			}
@@ -334,7 +335,7 @@ namespace
 					break;
 				}
 				phase += TAU * frequency * (1.0f + 6.0f * t) / static_cast<float>(sampleRate);
-				samples[i] += 0.15f * std::sin(phase) * std::sin(3.14159265f * t / 0.06f);
+				samples[i] += 0.15f * std::sin(phase) * std::sin(std::numbers::pi_v<float> * t / 0.06f);
 			}
 		}
 		normalize(samples, 0.6f);

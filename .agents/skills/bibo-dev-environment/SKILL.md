@@ -24,7 +24,7 @@ If a heredoc trips over the quoting of the shell, write the script to a file out
 Read and write files with `encoding='utf-8'`; the sources are UTF-8 and use tabs for indentation.
 
 ## Build
-Toolchain: CMake ≥ 3.25, Ninja, a C++17 compiler (LLVM-MinGW `c++`/`cc` on Windows). See README.md › Building.
+Toolchain: CMake ≥ 3.25, Ninja, a C++20 compiler (LLVM-MinGW `c++`/`cc` on Windows). See README.md › Building.
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release

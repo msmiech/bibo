@@ -458,7 +458,7 @@ void RaccoonFans::update(float timeDelta, bool cheering, glm::vec3 bear, glm::ve
 		return;
 	}
 	nextArrival = 0.4f; //tries again soon if there is no spot
-	auto hidden = std::find_if(raccoons.begin(), raccoons.end(), [](const Raccoon& raccoon) { return !raccoon.isVisible(); });
+	auto hidden = std::ranges::find_if(raccoons, [](const Raccoon& raccoon) { return !raccoon.isVisible(); });
 	glm::vec2 from, spot;
 	if (hidden == raccoons.end() || !finder(bear, heading, random, from, spot))
 	{

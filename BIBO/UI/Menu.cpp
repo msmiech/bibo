@@ -388,15 +388,6 @@ void Menu::showPauseMenu()
 	impl->show(impl->pauseMenu);
 }
 
-bool Hud::operator==(const Hud& other) const
-{
-	return visible == other.visible && prompt == other.prompt && promptKey == other.promptKey && speaker == other.speaker && text == other.text
-		&& canContinue == other.canContinue && continueKey == other.continueKey && choices == other.choices && selectedChoice == other.selectedChoice
-		&& countdown == other.countdown && racing == other.racing && raceTime == other.raceTime && checkpoints == other.checkpoints
-		&& timeLimit == other.timeLimit && fishing == other.fishing && fishingTime == other.fishingTime && salmon == other.salmon
-		&& score == other.score && objective == other.objective && objectiveDetail == other.objectiveDetail && banner == other.banner && bannerDetail == other.bannerDetail && bannerSuccess == other.bannerSuccess;
-}
-
 void Menu::setHud(const Hud& hud)
 {
 	Impl& menu = *impl;

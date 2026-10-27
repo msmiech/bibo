@@ -42,7 +42,7 @@ void FoliageInteraction::update(float timeDelta, const std::vector<Body>& bodies
 	{
 		imprint.age += timeDelta;
 	}
-	trail.erase(std::remove_if(trail.begin(), trail.end(), [](const Imprint& imprint) { return imprint.age >= HOLD_TIME + SPRING_TIME; }), trail.end());
+	std::erase_if(trail, [](const Imprint& imprint) { return imprint.age >= HOLD_TIME + SPRING_TIME; });
 
 	if (tracked.size() != bodies.size())
 	{

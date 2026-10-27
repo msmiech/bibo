@@ -265,7 +265,7 @@ TEST_CASE("The hedgehog has spines on its back, fur on its face and belly, eyes,
 	{
 		surfaces[static_cast<int>(model.surfaces[v])]++;
 		REQUIRE(std::abs(glm::length(model.normals[v]) - 1.0f) < 1e-3f);
-		if (model.parts[v] == HedgehogModel::BODY && model.surfaces[v] == SkinnedModel::FUR)
+		if (model.parts[v] == HedgehogModel::BODY && static_cast<int>(model.surfaces[v]) == SkinnedModel::FUR)
 		{
 			REQUIRE(model.positions[v].y >= 0.0f); //not in the ground
 		}
@@ -329,7 +329,7 @@ TEST_CASE("The beaver sits upright: fur, orange front teeth, eyes, a nose, a mou
 	//The teeth are orange
 	for (std::size_t v = 0; v < vertices; ++v)
 	{
-		if (model.surfaces[v] == SkinnedModel::TEETH)
+		if (static_cast<int>(model.surfaces[v]) == SkinnedModel::TEETH)
 		{
 			REQUIRE(model.colors[v].r > 2.0f * model.colors[v].g);
 			REQUIRE(model.colors[v].g > model.colors[v].b);
@@ -519,7 +519,7 @@ TEST_CASE("The raccoon stands on all fours: gray fur, a mask, eyes, a nose, a mo
 			parts[model.parts[v]]++;
 			REQUIRE(std::abs(glm::length(model.normals[v]) - 1.0f) < 1e-3f);
 			REQUIRE(std::abs(glm::length(model.combs[v]) - 1.0f) < 1e-3f);
-			if (model.surfaces[v] == SkinnedModel::FUR && model.parts[v] == RaccoonModel::HEAD)
+			if (static_cast<int>(model.surfaces[v]) == SkinnedModel::FUR && model.parts[v] == RaccoonModel::HEAD)
 			{
 				dark += model.colors[v].g < 0.03f ? 1 : 0; //the mask
 				light += model.colors[v].g > 0.4f ? 1 : 0; //the white around it

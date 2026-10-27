@@ -4,16 +4,18 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <numbers>
 #include <queue>
 
 #include "Noise.hpp"
+#include "Parallel.hpp"
 #include "WorldGenerator.hpp"
 
 using namespace bibo::world;
 
 namespace
 {
-	const float PI = 3.14159265f;
+	const float PI = std::numbers::pi_v<float>;
 	//The paths are searched on a grid with cells of this size
 	const float ROUTE_CELL = 2.0f;
 	//A cell that a path must not go through (sea, caves, the objects of the track)
@@ -227,13 +229,12 @@ void Landmarks::soften(const WorldGenerator& world, glm::vec2 center, float radi
 	area.columns = static_cast<int>(2.0f * half / RASTER_CELL) + 1;
 	const int n = area.columns;
 	area.heights.resize(static_cast<std::size_t>(n) * n);
-	for (int j = 0; j < n; ++j)
-	{
+	parallelFor(n, [&](int j) {
 		for (int i = 0; i < n; ++i)
 		{
 			area.heights[static_cast<std::size_t>(j) * n + i] = world.naturalHeight(area.origin + RASTER_CELL * glm::vec2(static_cast<float>(i), static_cast<float>(j)));
 		}
-	}
+	});
 	std::vector<float> next(area.heights.size());
 	for (int pass = 0; pass < 3; ++pass)
 	{
@@ -556,74 +557,79 @@ void Landmarks::findPaths(const WorldGenerator& world)
 	grid.height.resize(cellCount);
 	grid.penalty.assign(cellCount, 0.0f);
 	grid.network.assign(cellCount, Grid::NONE);
+	//The natural ground of every cell, then every cell on its own (the rows in parallel)
 	std::vector<float> naturals(cellCount);
-	for (std::size_t c = 0; c < cellCount; ++c)
-	{
-		naturals[c] = naturalGround(world, grid.position(static_cast<int>(c)));
-	}
-	for (std::size_t c = 0; c < cellCount; ++c)
-	{
-		glm::vec2 at = grid.position(static_cast<int>(c));
-		float natural = naturals[c];
-		grid.height[c] = applyLeveling(at, natural);
-		float inland, cliff;
-		world.coast(at, inland, cliff);
-		if (natural < sea + 0.6f)
+	parallelFor(grid.rows, [&](int row) {
+		for (std::size_t c = static_cast<std::size_t>(row) * grid.columns; c < static_cast<std::size_t>(row + 1) * grid.columns; ++c)
 		{
-			grid.penalty[c] = FORBIDDEN; //the sea and the pools
-			continue;
+			naturals[c] = naturalGround(world, grid.position(static_cast<int>(c)));
 		}
-		if (cliff > 0.3f && inland < 22.0f)
+	});
+	parallelFor(grid.rows, [&](int row) {
+		for (std::size_t c = static_cast<std::size_t>(row) * grid.columns; c < static_cast<std::size_t>(row + 1) * grid.columns; ++c)
 		{
-			grid.penalty[c] = 30.0f * cliff; //the edge of the cliffs
-		}
-		//Steep ground around the cell (also across the way): a path there would be a ledge under a crag or above a drop.
-		//To the neighbors in 8 directions, one and two cells away.
-		float steepest = 0.0f;
-		const int i = static_cast<int>(c) % grid.columns, j = static_cast<int>(c) / grid.columns;
-		for (int di = -1; di <= 1; ++di)
-		{
-			for (int dj = -1; dj <= 1; ++dj)
+			glm::vec2 at = grid.position(static_cast<int>(c));
+			float natural = naturals[c];
+			grid.height[c] = applyLeveling(at, natural);
+			float inland, cliff;
+			world.coast(at, inland, cliff);
+			if (natural < sea + 0.6f)
 			{
-				for (int reach = 1; reach <= STEEP_CELLS && (di != 0 || dj != 0); ++reach)
+				grid.penalty[c] = FORBIDDEN; //the sea and the pools
+				continue;
+			}
+			if (cliff > 0.3f && inland < 22.0f)
+			{
+				grid.penalty[c] = 30.0f * cliff; //the edge of the cliffs
+			}
+			//Steep ground around the cell (also across the way): a path there would be a ledge under a crag or above a drop.
+			//To the neighbors in 8 directions, one and two cells away.
+			float steepest = 0.0f;
+			const int i = static_cast<int>(c) % grid.columns, j = static_cast<int>(c) / grid.columns;
+			for (int di = -1; di <= 1; ++di)
+			{
+				for (int dj = -1; dj <= 1; ++dj)
 				{
-					int ni = i + di * reach, nj = j + dj * reach;
-					if (ni >= 0 && nj >= 0 && ni < grid.columns && nj < grid.rows)
+					for (int reach = 1; reach <= STEEP_CELLS && (di != 0 || dj != 0); ++reach)
 					{
-						float distance = ROUTE_CELL * static_cast<float>(reach) * std::sqrt(static_cast<float>(di * di + dj * dj));
-						steepest = std::max(steepest, std::abs(naturals[static_cast<std::size_t>(nj) * grid.columns + ni] - natural) / distance);
+						int ni = i + di * reach, nj = j + dj * reach;
+						if (ni >= 0 && nj >= 0 && ni < grid.columns && nj < grid.rows)
+						{
+							float distance = ROUTE_CELL * static_cast<float>(reach) * std::sqrt(static_cast<float>(di * di + dj * dj));
+							steepest = std::max(steepest, std::abs(naturals[static_cast<std::size_t>(nj) * grid.columns + ni] - natural) / distance);
+						}
 					}
 				}
 			}
-		}
-		if (steepest > STEEP_SLOPE)
-		{
-			float excess = steepest - STEEP_SLOPE;
-			grid.penalty[c] += 40.0f * excess * excess + 8.0f * excess;
-		}
-		for (const KeepClear& object : world.getKeepClear())
-		{
-			if (glm::distance(at, ground(object.center)) < object.radius + 4.0f)
+			if (steepest > STEEP_SLOPE)
+			{
+				float excess = steepest - STEEP_SLOPE;
+				grid.penalty[c] += 40.0f * excess * excess + 8.0f * excess;
+			}
+			for (const KeepClear& object : world.getKeepClear())
+			{
+				if (glm::distance(at, ground(object.center)) < object.radius + 4.0f)
+				{
+					grid.penalty[c] = FORBIDDEN;
+				}
+			}
+			if (world.caveRoofTop(at) > -1000.0f)
 			{
 				grid.penalty[c] = FORBIDDEN;
 			}
+			TrackPath::Nearest nearest = track.nearest(at);
+			if (grid.penalty[c] < FORBIDDEN && steepest < STEEP_SLOPE && nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth - 1.0f && natural < nearest.floorHeight + 1.0f
+				&& nearest.distance > START_CLEARANCE && nearest.distance < track.getLength() - START_CLEARANCE)
+			{
+				grid.network[c] = Grid::TRACK;
+			}
+			else if (grid.penalty[c] < FORBIDDEN && nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth + CANYON_BAND)
+			{
+				//A path climbs out of the canyon of the track, it does not go along its side next to the floor
+				grid.penalty[c] += CANYON_PENALTY;
+			}
 		}
-		if (world.caveRoofTop(at) > -1000.0f)
-		{
-			grid.penalty[c] = FORBIDDEN;
-		}
-		TrackPath::Nearest nearest = track.nearest(at);
-		if (grid.penalty[c] < FORBIDDEN && steepest < STEEP_SLOPE && nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth - 1.0f && natural < nearest.floorHeight + 1.0f
-			&& nearest.distance > START_CLEARANCE && nearest.distance < track.getLength() - START_CLEARANCE)
-		{
-			grid.network[c] = Grid::TRACK;
-		}
-		else if (grid.penalty[c] < FORBIDDEN && nearest.found && std::abs(nearest.lateral) < nearest.floorHalfWidth + CANYON_BAND)
-		{
-			//A path climbs out of the canyon of the track, it does not go along its side next to the floor
-			grid.penalty[c] += CANYON_PENALTY;
-		}
-	}
+	});
 
 	//No path joins the track right at a pool on it
 	const int SHORE_CELLS = 4;
@@ -894,35 +900,37 @@ void Landmarks::rasterize(const WorldGenerator& world)
 	//Cells without a leg get the ground (they change nothing when they are interpolated with the others).
 	//The paths do not cut into the floor of the race track and into the caves.
 	const TrackPath& track = world.getPath();
-	for (std::size_t c = 0; c < raster.size(); ++c)
-	{
-		Cell& cell = raster[c];
-		glm::vec2 at = rasterOrigin + RASTER_CELL * glm::vec2(static_cast<float>(c % rasterColumns), static_cast<float>(c / rasterColumns));
-		if (cell.distance >= REACH)
+	parallelFor(rasterRows, [&](int row) {
+		for (std::size_t c = static_cast<std::size_t>(row) * rasterColumns; c < static_cast<std::size_t>(row + 1) * rasterColumns; ++c)
 		{
-			cell.distance = REACH;
-			cell.height = leveled(world, at);
+			Cell& cell = raster[c];
+			glm::vec2 at = rasterOrigin + RASTER_CELL * glm::vec2(static_cast<float>(c % rasterColumns), static_cast<float>(c / rasterColumns));
+			if (cell.distance >= REACH)
+			{
+				cell.distance = REACH;
+				cell.height = leveled(world, at);
+			}
+			if (cell.secondDistance >= REACH)
+			{
+				cell.secondDistance = REACH;
+				cell.secondHeight = cell.height;
+			}
+			if (cell.distance >= REACH)
+			{
+				continue;
+			}
+			TrackPath::Nearest nearest = track.nearest(at);
+			if (nearest.found)
+			{
+				//Right from the edge of the floor: where a path climbs out of the canyon, the wall is cut too (no steep step up)
+				cell.allowed = smoothstep(1.5f, 2.5f, std::abs(nearest.lateral) - nearest.floorHalfWidth);
+			}
+			if (world.caveRoofTop(at) > -1000.0f)
+			{
+				cell.allowed = 0.0f;
+			}
 		}
-		if (cell.secondDistance >= REACH)
-		{
-			cell.secondDistance = REACH;
-			cell.secondHeight = cell.height;
-		}
-		if (cell.distance >= REACH)
-		{
-			continue;
-		}
-		TrackPath::Nearest nearest = track.nearest(at);
-		if (nearest.found)
-		{
-			//Right from the edge of the floor: where a path climbs out of the canyon, the wall is cut too (no steep step up)
-			cell.allowed = smoothstep(1.5f, 2.5f, std::abs(nearest.lateral) - nearest.floorHalfWidth);
-		}
-		if (world.caveRoofTop(at) > -1000.0f)
-		{
-			cell.allowed = 0.0f;
-		}
-	}
+	});
 }
 
 Landmarks::Cell Landmarks::cellAt(glm::vec2 position) const

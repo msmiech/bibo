@@ -3,6 +3,7 @@
 #include <cmath>
 #include <limits>
 #include "Noise.hpp"
+#include "Parallel.hpp"
 
 using namespace bibo::world;
 
@@ -550,8 +551,8 @@ void WorldGenerator::computeColumnRanges()
 	rangeColumns = static_cast<int>(std::ceil((bounds.maximum.x - bounds.minimum.x) / RANGE_CELL));
 	rangeRows = static_cast<int>(std::ceil((bounds.maximum.z - bounds.minimum.z) / RANGE_CELL));
 	columnRanges.assign(static_cast<std::size_t>(rangeColumns) * rangeRows, glm::vec2(0.0f));
-	for (int j = 0; j < rangeRows; ++j)
-	{
+	//The rows in parallel
+	parallelFor(rangeRows, [&](int j) {
 		for (int i = 0; i < rangeColumns; ++i)
 		{
 			float lowest = std::numeric_limits<float>::max(), highest = std::numeric_limits<float>::lowest();
@@ -578,7 +579,7 @@ void WorldGenerator::computeColumnRanges()
 			float margin = 3.0f + steepest + 0.25f * (highest - lowest);
 			columnRanges[static_cast<std::size_t>(j) * rangeColumns + i] = glm::vec2(lowest - margin, highest + margin);
 		}
-	}
+	});
 }
 
 bool WorldGenerator::mayContainSurface(const Box& box) const

@@ -30,7 +30,7 @@ TEST_CASE("The meshes of every node of the game are uploaded completely", "[gl][
 	Model model(&shader, &trackScene(), name.c_str(), nullptr);
 
 	const auto& normalMapped = normalMappedNodeNames();
-	const bool hasNormalMap = std::find(normalMapped.begin(), normalMapped.end(), name) != normalMapped.end();
+	const bool hasNormalMap = std::ranges::find(normalMapped, name) != normalMapped.end();
 
 	REQUIRE_FALSE(model.meshes.empty());
 	for (Mesh* mesh : model.meshes)

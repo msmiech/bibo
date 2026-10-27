@@ -182,7 +182,7 @@ TEST_CASE("A hit tells where the character touches the body and from which side"
 		character.move(vec3(0.0f, -5.0f, -10.0f) * FRAME, FRAME);
 	}
 
-	auto rockHit = std::find_if(hits.begin(), hits.end(), [&](const CharacterController::Hit& hit) { return hit.body == rock; });
+	auto rockHit = std::ranges::find(hits, rock, &CharacterController::Hit::body);
 	REQUIRE(rockHit != hits.end());
 	CHECK(rockHit->normal.z > 0.5f); //pointing from the rock back to the character
 	CHECK(glm::distance(rockHit->position, vec3(0.0f, 0.7f, -4.0f)) < 0.75f); //on the surface of the rock

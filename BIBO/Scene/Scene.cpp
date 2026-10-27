@@ -224,12 +224,8 @@ void Scene::initQuest()
 	vec3 seat = groundAt(finishLineTrigger.center + finishLineTrigger.across * BEAVER_SIDE + behind * BEAVER_BEHIND_LINE);
 	beaver = make_unique<Beaver>(seat, normalize(finishLineTrigger.across * (BEAVER_SIDE > 0.0f ? -1.0f : 1.0f) + 0.6f * behind));
 	beaverBody = physicsWorld->createKinematicSphere(beaver->getColliderCenter(), beaver->getColliderRadius());
-	FurryRenderer::Strands strands;
-	strands.furCount = BEAVER_FUR_COUNT;
-	strands.furSeed = 91;
-	FurryRenderer::Bounds bounds;
-	bounds.center = vec3(0.0f, 0.5f, 0.0f);
-	bounds.radius = 0.8f;
+	FurryRenderer::Strands strands{ .furCount = BEAVER_FUR_COUNT, .furSeed = 91 };
+	FurryRenderer::Bounds bounds{ .center = vec3(0.0f, 0.5f, 0.0f), .radius = 0.8f };
 	beaverRenderer = make_unique<FurryRenderer>(BeaverModel::build(), 1, strands, bounds);
 
 	//The bear starts behind the line, the beaver and the line are in front of it. In deep water it swims.
@@ -366,12 +362,8 @@ void Scene::initChonk()
 	chonk = make_unique<Raccoon>(ground, 2024u, CHONK_GIRTH);
 	chonk->sitAt(seat, look);
 	chonkBody = physicsWorld->createKinematicSphere(chonk->getColliderCenter(), chonk->getColliderRadius());
-	FurryRenderer::Strands strands;
-	strands.furCount = CHONK_FUR_COUNT;
-	strands.furSeed = 133;
-	FurryRenderer::Bounds bounds;
-	bounds.center = vec3(0.0f, 0.35f, 0.0f);
-	bounds.radius = 0.8f;
+	FurryRenderer::Strands strands{ .furCount = CHONK_FUR_COUNT, .furSeed = 133 };
+	FurryRenderer::Bounds bounds{ .center = vec3(0.0f, 0.35f, 0.0f), .radius = 0.8f };
 	chonkRenderer = make_unique<FurryRenderer>(RaccoonModel::build(CHONK_GIRTH), 1, strands, bounds);
 	stonesQuest = make_unique<StonesQuest>();
 
@@ -1161,7 +1153,7 @@ void Scene::drawShadowCasters(const render::ShadowCascade& cascade)
 	hedgehogRenderer->drawSurfaces(depthShader.get());
 	beaverRenderer->drawSurfaces(depthShader.get());
 	chonkRenderer->drawSurfaces(depthShader.get());
-	if (std::any_of(fans->getRaccoons().begin(), fans->getRaccoons().end(), [](const Raccoon& fan) { return fan.isVisible(); }))
+	if (std::ranges::any_of(fans->getRaccoons(), &Raccoon::isVisible))
 	{
 		fansRenderer->drawSurfaces(depthShader.get());
 	}

@@ -32,6 +32,14 @@ Shader::Shader(const string& vertexShader, const string& fragmentShader, const s
 
 
 Shader::~Shader() {//Destructor
+	//A program in use would only be flagged for deletion: whoever saved it as the current one (render::StateGuard) would
+	//later bind a program that no longer exists
+	GLint current = 0;
+	glGetIntegerv(GL_CURRENT_PROGRAM, &current);
+	if (static_cast<GLuint>(current) == programHandle)
+	{
+		glUseProgram(0);
+	}
 	glDeleteProgram(programHandle);
 	glDeleteShader(vertexHandle);
 	glDeleteShader(fragmentHandle);

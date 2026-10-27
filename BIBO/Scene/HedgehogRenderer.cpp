@@ -8,22 +8,13 @@ namespace
 {
 	FurryRenderer::Strands hedgehogStrands()
 	{
-		FurryRenderer::Strands strands;
-		strands.furCount = HedgehogRenderer::FUR_COUNT;
-		strands.spineCount = HedgehogRenderer::SPINE_COUNT;
-		strands.spineLength = HedgehogRenderer::SPINE_LENGTH;
-		strands.spineWidth = HedgehogRenderer::SPINE_WIDTH;
-		strands.furSeed = 78;
-		strands.spineSeed = 77;
-		return strands;
+		return { .furCount = HedgehogRenderer::FUR_COUNT, .spineCount = HedgehogRenderer::SPINE_COUNT, .spineLength = HedgehogRenderer::SPINE_LENGTH,
+			.spineWidth = HedgehogRenderer::SPINE_WIDTH, .furSeed = 78, .spineSeed = 77 };
 	}
 
 	FurryRenderer::Bounds hedgehogBounds()
 	{
-		FurryRenderer::Bounds bounds;
-		bounds.center = glm::vec3(0.0f, HEDGEHOG_BODY_HEIGHT, 0.0f);
-		bounds.radius = 0.75f;
-		return bounds;
+		return { .center = glm::vec3(0.0f, HEDGEHOG_BODY_HEIGHT, 0.0f), .radius = 0.75f };
 	}
 }
 

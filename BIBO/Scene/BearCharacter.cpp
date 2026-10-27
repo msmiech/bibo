@@ -12,8 +12,8 @@ using namespace scene;
 namespace
 {
 	const glm::vec3 UP(0.0f, 1.0f, 0.0f);
-	//Movement (per second): the speeds of the earlier versions, reached smoothly
-	const float FORWARD_SPEED = BearCharacter::FORWARD_SPEED, BACKWARD_SPEED = 7.5f;
+	//Movement (per second): the speeds of the earlier versions, reached smoothly (forward: BearCharacter::FORWARD_SPEED)
+	const float BACKWARD_SPEED = 7.5f;
 	const float ACCELERATION = 40.0f, DECELERATION = 50.0f;
 	const float TURN_RATE = glm::radians(90.0f); //forward/turn input
 	//Steering towards a direction (move input): quick on the spot, wider curves at full speed. The remaining angle is turned

@@ -119,7 +119,7 @@ int TerrainRenderer::draw(const scene::ViewFrustum* frustum, float time)
 	shader->enable();
 	for (auto& entry : chunks)
 	{
-		if (fading.count(entry.first) == 0 && drawChunk(entry.second, frustum))
+		if (!fading.contains(entry.first) && drawChunk(entry.second, frustum))
 		{
 			++drawn;
 		}

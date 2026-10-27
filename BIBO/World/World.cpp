@@ -2,9 +2,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-#include <thread>
 #include <assimp/scene.h>
 #include "MaterialTextures.hpp"
+#include "Parallel.hpp"
 #include "SkyRenderer.hpp"
 #include "TerrainRenderer.hpp"
 #include "VegetationRenderer.hpp"
@@ -100,28 +100,16 @@ void World::createWorldMap()
 	worldMapOrigin = glm::vec2(bounds.minimum.x, bounds.minimum.z);
 	worldMapSize = std::max(bounds.maximum.x - bounds.minimum.x, bounds.maximum.z - bounds.minimum.z);
 	std::vector<glm::vec4> texels(static_cast<std::size_t>(SIZE) * SIZE);
-	unsigned int threadCount = std::clamp(std::thread::hardware_concurrency(), 1u, 8u);
-	std::vector<std::thread> threads;
-	for (unsigned int t = 0; t < threadCount; ++t)
-	{
-		threads.emplace_back([&, t] {
-			for (int row = static_cast<int>(t); row < SIZE; row += static_cast<int>(threadCount))
-			{
-				for (int column = 0; column < SIZE; ++column)
-				{
-					glm::vec2 position = worldMapOrigin + (glm::vec2(static_cast<float>(column), static_cast<float>(row)) + 0.5f) * (worldMapSize / static_cast<float>(SIZE));
-					float inland, cliff;
-					generator->coast(position, inland, cliff);
-					float coastal = 1.0f - glm::smoothstep(8.0f, 40.0f, std::abs(inland));
-					texels[static_cast<std::size_t>(row) * SIZE + column] = glm::vec4(generator->height(position), generator->caveRoofTop(position), coastal, 0.0f);
-				}
-			}
-		});
-	}
-	for (std::thread& thread : threads)
-	{
-		thread.join();
-	}
+	parallelFor(SIZE, [&](int row) {
+		for (int column = 0; column < SIZE; ++column)
+		{
+			glm::vec2 position = worldMapOrigin + (glm::vec2(static_cast<float>(column), static_cast<float>(row)) + 0.5f) * (worldMapSize / static_cast<float>(SIZE));
+			float inland, cliff;
+			generator->coast(position, inland, cliff);
+			float coastal = 1.0f - glm::smoothstep(8.0f, 40.0f, std::abs(inland));
+			texels[static_cast<std::size_t>(row) * SIZE + column] = glm::vec4(generator->height(position), generator->caveRoofTop(position), coastal, 0.0f);
+		}
+	});
 	glGenTextures(1, &worldMap);
 	glBindTexture(GL_TEXTURE_2D, worldMap);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SIZE, SIZE, 0, GL_RGBA, GL_FLOAT, texels.data());

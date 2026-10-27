@@ -34,7 +34,7 @@ FurryRenderer::FurryRenderer(FurryModel furryModel, std::size_t count, const Str
 	: model(std::move(furryModel)), count(count), vertexCount(model.positions.size()), strands(strands), bounds(bounds),
 	skinShader(std::make_unique<Shader>("Shader/bear_skin.vert", "Shader/bear_skin.frag")),
 	furShader(std::make_unique<Shader>("Shader/bear_fur.vert", "Shader/bear_fur.frag")),
-	centers(count, glm::vec3(0.0f)), radii(count, bounds.radius)
+	poses(count), centers(count, glm::vec3(0.0f)), radii(count, bounds.radius)
 {
 	//Every animal has its block in the skin buffer, which the fur shader reads as a shader storage buffer from its start
 	GLint alignment = 256;
@@ -109,22 +109,38 @@ void FurryRenderer::setPose(std::size_t index, const std::vector<glm::mat4>& par
 	{
 		return;
 	}
+	//The vertices are only moved when the animal is drawn (the scene may be updated more often than drawn, e.g. in the tests)
+	Pose& pose = poses[index];
+	pose.parts = parts;
+	pose.bristle = bristle;
+	pose.moved = false;
+	radii[index] = bounds.radius * glm::length(glm::vec3(parts[0][0]));
+	centers[index] = glm::vec3(parts[0] * glm::vec4(bounds.center, 1.0f));
+	uploaded = false;
+}
+
+void FurryRenderer::moveVertices(std::size_t index)
+{
+	Pose& pose = poses[index];
+	if (pose.moved)
+	{
+		return;
+	}
+	pose.moved = true;
+	std::vector<glm::mat3> rotations(pose.parts.begin(), pose.parts.end());
 	glm::vec4* block = staging.data() + index * static_cast<std::size_t>(blockSize) / sizeof(glm::vec4);
 	for (std::size_t v = 0; v < vertexCount; ++v)
 	{
 		std::size_t part = static_cast<std::size_t>(model.parts[v]);
-		const glm::mat4& matrix = part < parts.size() ? parts[part] : parts[0];
-		glm::mat3 rotation(matrix);
+		part = part < pose.parts.size() ? part : 0;
+		const glm::mat3& rotation = rotations[part];
 		glm::vec3 normal = glm::normalize(rotation * model.normals[v]);
-		block[v * 4] = matrix * glm::vec4(model.positions[v], 1.0f);
+		block[v * 4] = pose.parts[part] * glm::vec4(model.positions[v], 1.0f);
 		block[v * 4 + 1] = glm::vec4(normal, 0.0f);
 		//Spines stand up (e.g. a startled hedgehog)
-		block[v * 4 + 2] = glm::vec4(model.spines[v] ? normal * (0.9f * bristle) : glm::vec3(0.0f), 0.0f);
+		block[v * 4 + 2] = glm::vec4(model.spines[v] ? normal * (0.9f * pose.bristle) : glm::vec3(0.0f), 0.0f);
 		block[v * 4 + 3] = glm::vec4(glm::normalize(rotation * model.combs[v]), 0.0f);
 	}
-	radii[index] = bounds.radius * glm::length(glm::vec3(parts[0][0]));
-	centers[index] = glm::vec3(parts[0] * glm::vec4(bounds.center, 1.0f));
-	uploaded = false;
 }
 
 void FurryRenderer::upload()
@@ -132,6 +148,10 @@ void FurryRenderer::upload()
 	if (uploaded)
 	{
 		return;
+	}
+	for (std::size_t i = 0; i < count; ++i)
+	{
+		moveVertices(i);
 	}
 	glBindBuffer(GL_ARRAY_BUFFER, skinBuffer);
 	//Orphaning: new memory while the graphics card may still draw the last frame

@@ -12,7 +12,7 @@ namespace bibo
 			int width;
 			int height;
 
-			bool operator==(const Resolution& other) const { return width == other.width && height == other.height; }
+			bool operator==(const Resolution&) const = default;
 		};
 
 		/**

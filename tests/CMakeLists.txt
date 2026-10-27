@@ -1,7 +1,7 @@
 # Catch2: test framework (https://github.com/catchorg/Catch2)
 FetchContent_Declare(Catch2
-	URL https://github.com/catchorg/Catch2/archive/refs/tags/v3.16.0.tar.gz
-	URL_HASH SHA256=0957cae5821b17ce07f0833aaa52b5137643a8382203221f363a8303c109af34
+	URL https://github.com/catchorg/Catch2/archive/refs/tags/v3.16.1.tar.gz
+	URL_HASH SHA256=d16bd1b8b2364918bd472cb216394acb93bde6784890df0d91bccfb3f28d777d
 	SYSTEM)
 FetchContent_MakeAvailable(Catch2)
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)

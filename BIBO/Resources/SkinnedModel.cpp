@@ -101,7 +101,7 @@ std::unique_ptr<SkinnedModel> SkinnedModel::load(const std::string& file, std::s
 		error = "there is no node for the bone " + *boneNames.begin();
 		return nullptr;
 	}
-	while (rootBone->mParent && boneNames.count(rootBone->mParent->mName.C_Str()))
+	while (rootBone->mParent && boneNames.contains(rootBone->mParent->mName.C_Str()))
 	{
 		rootBone = rootBone->mParent;
 	}
@@ -236,7 +236,20 @@ void SkinnedModel::skin(const std::vector<glm::mat4>& skinMatrices, std::vector<
 	{
 		const glm::ivec4& j = joints[i];
 		const glm::vec4& w = weights[i];
-		glm::mat4 blended = skinMatrices[j.x] * w.x + skinMatrices[j.y] * w.y + skinMatrices[j.z] * w.z + skinMatrices[j.w] * w.w;
+		//Most vertices follow fewer than 4 bones (the weights are sorted by size, the unused ones are 0)
+		glm::mat4 blended = skinMatrices[j.x] * w.x;
+		if (w.y > 0.0f)
+		{
+			blended += skinMatrices[j.y] * w.y;
+			if (w.z > 0.0f)
+			{
+				blended += skinMatrices[j.z] * w.z;
+				if (w.w > 0.0f)
+				{
+					blended += skinMatrices[j.w] * w.w;
+				}
+			}
+		}
 		skinnedPositions[i] = glm::vec3(blended * glm::vec4(positions[i], 1.0f));
 		glm::mat3 rotation(blended);
 		skinnedNormals[i] = glm::normalize(rotation * normals[i]);

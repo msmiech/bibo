@@ -50,7 +50,7 @@ namespace bibo
 			std::string banner, bannerDetail;
 			bool bannerSuccess = false;
 
-			bool operator==(const Hud& other) const;
+			bool operator==(const Hud&) const = default;
 		};
 
 		/**

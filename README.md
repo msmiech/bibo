@@ -95,7 +95,7 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
 * Settings for the detail of the world (how far the levels of detail and the vegetation reach)
 
 ## Building
-The game is built with [CMake](https://cmake.org) 3.25 or newer, the [Ninja](https://ninja-build.org) build tool and any C++17 compiler (Clang, GCC, MinGW-w64 or MSVC).
+The game is built with [CMake](https://cmake.org) 3.25 or newer, the [Ninja](https://ninja-build.org) build tool and a C++20 compiler (GCC 10, Clang 18, MinGW-w64 or MSVC 2019 16.10 or newer).
 All libraries are downloaded and built automatically the first time the project is configured (about 180 MB, internet access required),
 so apart from the tools only the OpenGL and windowing headers of the operating system are needed.
 Running the game requires a graphics card with OpenGL 4.3 support.
@@ -236,7 +236,7 @@ UBSAN_OPTIONS=halt_on_error=1 xvfb-run -a ctest --test-dir build-asan --output-o
 ## Implementation Details
 ### Language and Compiler
 This project was originally written in C++11 using Microsoft Visual Studio 2013.
-It now uses C++17 and CMake, and builds with GCC, Clang, MinGW-w64 and MSVC on Windows and Linux.
+It now uses C++20 and CMake, and builds with GCC, Clang, MinGW-w64 and MSVC on Windows and Linux.
 For hardware graphics (modern) OpenGL 4.3 (core profile) is used.
 It was developed for Windows 8.1 and Windows 10 and tested using Nvidia GeForce graphics hardware
 ### The world

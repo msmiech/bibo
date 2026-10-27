@@ -86,7 +86,8 @@ TEST_CASE("The bear waits at the start of the race without losing", "[gl][scene]
 	CHECK(scene.getRaceQuest().getOutcome() == bibo::scene::RaceQuest::Outcome::NONE);
 	CHECK_FALSE(scene.isBearInWater());
 
-	SECTION("A frame is rendered without OpenGL errors")
+	//The checks share the scene, one after the other (building it for each of them takes long, e.g. with the sanitizers of the CI)
+	//A frame is rendered without OpenGL errors
 	{
 		//Like Main.cpp draw: shadow maps, the scene in HDR, bloom, exposure and tone mapping into the framebuffer
 		bibo::render::Renderer renderer(800, 600);
@@ -108,7 +109,20 @@ TEST_CASE("The bear waits at the start of the race without losing", "[gl][scene]
 		CHECK(average < 230.0);
 	}
 
-	SECTION("Graphics options can be switched off")
+	//The world is only drawn where the camera looks
+	{
+		bibo::render::Renderer renderer(800, 600);
+		Framebuffer framebuffer(800, 600);
+		renderer.render(scene, bibo::render::RenderSettings(), 1.0f / 60.0f);
+		bibo::world::World::Statistics statistics = scene.getWorld().getStatistics();
+		CAPTURE(statistics.drawnChunks, statistics.meshes, statistics.drawnInstances, statistics.instances);
+		CHECK(statistics.drawnChunks > 0);
+		CHECK(statistics.drawnChunks < statistics.meshes);
+		CHECK(statistics.drawnInstances > 0);
+		CHECK(statistics.drawnInstances < static_cast<int>(statistics.instances));
+	}
+
+	//Graphics options can be switched off
 	{
 		bibo::render::RenderSettings settings;
 		settings.hdr = false;
@@ -129,22 +143,10 @@ TEST_CASE("The bear waits at the start of the race without losing", "[gl][scene]
 		//Without culling the whole world is drawn
 		bibo::world::World::Statistics statistics = scene.getWorld().getStatistics();
 		CHECK(statistics.drawnChunks == statistics.meshes);
+		scene.setViewFrustumCullingEnabled(true);
 	}
 
-	SECTION("The world is only drawn where the camera looks")
-	{
-		bibo::render::Renderer renderer(800, 600);
-		Framebuffer framebuffer(800, 600);
-		renderer.render(scene, bibo::render::RenderSettings(), 1.0f / 60.0f);
-		bibo::world::World::Statistics statistics = scene.getWorld().getStatistics();
-		CAPTURE(statistics.drawnChunks, statistics.meshes, statistics.drawnInstances, statistics.instances);
-		CHECK(statistics.drawnChunks > 0);
-		CHECK(statistics.drawnChunks < statistics.meshes);
-		CHECK(statistics.drawnInstances > 0);
-		CHECK(statistics.drawnInstances < static_cast<int>(statistics.instances));
-	}
-
-	SECTION("View frustum culling only skips geometries that would not cover any pixel")
+	//View frustum culling only skips geometries that would not cover any pixel
 	{
 		//Every geometry is drawn in white without depth test: the image shows all covered pixels.
 		//(A shaded image is not exactly reproducible: where surfaces fight for the same depth, the driver may decide differently in two frames.)
@@ -152,7 +154,7 @@ TEST_CASE("The bear waits at the start of the race without losing", "[gl][scene]
 		Framebuffer framebuffer(800, 600); //size of the window, the camera uses its aspect ratio
 		glDisable(GL_DEPTH_TEST);
 		silhouetteShader.enable();
-		REQUIRE(scene.isViewFrustumCullingEnabled()); //default
+		REQUIRE(scene.isViewFrustumCullingEnabled());
 		//Looking back over the start: the stone ring far ahead on the track is behind the camera
 		scene.getCamera().rotate(glm::pi<float>(), 0.0f);
 

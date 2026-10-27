@@ -221,7 +221,7 @@ TEST_CASE("Shader files include other shader files", "[shader]")
 	std::string error;
 	std::string code = bibo::Shader::preprocess((folder / "main.frag").string(), error);
 	CHECK(error.empty());
-	CHECK(code.rfind("#version 430 core\n", 0) == 0); //still the first line
+	CHECK(code.starts_with("#version 430 core\n")); //still the first line
 	CHECK_THAT(code, Catch::Matchers::ContainsSubstring("float b() { return 1.0; }"));
 	CHECK_THAT(code, Catch::Matchers::ContainsSubstring("float a() { return b(); }"));
 	CHECK_THAT(code, !Catch::Matchers::ContainsSubstring("#include"));

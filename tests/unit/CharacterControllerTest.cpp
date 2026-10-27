@@ -28,7 +28,7 @@ namespace
 
 	bool contains(const std::vector<BodyHandle>& bodies, BodyHandle body)
 	{
-		return std::find(bodies.begin(), bodies.end(), body) != bodies.end();
+		return std::ranges::find(bodies, body) != bodies.end();
 	}
 
 	/**

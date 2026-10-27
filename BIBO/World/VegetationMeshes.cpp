@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <numbers>
 #include "MeshBuilder.hpp"
 #include "Noise.hpp"
 
@@ -62,7 +63,7 @@ namespace
 			float t = static_cast<float>(s) / static_cast<float>(segments);
 			float curl = 0.25f * std::max(0.0f, t - 0.75f);
 			glm::vec3 spine = direction * (0.12f + length * t) + UP * (y + rise * t - droop * t * t + length * curl);
-			float shape = std::pow(std::sin(3.14159265f * std::min(t * 0.92f + 0.08f, 1.0f)), 0.6f);
+			float shape = std::pow(std::sin(std::numbers::pi_v<float> * std::min(t * 0.92f + 0.08f, 1.0f)), 0.6f);
 			float halfWidth = 0.5f * width * (0.35f + 0.65f * shape) * (1.0f - 0.85f * t * t * t);
 			if (serrated && s % 2 == 1)
 			{
@@ -194,7 +195,7 @@ namespace
 		std::uint32_t first = static_cast<std::uint32_t>(builder.mesh.vertices.size());
 		for (int i = 0; i <= latitude; ++i)
 		{
-			float polar = 3.14159265f * static_cast<float>(i) / static_cast<float>(latitude);
+			float polar = std::numbers::pi_v<float> * static_cast<float>(i) / static_cast<float>(latitude);
 			for (int j = 0; j <= longitude; ++j)
 			{
 				float azimuth = TAU * static_cast<float>(j % longitude) / static_cast<float>(longitude);
@@ -343,7 +344,7 @@ namespace
 				float t = static_cast<float>(s) / SEGMENTS;
 				glm::vec3 spine = out * (length * t) + UP * (0.02f + length * (0.85f * t - 0.8f * t * t));
 				//Leaflets: the width alternates along the frond
-				float width = 0.17f * length * std::pow(std::sin(3.14159265f * std::min(t * 1.1f, 1.0f)), 0.6f) * (s % 2 == 0 ? 1.0f : 0.6f);
+				float width = 0.17f * length * std::pow(std::sin(std::numbers::pi_v<float> * std::min(t * 1.1f, 1.0f)), 0.6f) * (s % 2 == 0 ? 1.0f : 0.6f);
 				glm::vec3 tangent = glm::normalize(out * length + UP * (length * (0.85f - 1.6f * t)));
 				glm::vec3 normal = glm::normalize(glm::cross(tangent, side)) * -1.0f;
 				if (normal.y < 0.0f)
@@ -421,7 +422,7 @@ namespace
 		for (int k = 0; k <= RINGS; ++k)
 		{
 			float t = static_cast<float>(k) / RINGS;
-			float radius = stemRadius * (1.0f + bulge * std::sin(3.14159265f * (0.3f + 0.6f * (1.0f - t))));
+			float radius = stemRadius * (1.0f + bulge * std::sin(std::numbers::pi_v<float> * (0.3f + 0.6f * (1.0f - t))));
 			for (int j = 0; j <= SIDES; ++j)
 			{
 				float angle = TAU * static_cast<float>(j) / SIDES;

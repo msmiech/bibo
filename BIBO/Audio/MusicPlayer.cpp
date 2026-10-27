@@ -104,9 +104,7 @@ struct MusicPlayer::Impl
 				}
 			}
 		}
-		self.voices.erase(std::remove_if(self.voices.begin(), self.voices.end(), [](const Voice& voice) {
-			return voice.position >= voice.samples->size();
-		}), self.voices.end());
+		std::erase_if(self.voices, [](const Voice& voice) { return voice.position >= voice.samples->size(); });
 	}
 };
 

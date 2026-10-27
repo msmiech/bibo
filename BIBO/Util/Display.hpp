@@ -1,45 +1,52 @@
 #pragma once
-#include <vector>
 #include <GLFW/glfw3.h>
+
+#include <vector>
+
 #include "Settings.hpp"
 
-namespace bibo
-{
-	namespace display
-	{
-		struct Resolution
-		{
-			int width;
-			int height;
+namespace bibo {
+namespace display {
+struct Resolution {
+  int width;
+  int height;
 
-			bool operator==(const Resolution&) const = default;
-		};
+  bool operator==(const Resolution&) const = default;
+};
 
-		/**
-		* @return The monitor of a full screen window, otherwise the monitor that contains the center of the window
-		* (the primary monitor if no monitor contains it, nullptr if there is no monitor at all)
-		*/
-		GLFWmonitor* getMonitor(GLFWwindow* window);
-		/**
-		* @return The resolutions of the video modes of the monitor (without duplicates for different refresh rates), largest first
-		*/
-		std::vector<Resolution> getResolutions(GLFWmonitor* monitor);
-		/**
-		* Creates a window. The window hints (e.g. of the OpenGL context) must be set before.
-		* @param windowMode WindowMode
-		* @param width Window size (windowed) or video mode (full screen), ignored for borderless windows
-		*/
-		GLFWwindow* createWindow(int windowMode, int width, int height, const char* title);
-		/**
-		* Switches the window to another window mode and/or size, on the monitor it is currently on
-		* @param windowMode WindowMode
-		* @param width Window size (windowed) or video mode (full screen), ignored for borderless windows
-		*/
-		void applyWindowMode(GLFWwindow* window, int windowMode, int width, int height);
-		/**
-		* Sets the icon of the window (title bar, task bar) from an image file, on the platforms that let applications set it.
-		* On Windows the icon is a resource of the executable (BIBO/bibo.rc) that GLFW uses for every window.
-		*/
-		void setWindowIcon(GLFWwindow* window, const char* path);
-	}
-}
+/**
+ * @return The monitor of a full screen window, otherwise the monitor that
+ * contains the center of the window (the primary monitor if no monitor contains
+ * it, nullptr if there is no monitor at all)
+ */
+GLFWmonitor* getMonitor(GLFWwindow* window);
+/**
+ * @return The resolutions of the video modes of the monitor (without duplicates
+ * for different refresh rates), largest first
+ */
+std::vector<Resolution> getResolutions(GLFWmonitor* monitor);
+/**
+ * Creates a window. The window hints (e.g. of the OpenGL context) must be set
+ * before.
+ * @param windowMode WindowMode
+ * @param width Window size (windowed) or video mode (full screen), ignored for
+ * borderless windows
+ */
+GLFWwindow* createWindow(int windowMode, int width, int height,
+                         const char* title);
+/**
+ * Switches the window to another window mode and/or size, on the monitor it is
+ * currently on
+ * @param windowMode WindowMode
+ * @param width Window size (windowed) or video mode (full screen), ignored for
+ * borderless windows
+ */
+void applyWindowMode(GLFWwindow* window, int windowMode, int width, int height);
+/**
+ * Sets the icon of the window (title bar, task bar) from an image file, on the
+ * platforms that let applications set it. On Windows the icon is a resource of
+ * the executable (BIBO/bibo.rc) that GLFW uses for every window.
+ */
+void setWindowIcon(GLFWwindow* window, const char* path);
+}  // namespace display
+}  // namespace bibo

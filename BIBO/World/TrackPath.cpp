@@ -8,24 +8,24 @@
 
 #include "Noise.hpp"
 
-using namespace bibo::world;
+namespace bibo::world {
 
 namespace {
 // The path is searched on a grid with cells of this size (every second cell of
 // the terrain)
-const int GRID_STEP = 2;
-const float GRID_CELL = TrackTerrain::CELL_SIZE * GRID_STEP;
+const int kGridStep = 2;
+const float kGridCell = TrackTerrain::kCellSize * kGridStep;
 // The floor of the canyon is what is at most this much higher than the lowest
 // point around
-const float FLOOR_TOLERANCE = 1.0f;
-const float FLOOR_SEARCH_RADIUS = 8.0f;
+const float kFloorTolerance = 1.0f;
+const float kFloorSearchRadius = 8.0f;
 
-glm::vec2 rightOf(glm::vec2 direction) {
+glm::vec2 RightOf(glm::vec2 direction) {
   // Driving direction (x, z) with y up: the right side is direction x up
   return glm::vec2(-direction.y, direction.x);
 }
 
-std::vector<glm::vec2> resample(const std::vector<glm::vec2>& loop,
+std::vector<glm::vec2> Resample(const std::vector<glm::vec2>& loop,
                                 float spacing) {
   std::vector<float> distances(loop.size() + 1, 0.0f);
   for (std::size_t i = 0; i < loop.size(); ++i) {
@@ -42,16 +42,16 @@ std::vector<glm::vec2> resample(const std::vector<glm::vec2>& loop,
     while (segment + 1 < loop.size() && distances[segment + 1] < d) {
       ++segment;
     }
-    float segmentLength =
+    float segment_length =
         std::max(distances[segment + 1] - distances[segment], 1e-6f);
-    float t = (d - distances[segment]) / segmentLength;
+    float t = (d - distances[segment]) / segment_length;
     result.push_back(
         glm::mix(loop[segment], loop[(segment + 1) % loop.size()], t));
   }
   return result;
 }
 
-void smooth(std::vector<glm::vec2>& loop, int iterations) {
+void Smooth(std::vector<glm::vec2>& loop, int iterations) {
   std::vector<glm::vec2> next(loop.size());
   for (int iteration = 0; iteration < iterations; ++iteration) {
     for (std::size_t i = 0; i < loop.size(); ++i) {
@@ -66,7 +66,7 @@ void smooth(std::vector<glm::vec2>& loop, int iterations) {
 /**
  * Cheapest way through a grid of costs (Dijkstra, 8 neighbors)
  */
-std::vector<int> cheapestPath(const std::vector<float>& cost, int columns,
+std::vector<int> CheapestPath(const std::vector<float>& cost, int columns,
                               int rows, int from, int to) {
   std::vector<float> best(cost.size(), std::numeric_limits<float>::max());
   std::vector<int> previous(cost.size(), -1);
@@ -114,24 +114,24 @@ std::vector<int> cheapestPath(const std::vector<float>& cost, int columns,
 }  // namespace
 
 TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start,
-                     glm::vec2 startDirection,
+                     glm::vec2 start_direction,
                      const std::vector<glm::vec2>& waypoints,
-                     float waterLevel) {
+                     float water_level) {
   // 1. Costs on a grid: cheap on the floor of the canyon, more expensive close
   // to the walls, very expensive up the walls
-  const int columns = std::max(1, terrain.getColumns() / GRID_STEP),
-            rows = std::max(1, terrain.getRows() / GRID_STEP);
-  const glm::vec2 origin = terrain.getOrigin();
+  const int columns = std::max(1, terrain.GetColumns() / kGridStep),
+            rows = std::max(1, terrain.GetRows() / kGridStep);
+  const glm::vec2 origin = terrain.GetOrigin();
   std::vector<float> heights(static_cast<std::size_t>(columns) * rows);
   for (int j = 0; j < rows; ++j) {
     for (int i = 0; i < columns; ++i) {
       heights[static_cast<std::size_t>(j) * columns + i] =
-          terrain.heightAt(i * GRID_STEP, j * GRID_STEP);
+          terrain.HeightAt(i * kGridStep, j * kGridStep);
     }
   }
   // Lowest point around every cell (separable minimum filter)
-  const int radius = static_cast<int>(FLOOR_SEARCH_RADIUS / GRID_CELL);
-  std::vector<float> rowMinimum(heights.size()), floorLevel(heights.size());
+  const int radius = static_cast<int>(kFloorSearchRadius / kGridCell);
+  std::vector<float> row_minimum(heights.size()), floor_level(heights.size());
   for (int j = 0; j < rows; ++j) {
     for (int i = 0; i < columns; ++i) {
       float lowest = std::numeric_limits<float>::max();
@@ -140,7 +140,7 @@ TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start,
         lowest = std::min(lowest,
                           heights[static_cast<std::size_t>(j) * columns + k]);
       }
-      rowMinimum[static_cast<std::size_t>(j) * columns + i] = lowest;
+      row_minimum[static_cast<std::size_t>(j) * columns + i] = lowest;
     }
   }
   for (int j = 0; j < rows; ++j) {
@@ -149,25 +149,25 @@ TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start,
       for (int k = std::max(0, j - radius); k <= std::min(rows - 1, j + radius);
            ++k) {
         lowest = std::min(
-            lowest, rowMinimum[static_cast<std::size_t>(k) * columns + i]);
+            lowest, row_minimum[static_cast<std::size_t>(k) * columns + i]);
       }
-      floorLevel[static_cast<std::size_t>(j) * columns + i] = lowest;
+      floor_level[static_cast<std::size_t>(j) * columns + i] = lowest;
     }
   }
   // Distance from the walls (chamfer distance transform of the floor)
-  const float FAR_AWAY = 1e6f;
-  std::vector<float> wallDistance(heights.size());
+  const float far_away = 1e6f;
+  std::vector<float> wall_distance(heights.size());
   for (std::size_t c = 0; c < heights.size(); ++c) {
-    wallDistance[c] =
-        heights[c] - floorLevel[c] < FLOOR_TOLERANCE ? FAR_AWAY : 0.0f;
+    wall_distance[c] =
+        heights[c] - floor_level[c] < kFloorTolerance ? far_away : 0.0f;
   }
   auto relax = [&](int i, int j, int di, int dj, float step) {
     int ni = i + di, nj = j + dj;
     if (ni >= 0 && nj >= 0 && ni < columns && nj < rows) {
-      float& value = wallDistance[static_cast<std::size_t>(j) * columns + i];
+      float& value = wall_distance[static_cast<std::size_t>(j) * columns + i];
       value = std::min(
           value,
-          wallDistance[static_cast<std::size_t>(nj) * columns + ni] + step);
+          wall_distance[static_cast<std::size_t>(nj) * columns + ni] + step);
     }
   };
   for (int j = 0; j < rows; ++j) {
@@ -188,19 +188,19 @@ TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start,
   }
   std::vector<float> cost(heights.size());
   for (std::size_t c = 0; c < heights.size(); ++c) {
-    float above = std::max(0.0f, heights[c] - floorLevel[c] - 0.4f);
-    float distanceToWall = std::min(wallDistance[c], 50.0f) * GRID_CELL;
+    float above = std::max(0.0f, heights[c] - floor_level[c] - 0.4f);
+    float distance_to_wall = std::min(wall_distance[c], 50.0f) * kGridCell;
     cost[c] = 1.0f + 30.0f * std::pow(above, 1.5f) +
-              10.0f * std::exp(-0.6f * distanceToWall);
+              10.0f * std::exp(-0.6f * distance_to_wall);
   }
 
   // 2. Cheapest way from the start through all waypoints back to the start
-  auto cellOf = [&](glm::vec2 position) {
+  auto cell_of = [&](glm::vec2 position) {
     int i = std::clamp(
-        static_cast<int>(std::round((position.x - origin.x) / GRID_CELL)), 0,
+        static_cast<int>(std::round((position.x - origin.x) / kGridCell)), 0,
         columns - 1);
     int j = std::clamp(
-        static_cast<int>(std::round((position.y - origin.y) / GRID_CELL)), 0,
+        static_cast<int>(std::round((position.y - origin.y) / kGridCell)), 0,
         rows - 1);
     return j * columns + i;
   };
@@ -209,25 +209,25 @@ TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start,
   stops.push_back(start);
   std::vector<glm::vec2> loop;
   for (std::size_t k = 0; k + 1 < stops.size(); ++k) {
-    std::vector<int> cells = cheapestPath(cost, columns, rows, cellOf(stops[k]),
-                                          cellOf(stops[k + 1]));
+    std::vector<int> cells = CheapestPath(
+        cost, columns, rows, cell_of(stops[k]), cell_of(stops[k + 1]));
     for (std::size_t c = 0; c + 1 < cells.size();
          ++c)  // the last cell is the first of the next part
     {
       loop.push_back(origin +
-                     GRID_CELL *
+                     kGridCell *
                          glm::vec2(static_cast<float>(cells[c] % columns),
                                    static_cast<float>(cells[c] / columns)));
     }
   }
   if (loop.size() < 3) {
-    loop = {start, start + startDirection, start - startDirection};
+    loop = {start, start + start_direction, start - start_direction};
   }
 
   // 3. Smooth the zigzag of the grid away and move the line into the middle of
   // the floor
-  smooth(loop, 40);
-  loop = resample(loop, SAMPLE_SPACING);
+  Smooth(loop, 40);
+  loop = Resample(loop, kSampleSpacing);
   for (int pass = 0; pass < 3; ++pass) {
     std::vector<glm::vec2> centered(loop.size());
     for (std::size_t i = 0; i < loop.size(); ++i) {
@@ -237,14 +237,14 @@ TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start,
       Sample sample;
       sample.position = glm::vec3(loop[i].x, 0.0f, loop[i].y);
       sample.tangent = direction;
-      measure(terrain, sample);
+      Measure(terrain, sample);
       centered[i] =
-          loop[i] +
-          rightOf(direction) * (0.5f * (sample.floorRight - sample.floorLeft));
+          loop[i] + RightOf(direction) *
+                        (0.5f * (sample.floor_right - sample.floor_left));
     }
     loop = centered;
-    smooth(loop, 12);
-    loop = resample(loop, SAMPLE_SPACING);
+    Smooth(loop, 12);
+    loop = Resample(loop, kSampleSpacing);
   }
 
   // 4. The first sample is at the start and the samples go in driving direction
@@ -256,48 +256,50 @@ TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start,
   }
   std::rotate(loop.begin(), loop.begin() + static_cast<std::ptrdiff_t>(first),
               loop.end());
-  if (glm::dot(loop[1 % loop.size()] - loop[0], startDirection) < 0.0f) {
+  if (glm::dot(loop[1 % loop.size()] - loop[0], start_direction) < 0.0f) {
     std::reverse(loop.begin() + 1, loop.end());
   }
 
-  samples.resize(loop.size());
+  samples_.resize(loop.size());
   float distance = 0.0f;
   for (std::size_t i = 0; i < loop.size(); ++i) {
-    Sample& sample = samples[i];
+    Sample& sample = samples_[i];
     glm::vec2 direction =
         loop[(i + 1) % loop.size()] - loop[(i + loop.size() - 1) % loop.size()];
     sample.tangent = glm::length(direction) > 1e-6f ? glm::normalize(direction)
                                                     : glm::vec2(0.0f, 1.0f);
-    sample.position = glm::vec3(loop[i].x, terrain.height(loop[i]), loop[i].y);
+    sample.position = glm::vec3(loop[i].x, terrain.Height(loop[i]), loop[i].y);
     sample.distance = distance;
-    measure(terrain, sample);
+    Measure(terrain, sample);
     distance += glm::distance(loop[i], loop[(i + 1) % loop.size()]);
   }
-  length = distance;
+  length_ = distance;
 
   // The floor measured at a puddle is narrow (the water is lower than the floor
   // around it): the widest floor nearby counts
-  const int WINDOW = 8;
-  std::vector<Sample> measured = samples;
-  for (std::size_t i = 0; i < samples.size(); ++i) {
+  const int window = 8;
+  std::vector<Sample> measured = samples_;
+  for (std::size_t i = 0; i < samples_.size(); ++i) {
     float left = 0.0f, right = 0.0f;
-    for (int k = -WINDOW; k <= WINDOW; ++k) {
-      const Sample& other = measured[(i + samples.size() + k) % samples.size()];
-      left = std::max(left, other.floorLeft);
-      right = std::max(right, other.floorRight);
+    for (int k = -window; k <= window; ++k) {
+      const Sample& other =
+          measured[(i + samples_.size() + k) % samples_.size()];
+      left = std::max(left, other.floor_left);
+      right = std::max(right, other.floor_right);
     }
-    samples[i].floorLeft = left;
-    samples[i].floorRight = right;
+    samples_[i].floor_left = left;
+    samples_[i].floor_right = right;
   }
 
   // The trail winds on the floor (but stays on it)
-  std::vector<float> offsets(samples.size());
-  for (std::size_t i = 0; i < samples.size(); ++i) {
-    const Sample& sample = samples[i];
-    float room = std::max(0.0f, std::min(sample.floorLeft, sample.floorRight) -
-                                    TRAIL_HALF_WIDTH - 1.0f);
+  std::vector<float> offsets(samples_.size());
+  for (std::size_t i = 0; i < samples_.size(); ++i) {
+    const Sample& sample = samples_[i];
+    float room =
+        std::max(0.0f, std::min(sample.floor_left, sample.floor_right) -
+                           kTrailHalfWidth - 1.0f);
     float wave =
-        noise::fbm(glm::vec2(sample.distance * 0.018f, 3.7f), 2, 4711u);
+        noise::Fbm(glm::vec2(sample.distance * 0.018f, 3.7f), 2, 4711u);
     offsets[i] = std::clamp(wave * 1.6f, -1.0f, 1.0f) * std::min(room, 3.0f);
   }
   for (int iteration = 0; iteration < 8; ++iteration) {
@@ -309,62 +311,62 @@ TrackPath::TrackPath(const TrackTerrain& terrain, glm::vec2 start,
     }
     offsets.swap(next);
   }
-  avoidWater(terrain, waterLevel, offsets);
-  for (std::size_t i = 0; i < samples.size(); ++i) {
-    samples[i].trailOffset = offsets[i];
+  AvoidWater(terrain, water_level, offsets);
+  for (std::size_t i = 0; i < samples_.size(); ++i) {
+    samples_[i].trail_offset = offsets[i];
   }
-  buildBuckets();
+  BuildBuckets();
 }
 
-bool TrackPath::dryTrail(const TrackTerrain& terrain, float waterLevel,
+bool TrackPath::DryTrail(const TrackTerrain& terrain, float water_level,
                          const Sample& sample, float offset,
-                         float halfWidth) const {
+                         float half_width) const {
   glm::vec2 center(sample.position.x, sample.position.z);
-  glm::vec2 right = rightOf(sample.tangent);
-  for (float lateral = offset - halfWidth;
-       lateral <= offset + halfWidth + 1e-3f; lateral += 0.25f) {
-    if (terrain.height(center + right * lateral) < waterLevel + 0.05f) {
+  glm::vec2 right = RightOf(sample.tangent);
+  for (float lateral = offset - half_width;
+       lateral <= offset + half_width + 1e-3f; lateral += 0.25f) {
+    if (terrain.Height(center + right * lateral) < water_level + 0.05f) {
       return false;
     }
   }
   return true;
 }
 
-void TrackPath::avoidWater(const TrackTerrain& terrain, float waterLevel,
+void TrackPath::AvoidWater(const TrackTerrain& terrain, float water_level,
                            std::vector<float>& offsets) const {
   // Where a pool of water lies on the floor, the trail goes around it on the
   // dry side (if the floor has room there). Pools that fill the whole floor are
   // crossed (the race jumps over them). The trail swerves in a smooth curve:
   // the shift is fixed at the pool and fades out along the track before and
   // after it (screened diffusion).
-  const std::size_t count = samples.size();
-  const float CLEARANCE = TRAIL_HALF_WIDTH + 0.2f;
+  const std::size_t count = samples_.size();
+  const float trail_clearance = kTrailHalfWidth + 0.2f;
   std::vector<float> shift(count, 0.0f);
   std::vector<bool> fixed(count, false);
-  std::vector<float> fixedShift(count, 0.0f);
+  std::vector<float> fixed_shift(count, 0.0f);
   for (int round = 0; round < 6; ++round) {
     bool changed = false;
     // The closest dry place on the floor for the samples where the trail is wet
     // (the trail may reach over the edge of the floor, where the ground only
     // begins to rise), NaN if there is none. Where the dry side is narrow it
     // may come closer to the water.
-    const float NONE = std::numeric_limits<float>::quiet_NaN();
+    const float none = std::numeric_limits<float>::quiet_NaN();
     std::vector<bool> wet(count, false);
-    std::vector<float> dryOffset(count, NONE);
+    std::vector<float> dry_offset(count, none);
     for (std::size_t i = 0; i < count; ++i) {
-      const Sample& sample = samples[i];
+      const Sample& sample = samples_[i];
       float offset = offsets[i] + shift[i];
-      wet[i] = !dryTrail(terrain, waterLevel, sample, offset, TRAIL_HALF_WIDTH);
-      for (float clearance : {CLEARANCE, TRAIL_HALF_WIDTH - 0.4f}) {
-        float bestDistance = std::numeric_limits<float>::max();
-        for (float candidate = -sample.floorLeft + TRAIL_HALF_WIDTH - 1.5f;
-             wet[i] && std::isnan(dryOffset[i]) &&
-             candidate <= sample.floorRight - TRAIL_HALF_WIDTH + 1.5f;
+      wet[i] = !DryTrail(terrain, water_level, sample, offset, kTrailHalfWidth);
+      for (float clearance : {trail_clearance, kTrailHalfWidth - 0.4f}) {
+        float best_distance = std::numeric_limits<float>::max();
+        for (float candidate = -sample.floor_left + kTrailHalfWidth - 1.5f;
+             wet[i] && std::isnan(dry_offset[i]) &&
+             candidate <= sample.floor_right - kTrailHalfWidth + 1.5f;
              candidate += 0.25f) {
-          if (std::abs(candidate - offset) < bestDistance &&
-              dryTrail(terrain, waterLevel, sample, candidate, clearance)) {
-            dryOffset[i] = candidate;
-            bestDistance = std::abs(candidate - offset);
+          if (std::abs(candidate - offset) < best_distance &&
+              DryTrail(terrain, water_level, sample, candidate, clearance)) {
+            dry_offset[i] = candidate;
+            best_distance = std::abs(candidate - offset);
           }
         }
       }
@@ -382,9 +384,9 @@ void TrackPath::avoidWater(const TrackTerrain& terrain, float waterLevel,
       int missing = 0;
       bool left = false, right = false;
       while (end < count && wet[end]) {
-        missing += std::isnan(dryOffset[end]) ? 1 : 0;
-        left = left || dryOffset[end] < -0.5f;
-        right = right || dryOffset[end] > 0.5f;
+        missing += std::isnan(dry_offset[end]) ? 1 : 0;
+        left = left || dry_offset[end] < -0.5f;
+        right = right || dry_offset[end] > 0.5f;
         ++end;
       }
       if (left == right || static_cast<float>(missing) >
@@ -393,19 +395,19 @@ void TrackPath::avoidWater(const TrackTerrain& terrain, float waterLevel,
         continue;
       }
       for (std::size_t i = first; i < end; ++i) {
-        float target = dryOffset[i];
+        float target = dry_offset[i];
         if (std::isnan(target)) {
           // Between the closest samples with a dry place
           std::size_t before = i, after = i;
-          while (before > first && std::isnan(dryOffset[before])) {
+          while (before > first && std::isnan(dry_offset[before])) {
             --before;
           }
-          while (after + 1 < end && std::isnan(dryOffset[after])) {
+          while (after + 1 < end && std::isnan(dry_offset[after])) {
             ++after;
           }
-          float a = std::isnan(dryOffset[before]) ? dryOffset[after]
-                                                  : dryOffset[before];
-          float b = std::isnan(dryOffset[after]) ? a : dryOffset[after];
+          float a = std::isnan(dry_offset[before]) ? dry_offset[after]
+                                                   : dry_offset[before];
+          float b = std::isnan(dry_offset[after]) ? a : dry_offset[after];
           target = after > before
                        ? glm::mix(a, b,
                                   static_cast<float>(i - before) /
@@ -413,9 +415,9 @@ void TrackPath::avoidWater(const TrackTerrain& terrain, float waterLevel,
                        : a;
         }
         if (!fixed[i] ||
-            std::abs(fixedShift[i] - (target - offsets[i])) > 0.1f) {
+            std::abs(fixed_shift[i] - (target - offsets[i])) > 0.1f) {
           fixed[i] = true;
-          fixedShift[i] = target - offsets[i];
+          fixed_shift[i] = target - offsets[i];
           changed = true;
         }
       }
@@ -429,7 +431,7 @@ void TrackPath::avoidWater(const TrackTerrain& terrain, float waterLevel,
     for (int iteration = 0; iteration < 1500; ++iteration) {
       for (std::size_t i = 0; i < count; ++i) {
         next[i] = fixed[i]
-                      ? fixedShift[i]
+                      ? fixed_shift[i]
                       : 0.9985f * (0.5f * shift[i] +
                                    0.25f * (shift[(i + count - 1) % count] +
                                             shift[(i + 1) % count]));
@@ -442,91 +444,92 @@ void TrackPath::avoidWater(const TrackTerrain& terrain, float waterLevel,
   }
 }
 
-void TrackPath::measure(const TrackTerrain& terrain, Sample& sample) const {
+void TrackPath::Measure(const TrackTerrain& terrain, Sample& sample) const {
   glm::vec2 center(sample.position.x, sample.position.z);
-  glm::vec2 right = rightOf(sample.tangent);
-  const float STEP = 0.25f;
+  glm::vec2 right = RightOf(sample.tangent);
+  const float step = 0.25f;
   // The lowest point of the floor close to the line
-  float floorHeight = std::numeric_limits<float>::max();
-  for (float offset = -6.0f; offset <= 6.0f; offset += STEP) {
-    floorHeight =
-        std::min(floorHeight, terrain.height(center + right * offset));
+  float floor_height = std::numeric_limits<float>::max();
+  for (float offset = -6.0f; offset <= 6.0f; offset += step) {
+    floor_height =
+        std::min(floor_height, terrain.Height(center + right * offset));
   }
-  auto floorWidth = [&](float side) {
+  auto floor_width = [&](float side) {
     float offset = 0.0f;
     while (offset < 25.0f &&
-           terrain.height(center + right * (side * (offset + STEP))) <
-               floorHeight + FLOOR_TOLERANCE) {
-      offset += STEP;
+           terrain.Height(center + right * (side * (offset + step))) <
+               floor_height + kFloorTolerance) {
+      offset += step;
     }
     return offset;
   };
-  sample.floorRight = floorWidth(1.0f);
-  sample.floorLeft = floorWidth(-1.0f);
-  auto wallHeight = [&](float side, float floorEdge) {
-    float highest = floorHeight;
-    for (float offset = floorEdge; offset <= floorEdge + 20.0f;
+  sample.floor_right = floor_width(1.0f);
+  sample.floor_left = floor_width(-1.0f);
+  auto wall_height = [&](float side, float floor_edge) {
+    float highest = floor_height;
+    for (float offset = floor_edge; offset <= floor_edge + 20.0f;
          offset += 1.0f) {
       highest =
-          std::max(highest, terrain.height(center + right * (side * offset)));
+          std::max(highest, terrain.Height(center + right * (side * offset)));
     }
-    return highest - floorHeight;
+    return highest - floor_height;
   };
-  sample.wallRight = wallHeight(1.0f, sample.floorRight);
-  sample.wallLeft = wallHeight(-1.0f, sample.floorLeft);
+  sample.wall_right = wall_height(1.0f, sample.floor_right);
+  sample.wall_left = wall_height(-1.0f, sample.floor_left);
 }
 
-void TrackPath::buildBuckets() {
+void TrackPath::BuildBuckets() {
   glm::vec2 low(std::numeric_limits<float>::max()),
       high(std::numeric_limits<float>::lowest());
-  for (const Sample& sample : samples) {
+  for (const Sample& sample : samples_) {
     low = glm::min(low, glm::vec2(sample.position.x, sample.position.z));
     high = glm::max(high, glm::vec2(sample.position.x, sample.position.z));
   }
-  bucketOrigin = low - glm::vec2(SEARCH_RADIUS);
-  bucketColumns =
-      static_cast<int>((high.x - low.x + 2.0f * SEARCH_RADIUS) / BUCKET_SIZE) +
+  bucket_origin_ = low - glm::vec2(kSearchRadius);
+  bucket_columns_ =
+      static_cast<int>((high.x - low.x + 2.0f * kSearchRadius) / kBucketSize) +
       1;
-  bucketRows =
-      static_cast<int>((high.y - low.y + 2.0f * SEARCH_RADIUS) / BUCKET_SIZE) +
+  bucket_rows_ =
+      static_cast<int>((high.y - low.y + 2.0f * kSearchRadius) / kBucketSize) +
       1;
-  buckets.assign(static_cast<std::size_t>(bucketColumns) * bucketRows, {});
-  for (std::size_t i = 0; i < samples.size(); ++i) {
-    glm::vec2 a(samples[i].position.x, samples[i].position.z);
-    const Sample& next = samples[(i + 1) % samples.size()];
+  buckets_.assign(static_cast<std::size_t>(bucket_columns_) * bucket_rows_, {});
+  for (std::size_t i = 0; i < samples_.size(); ++i) {
+    glm::vec2 a(samples_[i].position.x, samples_[i].position.z);
+    const Sample& next = samples_[(i + 1) % samples_.size()];
     glm::vec2 b(next.position.x, next.position.z);
-    glm::vec2 segmentLow =
-        glm::min(a, b) - glm::vec2(SEARCH_RADIUS) - bucketOrigin;
-    glm::vec2 segmentHigh =
-        glm::max(a, b) + glm::vec2(SEARCH_RADIUS) - bucketOrigin;
-    int i0 = std::max(0, static_cast<int>(segmentLow.x / BUCKET_SIZE)),
-        i1 = std::min(bucketColumns - 1,
-                      static_cast<int>(segmentHigh.x / BUCKET_SIZE));
-    int j0 = std::max(0, static_cast<int>(segmentLow.y / BUCKET_SIZE)),
-        j1 = std::min(bucketRows - 1,
-                      static_cast<int>(segmentHigh.y / BUCKET_SIZE));
+    glm::vec2 segment_low =
+        glm::min(a, b) - glm::vec2(kSearchRadius) - bucket_origin_;
+    glm::vec2 segment_high =
+        glm::max(a, b) + glm::vec2(kSearchRadius) - bucket_origin_;
+    int i0 = std::max(0, static_cast<int>(segment_low.x / kBucketSize)),
+        i1 = std::min(bucket_columns_ - 1,
+                      static_cast<int>(segment_high.x / kBucketSize));
+    int j0 = std::max(0, static_cast<int>(segment_low.y / kBucketSize)),
+        j1 = std::min(bucket_rows_ - 1,
+                      static_cast<int>(segment_high.y / kBucketSize));
     for (int j = j0; j <= j1; ++j) {
       for (int k = i0; k <= i1; ++k) {
-        buckets[static_cast<std::size_t>(j) * bucketColumns + k].push_back(
+        buckets_[static_cast<std::size_t>(j) * bucket_columns_ + k].push_back(
             static_cast<int>(i));
       }
     }
   }
 }
 
-TrackPath::Sample TrackPath::at(float distance) const {
-  if (samples.empty()) {
+TrackPath::Sample TrackPath::At(float distance) const {
+  if (samples_.empty()) {
     return Sample();
   }
-  distance = std::fmod(distance, length);
+  distance = std::fmod(distance, length_);
   if (distance < 0.0f) {
-    distance += length;
+    distance += length_;
   }
   // The samples are evenly spaced
-  float index = distance / length * static_cast<float>(samples.size());
-  std::size_t i = std::min(static_cast<std::size_t>(index), samples.size() - 1);
-  const Sample& a = samples[i];
-  const Sample& b = samples[(i + 1) % samples.size()];
+  float index = distance / length_ * static_cast<float>(samples_.size());
+  std::size_t i =
+      std::min(static_cast<std::size_t>(index), samples_.size() - 1);
+  const Sample& a = samples_[i];
+  const Sample& b = samples_[(i + 1) % samples_.size()];
   float t = index - static_cast<float>(i);
   Sample result = a;
   result.position = glm::mix(a.position, b.position, t);
@@ -534,28 +537,29 @@ TrackPath::Sample TrackPath::at(float distance) const {
   result.tangent =
       glm::length(tangent) > 1e-6f ? glm::normalize(tangent) : a.tangent;
   result.distance = distance;
-  result.floorLeft = glm::mix(a.floorLeft, b.floorLeft, t);
-  result.floorRight = glm::mix(a.floorRight, b.floorRight, t);
-  result.wallLeft = glm::mix(a.wallLeft, b.wallLeft, t);
-  result.wallRight = glm::mix(a.wallRight, b.wallRight, t);
-  result.trailOffset = glm::mix(a.trailOffset, b.trailOffset, t);
+  result.floor_left = glm::mix(a.floor_left, b.floor_left, t);
+  result.floor_right = glm::mix(a.floor_right, b.floor_right, t);
+  result.wall_left = glm::mix(a.wall_left, b.wall_left, t);
+  result.wall_right = glm::mix(a.wall_right, b.wall_right, t);
+  result.trail_offset = glm::mix(a.trail_offset, b.trail_offset, t);
   return result;
 }
 
-TrackPath::Nearest TrackPath::nearest(glm::vec2 position) const {
+TrackPath::Nearest TrackPath::FindNearest(glm::vec2 position) const {
   Nearest result;
-  glm::vec2 local = position - bucketOrigin;
-  int i = static_cast<int>(std::floor(local.x / BUCKET_SIZE)),
-      j = static_cast<int>(std::floor(local.y / BUCKET_SIZE));
-  if (i < 0 || j < 0 || i >= bucketColumns || j >= bucketRows) {
+  glm::vec2 local = position - bucket_origin_;
+  int i = static_cast<int>(std::floor(local.x / kBucketSize)),
+      j = static_cast<int>(std::floor(local.y / kBucketSize));
+  if (i < 0 || j < 0 || i >= bucket_columns_ || j >= bucket_rows_) {
     return result;
   }
-  float bestSquared = SEARCH_RADIUS * SEARCH_RADIUS;
-  int bestSegment = -1;
-  float bestT = 0.0f;
-  for (int segment : buckets[static_cast<std::size_t>(j) * bucketColumns + i]) {
-    const Sample& a = samples[segment];
-    const Sample& b = samples[(segment + 1) % samples.size()];
+  float best_squared = kSearchRadius * kSearchRadius;
+  int best_segment = -1;
+  float best_t = 0.0f;
+  for (int segment :
+       buckets_[static_cast<std::size_t>(j) * bucket_columns_ + i]) {
+    const Sample& a = samples_[segment];
+    const Sample& b = samples_[(segment + 1) % samples_.size()];
     glm::vec2 pa(a.position.x, a.position.z), pb(b.position.x, b.position.z);
     glm::vec2 ab = pb - pa;
     float t = std::clamp(
@@ -563,29 +567,31 @@ TrackPath::Nearest TrackPath::nearest(glm::vec2 position) const {
         1.0f);
     glm::vec2 offset = position - (pa + t * ab);
     float squared = glm::dot(offset, offset);
-    if (squared < bestSquared) {
-      bestSquared = squared;
-      bestSegment = segment;
-      bestT = t;
+    if (squared < best_squared) {
+      best_squared = squared;
+      best_segment = segment;
+      best_t = t;
     }
   }
-  if (bestSegment < 0) {
+  if (best_segment < 0) {
     return result;
   }
-  const Sample& a = samples[bestSegment];
-  const Sample& b = samples[(bestSegment + 1) % samples.size()];
+  const Sample& a = samples_[best_segment];
+  const Sample& b = samples_[(best_segment + 1) % samples_.size()];
   glm::vec2 pa(a.position.x, a.position.z), pb(b.position.x, b.position.z);
-  glm::vec2 closest = glm::mix(pa, pb, bestT);
+  glm::vec2 closest = glm::mix(pa, pb, best_t);
   glm::vec2 direction =
       glm::length(pb - pa) > 1e-6f ? glm::normalize(pb - pa) : a.tangent;
   result.found = true;
-  result.lateral = glm::dot(position - closest, rightOf(direction));
-  float trailOffset = glm::mix(a.trailOffset, b.trailOffset, bestT);
-  result.trailLateral = result.lateral - trailOffset;
-  result.distance = a.distance + bestT * glm::distance(pa, pb);
-  result.floorHalfWidth = result.lateral >= 0.0f
-                              ? glm::mix(a.floorRight, b.floorRight, bestT)
-                              : glm::mix(a.floorLeft, b.floorLeft, bestT);
-  result.floorHeight = glm::mix(a.position.y, b.position.y, bestT);
+  result.lateral = glm::dot(position - closest, RightOf(direction));
+  float trail_offset = glm::mix(a.trail_offset, b.trail_offset, best_t);
+  result.trail_lateral = result.lateral - trail_offset;
+  result.distance = a.distance + best_t * glm::distance(pa, pb);
+  result.floor_half_width = result.lateral >= 0.0f
+                                ? glm::mix(a.floor_right, b.floor_right, best_t)
+                                : glm::mix(a.floor_left, b.floor_left, best_t);
+  result.floor_height = glm::mix(a.position.y, b.position.y, best_t);
   return result;
 }
+
+}  // namespace bibo::world

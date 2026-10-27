@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_UTIL_DEMOSCRIPT_HPP_
+#define BIBO_UTIL_DEMOSCRIPT_HPP_
 #include <istream>
 #include <string>
 #include <vector>
@@ -19,7 +20,7 @@ namespace bibo {
 class DemoScript {
  public:
   struct Event {
-    enum Type { KeyDown, KeyUp, Quit };
+    enum Type { kKeyDown, kKeyUp, kQuit };
     int frame;
     Type type;
     int key;  // GLFW key code (not used by Quit)
@@ -30,25 +31,27 @@ class DemoScript {
    * @param error Line number and description of the first error
    * @return false if the script has an error (no events then)
    */
-  bool parse(std::istream& script, int fps, std::string& error);
-  bool load(const std::string& path, int fps, std::string& error);
+  bool Parse(std::istream& script, int fps, std::string& error);
+  bool Load(const std::string& path, int fps, std::string& error);
 
   /**
    * @return The events of the frame (in the order of the script)
    */
-  std::vector<Event> eventsAt(int frame) const;
+  std::vector<Event> EventsAt(int frame) const;
 
   /**
    * @return The frame of the last event (the Quit at the end)
    */
-  int lastFrame() const;
+  int LastFrame() const;
 
   /**
    * @return The GLFW key code or GLFW_KEY_UNKNOWN
    */
-  static int keyFromName(const std::string& name);
+  static int KeyFromName(const std::string& name);
 
  private:
-  std::vector<Event> events;  // sorted by frame
+  std::vector<Event> events_;  // sorted by frame
 };
 }  // namespace bibo
+
+#endif  // BIBO_UTIL_DEMOSCRIPT_HPP_

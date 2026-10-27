@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_CHUNK_HPP_
+#define BIBO_WORLD_CHUNK_HPP_
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -11,14 +12,14 @@
 namespace bibo {
 namespace world {
 /**
- * The world is partitioned into cubes of CHUNK_SIZE: every chunk is meshed on
+ * The world is partitioned into cubes of kChunkSize: every chunk is meshed on
  * its own, in a level of detail that depends on its distance from the camera.
- * Level 0 has CHUNK_CELLS voxels per axis (1 unit each), every further level
+ * Level 0 has kChunkCells voxels per axis (1 unit each), every further level
  * half as many.
  */
-constexpr float CHUNK_SIZE = 32.0f;
-constexpr int CHUNK_CELLS = 32;
-constexpr int LOD_COUNT = 4;
+constexpr float kChunkSize = 32.0f;
+constexpr int kChunkCells = 32;
+constexpr int kLodCount = 4;
 
 struct ChunkKey {
   int x = 0, y = 0, z = 0;
@@ -33,19 +34,19 @@ struct ChunkKeyHash {
   }
 };
 
-inline Box chunkBox(const ChunkKey& key) {
+inline Box ChunkBox(const ChunkKey& key) {
   Box box;
   box.minimum = glm::vec3(static_cast<float>(key.x), static_cast<float>(key.y),
                           static_cast<float>(key.z)) *
-                CHUNK_SIZE;
-  box.maximum = box.minimum + glm::vec3(CHUNK_SIZE);
+                kChunkSize;
+  box.maximum = box.minimum + glm::vec3(kChunkSize);
   return box;
 }
 
-inline ChunkKey chunkAt(glm::vec3 position) {
-  return {static_cast<int>(std::floor(position.x / CHUNK_SIZE)),
-          static_cast<int>(std::floor(position.y / CHUNK_SIZE)),
-          static_cast<int>(std::floor(position.z / CHUNK_SIZE))};
+inline ChunkKey ChunkAt(glm::vec3 position) {
+  return {static_cast<int>(std::floor(position.x / kChunkSize)),
+          static_cast<int>(std::floor(position.y / kChunkSize)),
+          static_cast<int>(std::floor(position.z / kChunkSize))};
 }
 
 /**
@@ -58,12 +59,12 @@ struct TerrainVertex {
   // trail, sand, bare rock (cave, cliff), snow from 0 to 255
   std::uint8_t material[4];
   // ambient occlusion: 0 in a closed cave, 255 on open ground
-  std::uint8_t skyVisibility;
+  std::uint8_t sky_visibility;
   std::uint8_t padding[3];
 };
 
 /**
- * The surface in a chunk as triangles. The skirts (after surfaceIndexCount)
+ * The surface in a chunk as triangles. The skirts (after surface_index_count)
  * hang from the border of the surface into the ground: they hide the cracks to
  * neighbors with another level of detail.
  */
@@ -72,9 +73,9 @@ struct ChunkMesh {
   int lod = 0;
   std::vector<TerrainVertex> vertices;
   std::vector<std::uint32_t> indices;
-  std::size_t surfaceIndexCount = 0;
+  std::size_t surface_index_count = 0;
   Box bounds;
-  bool empty() const { return surfaceIndexCount == 0; }
+  bool Empty() const { return surface_index_count == 0; }
 };
 
 /**
@@ -84,6 +85,8 @@ struct ChunkMesh {
  * level of detail fit together exactly (the voxels at the border are computed
  * the same way in both).
  */
-ChunkMesh meshChunk(const WorldGenerator& world, const ChunkKey& key, int lod);
+ChunkMesh MeshChunk(const WorldGenerator& world, const ChunkKey& key, int lod);
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_CHUNK_HPP_

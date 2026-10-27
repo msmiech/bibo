@@ -16,17 +16,17 @@ using glm::vec4;
 
 namespace {
 // Reproducible with --rng-seed
-std::mt19937& randomEngine() {
+std::mt19937& RandomEngine() {
   static std::mt19937 engine(Catch::getSeed());
   return engine;
 }
 
-aiMatrix4x4 randomMatrix(bool affine) {
+aiMatrix4x4 RandomMatrix(bool affine) {
   std::uniform_real_distribution<float> value(-10.0f, 10.0f);
   aiMatrix4x4 m;
   for (unsigned int row = 0; row < 4; ++row) {
     for (unsigned int column = 0; column < 4; ++column) {
-      m[row][column] = value(randomEngine());
+      m[row][column] = value(RandomEngine());
     }
   }
   if (affine) {
@@ -61,9 +61,9 @@ TEST_CASE("Assimp matrices are converted to GLM matrices", "[math]") {
   SECTION("Transforms points like the Assimp matrix") {
     std::uniform_real_distribution<float> coordinate(-100.0f, 100.0f);
     for (int i = 0; i < 100; ++i) {
-      aiMatrix4x4 m = randomMatrix(true);
-      aiVector3D point(coordinate(randomEngine()), coordinate(randomEngine()),
-                       coordinate(randomEngine()));
+      aiMatrix4x4 m = RandomMatrix(true);
+      aiVector3D point(coordinate(RandomEngine()), coordinate(RandomEngine()),
+                       coordinate(RandomEngine()));
       aiVector3D expected = m * point;
 
       vec3 actual =
@@ -76,8 +76,8 @@ TEST_CASE("Assimp matrices are converted to GLM matrices", "[math]") {
 
   SECTION("Converting a product is the product of the converted matrices") {
     for (int i = 0; i < 100; ++i) {
-      aiMatrix4x4 a = randomMatrix(false);
-      aiMatrix4x4 b = randomMatrix(false);
+      aiMatrix4x4 a = RandomMatrix(false);
+      aiMatrix4x4 b = RandomMatrix(false);
       CAPTURE(i);
       REQUIRE_THAT(
           util::ConvertMatrix(a * b),
@@ -97,22 +97,22 @@ TEST_CASE(
   aiMatrix4x4::RotationZ(glm::radians(90.0f), child->mTransformation);
   root.addChildren(1, &child);
 
-  auto grandChild = new aiNode("grandChild");
+  auto grand_child = new aiNode("grandChild");
   aiMatrix4x4::Translation(aiVector3D(1.0f, 0.0f, 0.0f),
-                           grandChild->mTransformation);
-  child->addChildren(1, &grandChild);
+                           grand_child->mTransformation);
+  child->addChildren(1, &grand_child);
 
   SECTION("Root node") {
-    aiMatrix4x4 result = randomMatrix(false);  // the previous value is ignored
-    Model::transformNode(&result, &root);
+    aiMatrix4x4 result = RandomMatrix(false);  // the previous value is ignored
+    Model::TransformNode(&result, &root);
     CHECK(result == root.mTransformation);
   }
 
   SECTION("Nested node: parent transformations are applied after the own one") {
-    aiMatrix4x4 result = randomMatrix(false);
-    Model::transformNode(&result, grandChild);
+    aiMatrix4x4 result = RandomMatrix(false);
+    Model::TransformNode(&result, grand_child);
     CHECK(result.Equal(root.mTransformation * child->mTransformation *
-                           grandChild->mTransformation,
+                           grand_child->mTransformation,
                        1e-6f));
 
     // Translated by 1 along x, rotated to the y axis and scaled by 2

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_UTIL_FRAMERECORDER_HPP_
+#define BIBO_UTIL_FRAMERECORDER_HPP_
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -21,21 +22,23 @@ class FrameRecorder {
   FrameRecorder(const FrameRecorder&) = delete;
   FrameRecorder& operator=(const FrameRecorder&) = delete;
 
-  bool isOpen() const;
+  bool IsOpen() const;
   /**
    * Reads the back buffer of the default framebuffer, call it before swapping
    * the buffers.
    * @return false if the frame could not be written or the framebuffer has
    * another size than at the start
    */
-  bool recordFrame(int width, int height);
-  int getFrameCount() const;
+  bool RecordFrame(int width, int height);
+  int GetFrameCount() const;
 
  private:
-  std::FILE* file = nullptr;
-  int width;
-  int height;
-  int frameCount = 0;
-  std::vector<unsigned char> pixels;
+  std::FILE* file_ = nullptr;
+  int width_;
+  int height_;
+  int frame_count_ = 0;
+  std::vector<unsigned char> pixels_;
 };
 }  // namespace bibo
+
+#endif  // BIBO_UTIL_FRAMERECORDER_HPP_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_SCENE_CREATUREMESHES_HPP_
+#define BIBO_SCENE_CREATUREMESHES_HPP_
 #include "../World/VegetationMeshes.hpp"
 
 namespace bibo {
@@ -11,27 +12,29 @@ namespace scene {
  * middle of the fish, which is 1 long.
  */
 enum class CreatureModel {
-  SALMON_HEAD,  // from the gills to the snout (eaten first)
-  SALMON_BODY,
-  // origin at the joint to the body (z = SALMON_TAIL_JOINT of the whole fish),
+  kSalmonHead,  // from the gills to the snout (eaten first)
+  kSalmonBody,
+  // origin at the joint to the body (z = kSalmonTailJoint of the whole fish),
   // it wiggles
-  SALMON_TAIL,
-  DROPLET,  // splash of water, radius 1
+  kSalmonTail,
+  kDroplet,  // splash of water, radius 1
   // glowing golden exclamation mark, 1 high, the origin at its bottom
-  QUEST_MARKER,
+  kQuestMarker,
   // the same in blue: a quest that was completed and can be done again
-  QUEST_MARKER_REPEATABLE,
-  COUNT
+  kQuestMarkerRepeatable,
+  kCount
 };
-constexpr int CREATURE_MODEL_COUNT = static_cast<int>(CreatureModel::COUNT);
+constexpr int kCreatureModelCount = static_cast<int>(CreatureModel::kCount);
 
 // Where the parts of the salmon meet (along its length, -0.5 tail to 0.5 snout)
-constexpr float SALMON_HEAD_JOINT = 0.2f;
-constexpr float SALMON_TAIL_JOINT = -0.15f;
+constexpr float kSalmonHeadJoint = 0.2f;
+constexpr float kSalmonTailJoint = -0.15f;
 
 /**
  * Generated, the same every time
  */
-world::VegetationMesh buildCreatureModel(CreatureModel model);
+world::VegetationMesh BuildCreatureModel(CreatureModel model);
 }  // namespace scene
 }  // namespace bibo
+
+#endif  // BIBO_SCENE_CREATUREMESHES_HPP_

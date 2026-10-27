@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_FOLIAGEINTERACTION_HPP_
+#define BIBO_WORLD_FOLIAGEINTERACTION_HPP_
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -38,49 +39,51 @@ class FoliageInteraction {
 
   // How long the plants stay pressed down after a body left, how long they
   // swing back afterwards
-  static constexpr float HOLD_TIME = 0.8f;
-  static constexpr float SPRING_TIME = 1.8f;
+  static constexpr float kHoldTime = 0.8f;
+  static constexpr float kSpringTime = 1.8f;
   // Only the plants closer than this to the camera are bent (the grass is not
   // drawn further away)
-  static constexpr float RANGE = 60.0f;
+  static constexpr float kRange = 60.0f;
 
   /**
    * Follows the bodies (in the same order every frame) and lets the imprints
    * age
    */
-  void update(float timeDelta, const std::vector<Body>& bodies,
+  void Update(float time_delta, const std::vector<Body>& bodies,
               glm::vec3 camera);
   /**
-   * The selected bodies and imprints into foliageInteractors and foliagePushes,
-   * their number into wind.w
+   * The selected bodies and imprints into foliage_interactors and
+   * foliage_pushes, their number into wind.w
    */
-  void fillFrameUniforms(render::FrameUniforms& uniforms) const;
+  void FillFrameUniforms(render::FrameUniforms& uniforms) const;
   /**
    * @return The bodies and imprints for the shaders, the most important first
-   * (at most MAX_FOLIAGE_INTERACTORS)
+   * (at most kMaxFoliageInteractors)
    */
-  const std::vector<Imprint>& getSelected() const { return selected; }
-  std::size_t getTrailLength() const { return trail.size(); }
+  const std::vector<Imprint>& GetSelected() const { return selected_; }
+  std::size_t GetTrailLength() const { return trail_.size(); }
 
   /**
    * How far the plants are pushed aside: 1 while a body is there and for
-   * HOLD_TIME after it left, then a damped swing back (a bit past upright), 0
-   * after SPRING_TIME
+   * kHoldTime after it left, then a damped swing back (a bit past upright), 0
+   * after kSpringTime
    * @param age Seconds since the body left (negative: it is there)
    */
-  static float push(float age);
+  static float Push(float age);
 
  private:
   struct Tracked {
     glm::vec3 position = glm::vec3(0.0f);
-    glm::vec3 lastImprint = glm::vec3(0.0f);
+    glm::vec3 last_imprint = glm::vec3(0.0f);
     glm::vec2 motion = glm::vec2(0.0f);
     bool valid = false;
   };
 
-  std::vector<Tracked> tracked;
-  std::vector<Imprint> trail;
-  std::vector<Imprint> selected;
+  std::vector<Tracked> tracked_;
+  std::vector<Imprint> trail_;
+  std::vector<Imprint> selected_;
 };
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_FOLIAGEINTERACTION_HPP_

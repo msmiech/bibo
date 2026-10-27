@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_VEGETATIONRENDERER_HPP_
+#define BIBO_WORLD_VEGETATIONRENDERER_HPP_
 #include <GL/glew.h>
 
 #include <memory>
@@ -25,10 +26,10 @@ struct LodBlend {
 };
 
 /**
- * @param lodDistances Where the levels 1, 2, ... begin (lodCount - 1 of them)
+ * @param lod_distances Where the levels 1, 2, ... begin (lod_count - 1 of them)
  * @param band Width of the cross-fade around every distance, relative to it
  */
-LodBlend blendLod(float distance, const float* lodDistances, int lodCount,
+LodBlend BlendLod(float distance, const float* lod_distances, int lod_count,
                   float band);
 
 /**
@@ -51,38 +52,38 @@ class VegetationRenderer {
   VegetationRenderer(const VegetationRenderer&) = delete;
   VegetationRenderer& operator=(const VegetationRenderer&) = delete;
 
-  void apply(const WorldStreamer::VegetationUpdate& update);
+  void Apply(const WorldStreamer::VegetationUpdate& update);
   /**
    * @return Number of drawn instances
    */
-  int draw(const scene::ViewFrustum& frustum, glm::vec3 camera);
-  void drawShadow(const render::ShadowCascade& cascade, glm::vec3 camera);
-  void setDetail(float newDetail) { detail = newDetail; }
-  std::size_t getInstanceCount() const;
+  int Draw(const scene::ViewFrustum& frustum, glm::vec3 camera);
+  void DrawShadow(const render::ShadowCascade& cascade, glm::vec3 camera);
+  void SetDetail(float new_detail) { detail_ = new_detail; }
+  std::size_t GetInstanceCount() const;
 
  private:
   struct GpuMesh {
-    GLuint vertexArray = 0, vertexBuffer = 0, indexBuffer = 0;
-    GLsizei indexCount = 0;
+    GLuint vertex_array = 0, vertex_buffer = 0, index_buffer = 0;
+    GLsizei index_count = 0;
     float radius = 0.0f;
   };
   struct ModelData {
     std::vector<GpuMesh> lods;
-    float lodDistances[2] = {1e9f, 1e9f};
-    float maxDistance = 100.0f;
-    float shadowDistance = 0.0f;  // 0: no shadow
-    float windAmplitude = 0.0f;
+    float lod_distances[2] = {1e9f, 1e9f};
+    float max_distance = 100.0f;
+    float shadow_distance = 0.0f;  // 0: no shadow
+    float wind_amplitude = 0.0f;
     // how far the bear and the animals push it aside (relative to its height)
     float interaction = 0.0f;
     float height = 0.0f;
-    bool twoSided = false;
-    bool scaleDistances = false;  // the distances grow with the scale (stones)
+    bool two_sided = false;
+    bool scale_distances = false;  // the distances grow with the scale (stones)
   };
   struct ColumnData {
     std::vector<Instance> layers[2];  // large, small
     glm::vec3 center = glm::vec3(0.0f);
     float radius = 0.0f;
-    void updateBounds();
+    void UpdateBounds();
   };
   struct Batch {
     int model, lod;
@@ -94,24 +95,26 @@ class VegetationRenderer {
   /**
    * Sorts the instances into batches (model and level of detail) and uploads
    * them
-   * @param shadowCascade nullptr: for the camera
+   * @param shadow_cascade nullptr: for the camera
    */
-  void collect(const scene::ViewFrustum* frustum,
-               const render::ShadowCascade* shadowCascade, glm::vec3 camera);
-  void drawBatches(Shader& shader, bool shadowPass, bool dithered);
+  void Collect(const scene::ViewFrustum* frustum,
+               const render::ShadowCascade* shadow_cascade, glm::vec3 camera);
+  void DrawBatches(Shader& shader, bool shadow_pass, bool dithered);
 
-  std::unique_ptr<Shader> shader;
-  std::unique_ptr<Shader> ditherShader;
-  std::unique_ptr<Shader> depthShader;
-  std::vector<ModelData> models;
-  std::unordered_map<ColumnKey, ColumnData, ColumnKeyHash> columns;
-  GLuint instanceBuffer = 0;
-  std::vector<std::vector<Instance>> sorted;  // per model and level of detail
+  std::unique_ptr<Shader> shader_;
+  std::unique_ptr<Shader> dither_shader_;
+  std::unique_ptr<Shader> depth_shader_;
+  std::vector<ModelData> models_;
+  std::unordered_map<ColumnKey, ColumnData, ColumnKeyHash> columns_;
+  GLuint instance_buffer_ = 0;
+  std::vector<std::vector<Instance>> sorted_;  // per model and level of detail
   // the instances that fade, per model and level of detail
-  std::vector<std::vector<Instance>> sortedDithered;
-  std::vector<Instance> staging;
-  std::vector<Batch> batches;
-  float detail;
+  std::vector<std::vector<Instance>> sorted_dithered_;
+  std::vector<Instance> staging_;
+  std::vector<Batch> batches_;
+  float detail_;
 };
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_VEGETATIONRENDERER_HPP_

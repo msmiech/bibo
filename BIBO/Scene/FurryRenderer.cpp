@@ -6,22 +6,21 @@
 
 #include "Fur.hpp"
 
-using namespace bibo;
-using namespace bibo::scene;
+namespace bibo::scene {
 
 namespace {
 // Up to this distance from the camera all strands are drawn (like the bear)
-const float FULL_DETAIL_DISTANCE = 24.0f;
-const float MIN_DETAIL = 0.12f;
+const float kFullDetailDistance = 24.0f;
+const float kMinDetail = 0.12f;
 // position, normal, bend, comb (like the skin buffer of the bear)
-const GLsizei VERTEX_SIZE = 4 * sizeof(glm::vec4);
+const GLsizei kVertexSize = 4 * sizeof(glm::vec4);
 
-void setMatrix(Shader* shader, const char* name, const glm::mat4& matrix) {
-  glUniformMatrix4fv(shader->getUniformLocation(name), 1, GL_FALSE,
+void SetMatrix(Shader* shader, const char* name, const glm::mat4& matrix) {
+  glUniformMatrix4fv(shader->GetUniformLocation(name), 1, GL_FALSE,
                      glm::value_ptr(matrix));
 }
 
-GLuint strandBuffer(const std::vector<fur::Strand>& strands) {
+GLuint StrandBuffer(const std::vector<fur::Strand>& strands) {
   GLuint buffer;
   glGenBuffers(1, &buffer);
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
@@ -33,45 +32,45 @@ GLuint strandBuffer(const std::vector<fur::Strand>& strands) {
 }
 }  // namespace
 
-FurryRenderer::FurryRenderer(FurryModel furryModel, std::size_t count,
+FurryRenderer::FurryRenderer(FurryModel furry_model, std::size_t count,
                              const Strands& strands, const Bounds& bounds)
-    : model(std::move(furryModel)),
-      count(count),
-      vertexCount(model.positions.size()),
-      strands(strands),
-      bounds(bounds),
-      skinShader(std::make_unique<Shader>("Shader/bear_skin.vert",
-                                          "Shader/bear_skin.frag")),
-      furShader(std::make_unique<Shader>("Shader/bear_fur.vert",
-                                         "Shader/bear_fur.frag")),
-      poses(count),
-      centers(count, glm::vec3(0.0f)),
-      radii(count, bounds.radius) {
+    : model_(std::move(furry_model)),
+      count_(count),
+      vertex_count_(model_.positions.size()),
+      strands_(strands),
+      bounds_(bounds),
+      skin_shader_(std::make_unique<Shader>("Shader/bear_skin.vert",
+                                            "Shader/bear_skin.frag")),
+      fur_shader_(std::make_unique<Shader>("Shader/bear_fur.vert",
+                                           "Shader/bear_fur.frag")),
+      poses_(count),
+      centers_(count, glm::vec3(0.0f)),
+      radii_(count, bounds.radius) {
   // Every animal has its block in the skin buffer, which the fur shader reads
   // as a shader storage buffer from its start
   GLint alignment = 256;
   glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &alignment);
   alignment = std::max(alignment, 16);
-  GLsizeiptr bytes = static_cast<GLsizeiptr>(vertexCount) * VERTEX_SIZE;
-  blockSize = (bytes + alignment - 1) / alignment * alignment;
-  staging.assign(
-      count * static_cast<std::size_t>(blockSize) / sizeof(glm::vec4),
+  GLsizeiptr bytes = static_cast<GLsizeiptr>(vertex_count_) * kVertexSize;
+  block_size_ = (bytes + alignment - 1) / alignment * alignment;
+  staging_.assign(
+      count * static_cast<std::size_t>(block_size_) / sizeof(glm::vec4),
       glm::vec4(0.0f));
 
-  glGenVertexArrays(1, &vertexArray);
-  glBindVertexArray(vertexArray);
-  glGenBuffers(1, &skinBuffer);
-  glBindBuffer(GL_ARRAY_BUFFER, skinBuffer);
-  glBufferData(GL_ARRAY_BUFFER, staging.size() * sizeof(glm::vec4), nullptr,
+  glGenVertexArrays(1, &vertex_array_);
+  glBindVertexArray(vertex_array_);
+  glGenBuffers(1, &skin_buffer_);
+  glBindBuffer(GL_ARRAY_BUFFER, skin_buffer_);
+  glBufferData(GL_ARRAY_BUFFER, staging_.size() * sizeof(glm::vec4), nullptr,
                GL_STREAM_DRAW);
-  glGenBuffers(1, &colorBuffer);
-  glBindBuffer(GL_ARRAY_BUFFER, colorBuffer);
-  glBufferData(GL_ARRAY_BUFFER, model.colors.size() * sizeof(glm::vec4),
-               model.colors.data(), GL_STATIC_DRAW);
-  glGenBuffers(1, &surfaceBuffer);
-  glBindBuffer(GL_ARRAY_BUFFER, surfaceBuffer);
-  glBufferData(GL_ARRAY_BUFFER, model.surfaces.size() * sizeof(float),
-               model.surfaces.data(), GL_STATIC_DRAW);
+  glGenBuffers(1, &color_buffer_);
+  glBindBuffer(GL_ARRAY_BUFFER, color_buffer_);
+  glBufferData(GL_ARRAY_BUFFER, model_.colors.size() * sizeof(glm::vec4),
+               model_.colors.data(), GL_STATIC_DRAW);
+  glGenBuffers(1, &surface_buffer_);
+  glBindBuffer(GL_ARRAY_BUFFER, surface_buffer_);
+  glBufferData(GL_ARRAY_BUFFER, model_.surfaces.size() * sizeof(float),
+               model_.surfaces.data(), GL_STATIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   // Binding 0: the skin of one animal (set for every animal), 1: the colors, 2:
   // the surfaces (the same for all)
@@ -86,214 +85,220 @@ FurryRenderer::FurryRenderer(FurryModel furryModel, std::size_t count,
   for (GLuint attribute = 0; attribute < 4; ++attribute) {
     glEnableVertexAttribArray(attribute);
   }
-  glBindVertexBuffer(0, skinBuffer, 0, VERTEX_SIZE);
-  glBindVertexBuffer(1, colorBuffer, 0, sizeof(glm::vec4));
-  glBindVertexBuffer(2, surfaceBuffer, 0, sizeof(float));
-  glGenBuffers(1, &indexBuffer);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+  glBindVertexBuffer(0, skin_buffer_, 0, kVertexSize);
+  glBindVertexBuffer(1, color_buffer_, 0, sizeof(glm::vec4));
+  glBindVertexBuffer(2, surface_buffer_, 0, sizeof(float));
+  glGenBuffers(1, &index_buffer_);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-               model.indices.size() * sizeof(unsigned int),
-               model.indices.data(), GL_STATIC_DRAW);
-  indexCount = static_cast<GLsizei>(model.indices.size());
+               model_.indices.size() * sizeof(unsigned int),
+               model_.indices.data(), GL_STATIC_DRAW);
+  index_count_ = static_cast<GLsizei>(model_.indices.size());
   glBindVertexArray(0);
 
   std::vector<fur::Strand> spines;
-  if (strands.spineCount > 0 && !model.spineTriangles.empty()) {
-    spines = fur::generateStrands(model.positions, model.colors,
-                                  model.spineTriangles, strands.spineCount,
-                                  strands.spineSeed);
+  if (strands.spine_count > 0 && !model_.spine_triangles.empty()) {
+    spines = fur::GenerateStrands(model_.positions, model_.colors,
+                                  model_.spine_triangles, strands.spine_count,
+                                  strands.spine_seed);
   }
   std::vector<fur::Strand> fur;
-  if (strands.furCount > 0 && !model.furTriangles.empty()) {
-    fur =
-        fur::generateStrands(model.positions, model.colors, model.furTriangles,
-                             strands.furCount, strands.furSeed);
+  if (strands.fur_count > 0 && !model_.fur_triangles.empty()) {
+    fur = fur::GenerateStrands(model_.positions, model_.colors,
+                               model_.fur_triangles, strands.fur_count,
+                               strands.fur_seed);
   }
-  spineCount = spines.size();
-  furCount = fur.size();
-  spineBuffer = strandBuffer(spines);
-  furBuffer = strandBuffer(fur);
-  glGenVertexArrays(1, &strandVertexArray);
+  spine_count_ = spines.size();
+  fur_count_ = fur.size();
+  spine_buffer_ = StrandBuffer(spines);
+  fur_buffer_ = StrandBuffer(fur);
+  glGenVertexArrays(1, &strand_vertex_array_);
 }
 
 FurryRenderer::~FurryRenderer() {
-  GLuint buffers[] = {skinBuffer,  colorBuffer, surfaceBuffer,
-                      indexBuffer, spineBuffer, furBuffer};
+  GLuint buffers[] = {skin_buffer_,  color_buffer_, surface_buffer_,
+                      index_buffer_, spine_buffer_, fur_buffer_};
   glDeleteBuffers(6, buffers);
-  glDeleteVertexArrays(1, &vertexArray);
-  glDeleteVertexArrays(1, &strandVertexArray);
+  glDeleteVertexArrays(1, &vertex_array_);
+  glDeleteVertexArrays(1, &strand_vertex_array_);
 }
 
-void FurryRenderer::setPose(std::size_t index,
+void FurryRenderer::SetPose(std::size_t index,
                             const std::vector<glm::mat4>& parts,
                             float bristle) {
-  if (index >= count || parts.empty()) {
+  if (index >= count_ || parts.empty()) {
     return;
   }
   // The vertices are only moved when the animal is drawn (the scene may be
   // updated more often than drawn, e.g. in the tests)
-  Pose& pose = poses[index];
+  Pose& pose = poses_[index];
   pose.parts = parts;
   pose.bristle = bristle;
   pose.moved = false;
-  radii[index] = bounds.radius * glm::length(glm::vec3(parts[0][0]));
-  centers[index] = glm::vec3(parts[0] * glm::vec4(bounds.center, 1.0f));
-  uploaded = false;
+  radii_[index] = bounds_.radius * glm::length(glm::vec3(parts[0][0]));
+  centers_[index] = glm::vec3(parts[0] * glm::vec4(bounds_.center, 1.0f));
+  uploaded_ = false;
 }
 
-void FurryRenderer::moveVertices(std::size_t index) {
-  Pose& pose = poses[index];
+void FurryRenderer::MoveVertices(std::size_t index) {
+  Pose& pose = poses_[index];
   if (pose.moved) {
     return;
   }
   pose.moved = true;
   std::vector<glm::mat3> rotations(pose.parts.begin(), pose.parts.end());
-  glm::vec4* block = staging.data() + index *
-                                          static_cast<std::size_t>(blockSize) /
-                                          sizeof(glm::vec4);
-  for (std::size_t v = 0; v < vertexCount; ++v) {
-    std::size_t part = static_cast<std::size_t>(model.parts[v]);
+  glm::vec4* block =
+      staging_.data() +
+      index * static_cast<std::size_t>(block_size_) / sizeof(glm::vec4);
+  for (std::size_t v = 0; v < vertex_count_; ++v) {
+    std::size_t part = static_cast<std::size_t>(model_.parts[v]);
     part = part < pose.parts.size() ? part : 0;
     const glm::mat3& rotation = rotations[part];
-    glm::vec3 normal = glm::normalize(rotation * model.normals[v]);
-    block[v * 4] = pose.parts[part] * glm::vec4(model.positions[v], 1.0f);
+    glm::vec3 normal = glm::normalize(rotation * model_.normals[v]);
+    block[v * 4] = pose.parts[part] * glm::vec4(model_.positions[v], 1.0f);
     block[v * 4 + 1] = glm::vec4(normal, 0.0f);
     // Spines stand up (e.g. a startled hedgehog)
     block[v * 4 + 2] = glm::vec4(
-        model.spines[v] ? normal * (0.9f * pose.bristle) : glm::vec3(0.0f),
+        model_.spines[v] ? normal * (0.9f * pose.bristle) : glm::vec3(0.0f),
         0.0f);
     block[v * 4 + 3] =
-        glm::vec4(glm::normalize(rotation * model.combs[v]), 0.0f);
+        glm::vec4(glm::normalize(rotation * model_.combs[v]), 0.0f);
   }
 }
 
-void FurryRenderer::upload() {
-  if (uploaded) {
+void FurryRenderer::Upload() {
+  if (uploaded_) {
     return;
   }
-  for (std::size_t i = 0; i < count; ++i) {
-    moveVertices(i);
+  for (std::size_t i = 0; i < count_; ++i) {
+    MoveVertices(i);
   }
-  glBindBuffer(GL_ARRAY_BUFFER, skinBuffer);
+  glBindBuffer(GL_ARRAY_BUFFER, skin_buffer_);
   // Orphaning: new memory while the graphics card may still draw the last frame
-  glBufferData(GL_ARRAY_BUFFER, staging.size() * sizeof(glm::vec4), nullptr,
+  glBufferData(GL_ARRAY_BUFFER, staging_.size() * sizeof(glm::vec4), nullptr,
                GL_STREAM_DRAW);
-  glBufferSubData(GL_ARRAY_BUFFER, 0, staging.size() * sizeof(glm::vec4),
-                  staging.data());
+  glBufferSubData(GL_ARRAY_BUFFER, 0, staging_.size() * sizeof(glm::vec4),
+                  staging_.data());
   glBindBuffer(GL_ARRAY_BUFFER, 0);
-  uploaded = true;
+  uploaded_ = true;
 }
 
-void FurryRenderer::bindVertices(std::size_t index) {
-  glBindVertexBuffer(0, skinBuffer, static_cast<GLintptr>(index) * blockSize,
-                     VERTEX_SIZE);
+void FurryRenderer::BindVertices(std::size_t index) {
+  glBindVertexBuffer(0, skin_buffer_,
+                     static_cast<GLintptr>(index) * block_size_, kVertexSize);
 }
 
-void FurryRenderer::drawSurfaces(Shader* shader) {
-  upload();
-  if (shader->getUniformLocation("model") >= 0) {
-    setMatrix(shader, "model",
+void FurryRenderer::DrawSurfaces(Shader* shader) {
+  Upload();
+  if (shader->GetUniformLocation("model") >= 0) {
+    SetMatrix(shader, "model",
               glm::mat4(1.0f));  // the vertices are in world space
   }
-  glBindVertexArray(vertexArray);
-  for (std::size_t i = 0; i < count; ++i) {
-    bindVertices(i);
-    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
+  glBindVertexArray(vertex_array_);
+  for (std::size_t i = 0; i < count_; ++i) {
+    BindVertices(i);
+    glDrawElements(GL_TRIANGLES, index_count_, GL_UNSIGNED_INT, nullptr);
   }
   glBindVertexArray(0);
 }
 
-void FurryRenderer::drawShaded(const BearRenderContext& context,
+void FurryRenderer::DrawShaded(const BearRenderContext& context,
                                const ViewFrustum& frustum) {
-  upload();
+  Upload();
   std::vector<std::size_t> visible;
-  for (std::size_t i = 0; i < count; ++i) {
-    if (frustum.sphereInFrustum(centers[i], radii[i]) != ViewFrustum::OUTSIDE) {
+  for (std::size_t i = 0; i < count_; ++i) {
+    if (frustum.SphereInFrustum(centers_[i], radii_[i]) !=
+        ViewFrustum::kOutside) {
       visible.push_back(i);
     }
   }
-  drawnCount = static_cast<int>(visible.size());
+  drawn_count_ = static_cast<int>(visible.size());
   if (visible.empty()) {
     return;
   }
-  auto setCommonUniforms = [&](Shader* shader) {
-    shader->enable();
-    setMatrix(shader, "view", context.view);
-    setMatrix(shader, "projection", context.projection);
-    glUniform3fv(shader->getUniformLocation("worldEye"), 1,
+  auto set_common_uniforms = [&](Shader* shader) {
+    shader->Enable();
+    SetMatrix(shader, "view", context.view);
+    SetMatrix(shader, "projection", context.projection);
+    glUniform3fv(shader->GetUniformLocation("worldEye"), 1,
                  glm::value_ptr(context.eye));
   };
 
-  setCommonUniforms(skinShader.get());
-  glBindVertexArray(vertexArray);
+  set_common_uniforms(skin_shader_.get());
+  glBindVertexArray(vertex_array_);
   for (std::size_t i : visible) {
-    bindVertices(i);
-    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
+    BindVertices(i);
+    glDrawElements(GL_TRIANGLES, index_count_, GL_UNSIGNED_INT, nullptr);
   }
 
   GLint viewport[4];
   glGetIntegerv(GL_VIEWPORT, viewport);
-  float pixelSize = 2.0f / (context.projection[1][1] *
-                            static_cast<float>(std::max(viewport[3], 1)));
-  setCommonUniforms(furShader.get());
-  glUniform1i(furShader->getUniformLocation("segments"),
-              BearRenderer::STRAND_SEGMENTS);
-  glUniform1f(furShader->getUniformLocation("pixelSize"), pixelSize);
-  GLint spinesLocation = furShader->getUniformLocation("spines");
-  GLint lengthLocation = furShader->getUniformLocation("maxFurLength");
-  GLint widthLocation = furShader->getUniformLocation("strandWidth");
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, colorBuffer);
+  float pixel_size = 2.0f / (context.projection[1][1] *
+                             static_cast<float>(std::max(viewport[3], 1)));
+  set_common_uniforms(fur_shader_.get());
+  glUniform1i(fur_shader_->GetUniformLocation("segments"),
+              BearRenderer::kStrandSegments);
+  glUniform1f(fur_shader_->GetUniformLocation("pixelSize"), pixel_size);
+  GLint spines_location = fur_shader_->GetUniformLocation("spines");
+  GLint length_location = fur_shader_->GetUniformLocation("maxFurLength");
+  GLint width_location = fur_shader_->GetUniformLocation("strandWidth");
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, color_buffer_);
 
-  GLboolean blend = glIsEnabled(GL_BLEND), cullFace = glIsEnabled(GL_CULL_FACE);
+  GLboolean blend = glIsEnabled(GL_BLEND),
+            cull_face = glIsEnabled(GL_CULL_FACE);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glDisable(GL_CULL_FACE);  // the ribbons face the camera anyway
-  glBindVertexArray(strandVertexArray);
-  const GLsizei verticesPerStrand = 2 * (BearRenderer::STRAND_SEGMENTS + 1) + 2;
+  glBindVertexArray(strand_vertex_array_);
+  const GLsizei vertices_per_strand =
+      2 * (BearRenderer::kStrandSegments + 1) + 2;
   for (std::size_t i : visible) {
     // Level of detail: the strands are in random order, the first ones are
     // spread over the whole animal
-    float distance = glm::distance(context.eye, centers[i]);
+    float distance = glm::distance(context.eye, centers_[i]);
     float detail = std::clamp(
-        std::pow(FULL_DETAIL_DISTANCE / std::max(distance, 0.01f), 2.0f),
-        MIN_DETAIL, 1.0f);
-    glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, skinBuffer,
-                      static_cast<GLintptr>(i) * blockSize,
-                      static_cast<GLsizeiptr>(vertexCount) * VERTEX_SIZE);
+        std::pow(kFullDetailDistance / std::max(distance, 0.01f), 2.0f),
+        kMinDetail, 1.0f);
+    glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, skin_buffer_,
+                      static_cast<GLintptr>(i) * block_size_,
+                      static_cast<GLsizeiptr>(vertex_count_) * kVertexSize);
     // The fur first, the spines lie on it
-    if (furCount > 0) {
-      glUniform1i(spinesLocation, 0);
-      glUniform1f(lengthLocation, fur::MAX_LENGTH);
-      glUniform1f(widthLocation,
-                  BearRenderer::STRAND_WIDTH / std::sqrt(detail));
-      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, furBuffer);
+    if (fur_count_ > 0) {
+      glUniform1i(spines_location, 0);
+      glUniform1f(length_location, fur::kMaxLength);
+      glUniform1f(width_location,
+                  BearRenderer::kStrandWidth / std::sqrt(detail));
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, fur_buffer_);
       std::size_t drawn = std::max<std::size_t>(
-          1, static_cast<std::size_t>(static_cast<float>(furCount) * detail));
-      glDrawArrays(
-          GL_TRIANGLE_STRIP, 0,
-          static_cast<GLsizei>(std::min(drawn, furCount)) * verticesPerStrand);
-    }
-    if (spineCount > 0) {
-      glUniform1i(spinesLocation, 1);
-      glUniform1f(lengthLocation, strands.spineLength);
-      glUniform1f(widthLocation, strands.spineWidth / std::sqrt(detail));
-      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, spineBuffer);
-      std::size_t drawn = std::max<std::size_t>(
-          1, static_cast<std::size_t>(static_cast<float>(spineCount) * detail));
+          1, static_cast<std::size_t>(static_cast<float>(fur_count_) * detail));
       glDrawArrays(GL_TRIANGLE_STRIP, 0,
-                   static_cast<GLsizei>(std::min(drawn, spineCount)) *
-                       verticesPerStrand);
+                   static_cast<GLsizei>(std::min(drawn, fur_count_)) *
+                       vertices_per_strand);
+    }
+    if (spine_count_ > 0) {
+      glUniform1i(spines_location, 1);
+      glUniform1f(length_location, strands_.spine_length);
+      glUniform1f(width_location, strands_.spine_width / std::sqrt(detail));
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, spine_buffer_);
+      std::size_t drawn = std::max<std::size_t>(
+          1,
+          static_cast<std::size_t>(static_cast<float>(spine_count_) * detail));
+      glDrawArrays(GL_TRIANGLE_STRIP, 0,
+                   static_cast<GLsizei>(std::min(drawn, spine_count_)) *
+                       vertices_per_strand);
     }
   }
-  glUniform1i(spinesLocation, 0);
+  glUniform1i(spines_location, 0);
   glBindVertexArray(0);
   if (!blend) {
     glDisable(GL_BLEND);
   }
-  if (cullFace) {
+  if (cull_face) {
     glEnable(GL_CULL_FACE);
   }
   for (GLuint binding = 0; binding < 3; ++binding) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, 0);
   }
 }
+
+}  // namespace bibo::scene

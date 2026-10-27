@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_SCENE_FUR_HPP_
+#define BIBO_SCENE_FUR_HPP_
 #include <cstddef>
 #include <cstdint>
 #include <glm/glm.hpp>
@@ -10,7 +11,7 @@ namespace fur {
  * Length of the fur (world units) where the fur length of a vertex is 1 (alpha
  * of its color)
  */
-const float MAX_LENGTH = 0.13f;
+const float kMaxLength = 0.13f;
 
 struct SphereCollider {
   glm::vec3 center;
@@ -26,9 +27,9 @@ struct Environment {
   glm::vec3 wind = glm::vec3(0.0f);
   float time = 0.0f;  // seconds, for the gusts of the wind
   // the fur lies on the ground plane instead of going through it
-  bool hasGround = false;
-  glm::vec3 groundPoint = glm::vec3(0.0f);
-  glm::vec3 groundNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+  bool has_ground = false;
+  glm::vec3 ground_point = glm::vec3(0.0f);
+  glm::vec3 ground_normal = glm::vec3(0.0f, 1.0f, 0.0f);
   std::vector<SphereCollider> spheres;  // e.g. rocks
 };
 
@@ -48,14 +49,14 @@ class GuideHairs {
   /**
    * Straightens all hairs and forgets the motion (e.g. after a restart)
    */
-  void reset(const std::vector<glm::vec3>& positions);
+  void Reset(const std::vector<glm::vec3>& positions);
   /**
    * @param positions Current world positions of the vertices
    * @param normals Current world normals of the vertices
    * @param lengths Fur length of every vertex (world units), 0 where there is
    * no fur
    */
-  void update(float timeDelta, const std::vector<glm::vec3>& positions,
+  void Update(float time_delta, const std::vector<glm::vec3>& positions,
               const std::vector<glm::vec3>& normals,
               const std::vector<float>& lengths,
               const Environment& environment);
@@ -64,11 +65,11 @@ class GuideHairs {
    * a rock)
    * @param velocity Direction and speed of the push (world units / s)
    */
-  void addImpulse(glm::vec3 position, glm::vec3 velocity, float radius);
+  void AddImpulse(glm::vec3 position, glm::vec3 velocity, float radius);
   /**
    * Bend of every guide hair (world space, in fur lengths)
    */
-  const std::vector<glm::vec3>& getOffsets() const { return offsets; }
+  const std::vector<glm::vec3>& GetOffsets() const { return offsets_; }
 
  private:
   struct Impulse {
@@ -77,11 +78,11 @@ class GuideHairs {
     float radius;
   };
 
-  std::vector<glm::vec3> previousPositions;
-  std::vector<glm::vec3> vertexVelocities;
-  std::vector<glm::vec3> offsets;
-  std::vector<glm::vec3> offsetVelocities;
-  std::vector<Impulse> impulses;
+  std::vector<glm::vec3> previous_positions_;
+  std::vector<glm::vec3> vertex_velocities_;
+  std::vector<glm::vec3> offsets_;
+  std::vector<glm::vec3> offset_velocities_;
+  std::vector<Impulse> impulses_;
 };
 
 /**
@@ -94,7 +95,7 @@ struct Strand {
   // weights of the first two vertices (the third one has the rest)
   float barycentric[2];
   // the strand is a bit shorter or longer than the fur of the triangle
-  float lengthScale;
+  float length_scale;
   float shade;  // brightness variation
 };
 
@@ -105,7 +106,7 @@ struct Strand {
  * @param colors Vertex colors, alpha is the fur length
  * @param triangles 3 vertex indices per triangle
  */
-std::vector<Strand> generateStrands(const std::vector<glm::vec3>& positions,
+std::vector<Strand> GenerateStrands(const std::vector<glm::vec3>& positions,
                                     const std::vector<glm::vec4>& colors,
                                     const std::vector<unsigned int>& triangles,
                                     std::size_t count, std::uint32_t seed);
@@ -115,7 +116,9 @@ std::vector<Strand> generateStrands(const std::vector<glm::vec3>& positions,
  * backwards and down, like an animal's fur
  * @param forward Front of the model
  */
-std::vector<glm::vec3> combDirections(const std::vector<glm::vec3>& normals,
+std::vector<glm::vec3> CombDirections(const std::vector<glm::vec3>& normals,
                                       glm::vec3 forward, glm::vec3 up);
 }  // namespace fur
 }  // namespace bibo
+
+#endif  // BIBO_SCENE_FUR_HPP_

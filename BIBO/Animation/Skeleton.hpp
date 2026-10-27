@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_ANIMATION_SKELETON_HPP_
+#define BIBO_ANIMATION_SKELETON_HPP_
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <string>
@@ -14,16 +15,16 @@ struct Transform {
   glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
   glm::vec3 scale = glm::vec3(1.0f);
 
-  glm::mat4 toMatrix() const;
+  glm::mat4 ToMatrix() const;
   /**
    * @param matrix Translation, rotation and (positive) scale, no shear
    */
-  static Transform fromMatrix(const glm::mat4& matrix);
+  static Transform FromMatrix(const glm::mat4& matrix);
   /**
    * Translation and scale are interpolated linearly, the rotation along the
    * shortest arc
    */
-  static Transform mix(const Transform& a, const Transform& b, float t);
+  static Transform Mix(const Transform& a, const Transform& b, float t);
 };
 
 /**
@@ -35,59 +36,59 @@ struct Bone {
   std::string name;
   int parent = -1;  // index of the parent bone, -1 for the root bone
   // relative to the parent in the bind pose (the pose the model was skinned in)
-  Transform bindLocal;
+  Transform bind_local;
   // from model space into the space of the bone in the bind pose
-  glm::mat4 inverseBind = glm::mat4(1.0f);
+  glm::mat4 inverse_bind = glm::mat4(1.0f);
 };
 
 class Skeleton {
  public:
   std::vector<Bone> bones;  // parents come before their children
   // model space transform of the parent of the root bone (e.g. the armature)
-  glm::mat4 rootParent = glm::mat4(1.0f);
+  glm::mat4 root_parent = glm::mat4(1.0f);
 
   /**
    * @return Index of the bone or -1
    */
-  int find(const std::string& name) const;
-  Pose bindPose() const;
+  int Find(const std::string& name) const;
+  Pose BindPose() const;
   /**
    * Model space transforms of all bones (forward kinematics)
    * @param base Transform of the model, e.g. its world transform
    */
-  void modelMatrices(const Pose& pose, std::vector<glm::mat4>& result,
+  void ModelMatrices(const Pose& pose, std::vector<glm::mat4>& result,
                      const glm::mat4& base = glm::mat4(1.0f)) const;
   /**
    * The pose whose bones have the given transforms
    * @param matrices Transforms of all bones in the space of base
    */
-  Pose localPose(const std::vector<glm::mat4>& matrices,
+  Pose LocalPose(const std::vector<glm::mat4>& matrices,
                  const glm::mat4& base = glm::mat4(1.0f)) const;
   /**
    * Matrices for skinning: from the bind pose into the current pose
-   * @param matrices Current transforms of all bones (e.g. modelMatrices)
+   * @param matrices Current transforms of all bones (e.g. ModelMatrices)
    */
-  void skinMatrices(const std::vector<glm::mat4>& matrices,
+  void SkinMatrices(const std::vector<glm::mat4>& matrices,
                     std::vector<glm::mat4>& result) const;
   /**
-   * Computes inverseBind of all bones from the bind pose
+   * Computes inverse_bind of all bones from the bind pose
    */
-  void computeInverseBind();
+  void ComputeInverseBind();
 };
 
 /**
  * Shortest rotation that turns one direction into another (the directions do
  * not need to be normalized)
  */
-glm::quat rotationBetween(glm::vec3 from, glm::vec3 to);
+glm::quat RotationBetween(glm::vec3 from, glm::vec3 to);
 
 /**
  * Interpolation factor for smoothing a value towards a target independent of
- * the frame rate (value += (target - value) * smoothingFactor(...))
- * @param halfLife Time after which half of the distance to the target is
+ * the frame rate (value += (target - value) * SmoothingFactor(...))
+ * @param half_life Time after which half of the distance to the target is
  * covered
  */
-float smoothingFactor(float halfLife, float timeDelta);
+float SmoothingFactor(float half_life, float time_delta);
 
 /**
  * Damped spring that pulls a point towards a target (semi-implicit Euler,
@@ -102,9 +103,9 @@ struct SpringPoint {
    * @param damping Velocity damping (1/s)
    * @param acceleration Additional acceleration (e.g. gravity)
    */
-  void update(glm::vec3 target, float stiffness, float damping,
-              glm::vec3 acceleration, float timeDelta);
-  void reset(glm::vec3 to);
+  void Update(glm::vec3 target, float stiffness, float damping,
+              glm::vec3 acceleration, float time_delta);
+  void Reset(glm::vec3 to);
 };
 
 /**
@@ -115,7 +116,9 @@ struct SpringValue {
   float value = 0.0f;
   float velocity = 0.0f;
 
-  void update(float target, float stiffness, float damping, float timeDelta);
+  void Update(float target, float stiffness, float damping, float time_delta);
 };
 }  // namespace animation
 }  // namespace bibo
+
+#endif  // BIBO_ANIMATION_SKELETON_HPP_

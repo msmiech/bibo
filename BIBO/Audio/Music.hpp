@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_AUDIO_MUSIC_HPP_
+#define BIBO_AUDIO_MUSIC_HPP_
 #include <string>
 #include <vector>
 
@@ -21,12 +22,12 @@ struct Note {
  * @param error The first error (an unknown note, a bar with a wrong length)
  * @return The notes (without the rests), empty if there is an error
  */
-std::vector<Note> parseMelody(const std::string& text, float start,
+std::vector<Note> ParseMelody(const std::string& text, float start,
                               std::string& error);
 /**
  * @return The frequency of a MIDI note number in Hz (A4 = 69 = 440 Hz)
  */
-float noteFrequency(float pitch);
+float NoteFrequency(float pitch);
 
 /**
  * A piece of music as stereo samples (left, right, left, ...) between -1 and 1.
@@ -34,15 +35,15 @@ float noteFrequency(float pitch);
  * gap or a click.
  */
 struct Song {
-  int sampleRate = 0;
-  float beatsPerMinute = 0.0f;
+  int sample_rate = 0;
+  float beats_per_minute = 0.0f;
   int bars = 0;  // of 4 beats
   std::vector<float> samples;
 
-  std::size_t frames() const { return samples.size() / 2; }
-  float seconds() const {
-    return sampleRate > 0
-               ? static_cast<float>(frames()) / static_cast<float>(sampleRate)
+  std::size_t Frames() const { return samples.size() / 2; }
+  float Seconds() const {
+    return sample_rate > 0
+               ? static_cast<float>(Frames()) / static_cast<float>(sample_rate)
                : 0.0f;
   }
 };
@@ -53,11 +54,13 @@ struct Song {
  * (slide whistle, spring) at the ends of the phrases. It is synthesized by the
  * game (no sound files), the same every time.
  */
-Song composeIslandTune(int sampleRate);
+Song ComposeIslandTune(int sample_rate);
 /**
- * The melodies of composeIslandTune (in the notation of parseMelody), 8 bars
+ * The melodies of ComposeIslandTune (in the notation of ParseMelody), 8 bars
  * each
  */
-std::vector<std::string> islandTuneMelodies();
+std::vector<std::string> IslandTuneMelodies();
 }  // namespace audio
 }  // namespace bibo
+
+#endif  // BIBO_AUDIO_MUSIC_HPP_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_RESOURCES_SKINNEDMODEL_HPP_
+#define BIBO_RESOURCES_SKINNEDMODEL_HPP_
 #include <glm/glm.hpp>
 #include <memory>
 #include <string>
@@ -21,15 +22,15 @@ class SkinnedModel {
   enum Surface {
     // fur color and length in the vertex color, bare skin where the fur length
     // is 0 (paw pads, lips), also the eyelids
-    FUR = 0,
+    kFur = 0,
     // the vertex color is the direction from the center of the eye in eye space
     // (gaze along +Z), see bear_skin.frag
-    EYE = 1,
-    NOSE = 2,
-    MOUTH = 3,  // inside of the mouth
-    TONGUE = 4,
-    TEETH = 5,
-    CLAW = 6
+    kEye = 1,
+    kNose = 2,
+    kMouth = 3,  // inside of the mouth
+    kTongue = 4,
+    kTeeth = 5,
+    kClaw = 6
   };
 
   /**
@@ -37,8 +38,8 @@ class SkinnedModel {
    */
   struct Part {
     Surface surface;
-    unsigned int firstIndex;
-    unsigned int indexCount;
+    unsigned int first_index;
+    unsigned int index_count;
   };
 
   animation::Skeleton skeleton;
@@ -57,25 +58,27 @@ class SkinnedModel {
    * @param error Why the file could not be loaded
    * @return nullptr if the file cannot be loaded or has no skinned mesh
    */
-  static std::unique_ptr<SkinnedModel> load(const std::string& file,
+  static std::unique_ptr<SkinnedModel> Load(const std::string& file,
                                             std::string& error);
 
   /**
    * Moves the vertices with the bones (linear blend skinning)
-   * @param skinMatrices Skeleton::skinMatrices of the current pose
+   * @param skinMatrices Skeleton::SkinMatrices of the current pose
    * @param directions Optional directions per vertex (e.g. along the fur),
    * rotated like the normals
    */
-  void skin(const std::vector<glm::mat4>& skinMatrices,
-            std::vector<glm::vec3>& skinnedPositions,
-            std::vector<glm::vec3>& skinnedNormals,
+  void Skin(const std::vector<glm::mat4>& skin_matrices,
+            std::vector<glm::vec3>& skinned_positions,
+            std::vector<glm::vec3>& skinned_normals,
             const std::vector<glm::vec3>* directions = nullptr,
-            std::vector<glm::vec3>* skinnedDirections = nullptr) const;
+            std::vector<glm::vec3>* skinned_directions = nullptr) const;
 
   /**
    * @return The indices of all triangles with this surface
    */
-  std::vector<unsigned int> triangles(Surface surface) const;
+  std::vector<unsigned int> Triangles(Surface surface) const;
 };
 }  // namespace resources
 }  // namespace bibo
+
+#endif  // BIBO_RESOURCES_SKINNEDMODEL_HPP_

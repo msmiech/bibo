@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_SCENE_RACCOONMODEL_HPP_
+#define BIBO_SCENE_RACCOONMODEL_HPP_
 #include <glm/glm.hpp>
 
 #include "FurryModel.hpp"
@@ -8,19 +9,19 @@ namespace scene {
 // Joints of the parts of the raccoon (model space of the body, the jaw: of the
 // head) when it stands on all fours
 // it rears up around this point (on the middle line)
-constexpr glm::vec3 RACCOON_HIPS(0.0f, 0.3f, -0.12f);
-constexpr glm::vec3 RACCOON_NECK(0.0f, 0.37f, 0.25f);
-constexpr glm::vec3 RACCOON_JAW(0.0f, 0.0f, 0.1f);
+constexpr glm::vec3 kRaccoonHips(0.0f, 0.3f, -0.12f);
+constexpr glm::vec3 kRaccoonNeck(0.0f, 0.37f, 0.25f);
+constexpr glm::vec3 kRaccoonJaw(0.0f, 0.0f, 0.1f);
 // where the tail grows out of the body
-constexpr glm::vec3 RACCOON_TAIL(0.0f, 0.36f, -0.24f);
+constexpr glm::vec3 kRaccoonTail(0.0f, 0.36f, -0.24f);
 // left, the right one mirrored (inside the chest)
-constexpr glm::vec3 RACCOON_SHOULDER(0.085f, 0.27f, 0.17f);
+constexpr glm::vec3 kRaccoonShoulder(0.085f, 0.27f, 0.17f);
 // left hip joint, the right one mirrored
-constexpr glm::vec3 RACCOON_HIP(0.09f, 0.3f, -0.12f);
+constexpr glm::vec3 kRaccoonHip(0.09f, 0.3f, -0.12f);
 // Length of the legs from their joint to the ground
-constexpr float RACCOON_FRONT_LEG = 0.27f, RACCOON_HIND_LEG = 0.3f;
+constexpr float kRaccoonFrontLeg = 0.27f, kRaccoonHindLeg = 0.3f;
 // Height of the back when it stands on all fours
-constexpr float RACCOON_HEIGHT = 0.5f;
+constexpr float kRaccoonHeight = 0.5f;
 
 /**
  * The raccoon for the renderer of the bear (FurryModel), standing on all fours:
@@ -32,27 +33,29 @@ constexpr float RACCOON_HEIGHT = 0.5f;
  * space with the origin at its joint (see the constants above), the parts reach
  * into the body (or the head), so they stay connected when they move. Model
  * space: +Z forward, +Y up, +X left, the origin on the ground under the body,
- * about 1 long (scaled up in the world, Raccoon::SCALE). Generated, the same
+ * about 1 long (scaled up in the world, Raccoon::kScale). Generated, the same
  * every time.
  */
 struct RaccoonModel : FurryModel {
   enum Part {
-    BODY = 0,
-    HEAD,
-    JAW,
-    TAIL,
-    FRONT_LEFT,
-    FRONT_RIGHT,
-    HIND_LEFT,
-    HIND_RIGHT,
-    PART_COUNT
+    kBody = 0,
+    kHead,
+    kJaw,
+    kTail,
+    kFrontLeft,
+    kFrontRight,
+    kHindLeft,
+    kHindRight,
+    kPartCount
   };
 
   /**
    * @param girth How round its belly is (1: an ordinary raccoon, more: a well
    * fed one)
    */
-  static RaccoonModel build(float girth = 1.0f);
+  static RaccoonModel Build(float girth = 1.0f);
 };
 }  // namespace scene
 }  // namespace bibo
+
+#endif  // BIBO_SCENE_RACCOONMODEL_HPP_

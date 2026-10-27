@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_VEGETATIONMESHES_HPP_
+#define BIBO_WORLD_VEGETATIONMESHES_HPP_
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <vector>
@@ -11,18 +12,18 @@ namespace world {
  * How a part of a model is shaded (the vegetation shader uses the same numbers)
  */
 enum VegetationMaterial : std::uint8_t {
-  VEGETATION_PLAIN,    // vertex color
-  VEGETATION_BARK,     // bark texture along the uv (u around, v along)
-  VEGETATION_NEEDLES,  // needle texture, translucent
-  VEGETATION_LEAVES,   // leaf texture, translucent
+  kVegetationPlain,    // vertex color
+  kVegetationBark,     // bark texture along the uv (u around, v along)
+  kVegetationNeedles,  // needle texture, translucent
+  kVegetationLeaves,   // leaf texture, translucent
   // rock texture projected in model space, moss and snow on top
-  VEGETATION_STONE,
-  VEGETATION_CAP_SPOTTED,  // mushroom cap with white spots
-  VEGETATION_STEM,         // mushroom stem
-  VEGETATION_GLOW,         // glowing mushroom
-  VEGETATION_WOOD,         // cut wood with year rings (uv: center at 0.5, 0.5)
-  VEGETATION_GRASS,        // blades of grass, translucent
-  VEGETATION_GLOSSY        // wet and shiny: eyes, noses, the scales of a fish
+  kVegetationStone,
+  kVegetationCapSpotted,  // mushroom cap with white spots
+  kVegetationStem,        // mushroom stem
+  kVegetationGlow,        // glowing mushroom
+  kVegetationWood,        // cut wood with year rings (uv: center at 0.5, 0.5)
+  kVegetationGrass,       // blades of grass, translucent
+  kVegetationGlossy       // wet and shiny: eyes, noses, the scales of a fish
 };
 
 /**
@@ -48,6 +49,8 @@ struct VegetationMesh {
  * The levels of detail of a model (1 to 3, the first is the most detailed).
  * Generated, deterministic.
  */
-std::vector<VegetationMesh> buildModel(Model model);
+std::vector<VegetationMesh> BuildModel(Model model);
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_VEGETATIONMESHES_HPP_

@@ -6,19 +6,18 @@
 #include "../Render/RenderUtil.hpp"
 #include "../Resources/Shader.hpp"
 
-using namespace bibo;
-using namespace bibo::world;
+namespace bibo::world {
 
 namespace {
 // How bumpy the normal maps of the materials are
-const float BUMP_STRENGTH[MATERIAL_LAYER_COUNT] = {1.5f, 3.0f, 4.0f, 4.5f,
-                                                   2.0f, 6.0f, 3.5f, 3.0f};
+const float kBumpStrength[kMaterialLayerCount] = {1.5f, 3.0f, 4.0f, 4.5f,
+                                                  2.0f, 6.0f, 3.5f, 3.0f};
 
-int mipLevels(int size) {
+int MipLevels(int size) {
   return static_cast<int>(std::floor(std::log2(static_cast<float>(size)))) + 1;
 }
 
-void setSampling(GLenum target) {
+void SetSampling(GLenum target) {
   glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -32,22 +31,22 @@ void setSampling(GLenum target) {
 }
 }  // namespace
 
-MaterialTextures::MaterialTextures(int size) : size(size) {
+MaterialTextures::MaterialTextures(int size) : size_(size) {
   render::StateGuard state;
   glDisable(GL_DEPTH_TEST);
   glDisable(GL_BLEND);
   glDisable(GL_CULL_FACE);
 
-  glGenTextures(1, &albedo);
-  glBindTexture(GL_TEXTURE_2D_ARRAY, albedo);
-  glTexStorage3D(GL_TEXTURE_2D_ARRAY, mipLevels(size), GL_SRGB8_ALPHA8, size,
-                 size, MATERIAL_LAYER_COUNT);
-  setSampling(GL_TEXTURE_2D_ARRAY);
-  glGenTextures(1, &normal);
-  glBindTexture(GL_TEXTURE_2D_ARRAY, normal);
-  glTexStorage3D(GL_TEXTURE_2D_ARRAY, mipLevels(size), GL_RGBA8, size, size,
-                 MATERIAL_LAYER_COUNT);
-  setSampling(GL_TEXTURE_2D_ARRAY);
+  glGenTextures(1, &albedo_);
+  glBindTexture(GL_TEXTURE_2D_ARRAY, albedo_);
+  glTexStorage3D(GL_TEXTURE_2D_ARRAY, MipLevels(size), GL_SRGB8_ALPHA8, size,
+                 size, kMaterialLayerCount);
+  SetSampling(GL_TEXTURE_2D_ARRAY);
+  glGenTextures(1, &normal_);
+  glBindTexture(GL_TEXTURE_2D_ARRAY, normal_);
+  glTexStorage3D(GL_TEXTURE_2D_ARRAY, MipLevels(size), GL_RGBA8, size, size,
+                 kMaterialLayerCount);
+  SetSampling(GL_TEXTURE_2D_ARRAY);
 
   GLuint height;
   glGenTextures(1, &height);
@@ -63,52 +62,54 @@ MaterialTextures::MaterialTextures(int size) : size(size) {
   glGenFramebuffers(1, &framebuffer);
   glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
   glViewport(0, 0, size, size);
-  for (int layer = 0; layer < MATERIAL_LAYER_COUNT; ++layer) {
+  for (int layer = 0; layer < kMaterialLayerCount; ++layer) {
     // 1. Color, roughness and height (the sRGB texture gets the linear color
     // converted)
-    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, albedo, 0,
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, albedo_, 0,
                               layer);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, height, 0);
     const GLenum both[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
     glDrawBuffers(2, both);
     glEnable(GL_FRAMEBUFFER_SRGB);
-    generator.enable();
-    glUniform1i(generator.getUniformLocation("material"), layer);
-    triangle.draw();
+    generator.Enable();
+    glUniform1i(generator.GetUniformLocation("material"), layer);
+    triangle.Draw();
     glDisable(GL_FRAMEBUFFER_SRGB);
 
     // 2. Normal and occlusion from the height
-    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, normal, 0,
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, normal_, 0,
                               layer);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, 0, 0);
     glDrawBuffers(1, both);
-    normals.enable();
-    glUniform1f(normals.getUniformLocation("bumpStrength"),
-                BUMP_STRENGTH[layer]);
+    normals.Enable();
+    glUniform1f(normals.GetUniformLocation("bumpStrength"),
+                kBumpStrength[layer]);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, height);
-    triangle.draw();
+    triangle.Draw();
   }
   glBindTexture(GL_TEXTURE_2D, 0);
   glDeleteFramebuffers(1, &framebuffer);
   glDeleteTextures(1, &height);
 
-  glBindTexture(GL_TEXTURE_2D_ARRAY, albedo);
+  glBindTexture(GL_TEXTURE_2D_ARRAY, albedo_);
   glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
-  glBindTexture(GL_TEXTURE_2D_ARRAY, normal);
+  glBindTexture(GL_TEXTURE_2D_ARRAY, normal_);
   glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
   glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }
 
 MaterialTextures::~MaterialTextures() {
-  glDeleteTextures(1, &albedo);
-  glDeleteTextures(1, &normal);
+  glDeleteTextures(1, &albedo_);
+  glDeleteTextures(1, &normal_);
 }
 
-void MaterialTextures::bind() const {
-  glActiveTexture(GL_TEXTURE0 + render::TextureUnit::MATERIAL_ALBEDO);
-  glBindTexture(GL_TEXTURE_2D_ARRAY, albedo);
-  glActiveTexture(GL_TEXTURE0 + render::TextureUnit::MATERIAL_NORMAL);
-  glBindTexture(GL_TEXTURE_2D_ARRAY, normal);
+void MaterialTextures::Bind() const {
+  glActiveTexture(GL_TEXTURE0 + render::texture_unit::kMaterialAlbedo);
+  glBindTexture(GL_TEXTURE_2D_ARRAY, albedo_);
+  glActiveTexture(GL_TEXTURE0 + render::texture_unit::kMaterialNormal);
+  glBindTexture(GL_TEXTURE_2D_ARRAY, normal_);
   glActiveTexture(GL_TEXTURE0);
 }
+
+}  // namespace bibo::world

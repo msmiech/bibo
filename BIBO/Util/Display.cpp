@@ -5,12 +5,13 @@
 #include <algorithm>
 #include <iostream>
 
-using namespace std;
-using namespace bibo;
-using namespace display;
+namespace bibo::display {
+
+using std::max;
+using std::vector;
 
 namespace {
-bool isWayland() {
+bool IsWayland() {
 #if GLFW_VERSION_MAJOR > 3 || \
     (GLFW_VERSION_MAJOR == 3 && GLFW_VERSION_MINOR >= 4)
   return glfwGetPlatform() == GLFW_PLATFORM_WAYLAND;
@@ -20,32 +21,32 @@ bool isWayland() {
 }
 }  // namespace
 
-GLFWmonitor* display::getMonitor(GLFWwindow* window) {
-  if (GLFWmonitor* fullscreenMonitor = glfwGetWindowMonitor(window)) {
-    return fullscreenMonitor;
+GLFWmonitor* GetMonitor(GLFWwindow* window) {
+  if (GLFWmonitor* fullscreen_monitor = glfwGetWindowMonitor(window)) {
+    return fullscreen_monitor;
   }
 
   int x = 0, y = 0, width = 0, height = 0;
   glfwGetWindowPos(window, &x, &y);
   glfwGetWindowSize(window, &width, &height);
-  int centerX = x + width / 2;
-  int centerY = y + height / 2;
+  int center_x = x + width / 2;
+  int center_y = y + height / 2;
 
   int count = 0;
   GLFWmonitor** monitors = glfwGetMonitors(&count);
   for (int i = 0; i < count; ++i) {
-    int monitorX = 0, monitorY = 0;
-    glfwGetMonitorPos(monitors[i], &monitorX, &monitorY);
+    int monitor_x = 0, monitor_y = 0;
+    glfwGetMonitorPos(monitors[i], &monitor_x, &monitor_y);
     const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
-    if (mode && centerX >= monitorX && centerX < monitorX + mode->width &&
-        centerY >= monitorY && centerY < monitorY + mode->height) {
+    if (mode && center_x >= monitor_x && center_x < monitor_x + mode->width &&
+        center_y >= monitor_y && center_y < monitor_y + mode->height) {
       return monitors[i];
     }
   }
   return glfwGetPrimaryMonitor();
 }
 
-vector<Resolution> display::getResolutions(GLFWmonitor* monitor) {
+vector<Resolution> GetResolutions(GLFWmonitor* monitor) {
   vector<Resolution> resolutions;
   int count = 0;
   const GLFWvidmode* modes =
@@ -66,9 +67,9 @@ vector<Resolution> display::getResolutions(GLFWmonitor* monitor) {
   return resolutions;
 }
 
-GLFWwindow* display::createWindow(int windowMode, int width, int height,
-                                  const char* title) {
-  if (windowMode == FULLSCREEN) {
+GLFWwindow* CreateWindow(int window_mode, int width, int height,
+                         const char* title) {
+  if (window_mode == kFullscreen) {
     // Without a monitor, the window is created windowed
     return glfwCreateWindow(width, height, title, glfwGetPrimaryMonitor(),
                             nullptr);
@@ -80,21 +81,21 @@ GLFWwindow* display::createWindow(int windowMode, int width, int height,
   GLFWwindow* window = glfwCreateWindow(width, height, title, nullptr, nullptr);
   glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
   if (window) {
-    applyWindowMode(window, windowMode, width, height);
+    ApplyWindowMode(window, window_mode, width, height);
     glfwShowWindow(window);
   }
   return window;
 }
 
-void display::applyWindowMode(GLFWwindow* window, int windowMode, int width,
-                              int height) {
-  GLFWmonitor* monitor = getMonitor(window);
+void ApplyWindowMode(GLFWwindow* window, int window_mode, int width,
+                     int height) {
+  GLFWmonitor* monitor = GetMonitor(window);
   if (!monitor) {
     glfwSetWindowSize(window, width, height);
     return;
   }
 
-  if (windowMode == FULLSCREEN) {
+  if (window_mode == kFullscreen) {
     // GLFW_DONT_CARE: the highest refresh rate of the resolution
     glfwSetWindowMonitor(window, monitor, 0, 0, width, height, GLFW_DONT_CARE);
     return;
@@ -103,28 +104,28 @@ void display::applyWindowMode(GLFWwindow* window, int windowMode, int width,
   // The decoration (title bar and border) is applied when the window leaves
   // full screen
   glfwSetWindowAttrib(window, GLFW_DECORATED,
-                      windowMode == WINDOWED ? GLFW_TRUE : GLFW_FALSE);
+                      window_mode == kWindowed ? GLFW_TRUE : GLFW_FALSE);
   if (glfwGetWindowMonitor(window)) {
     // Leave full screen first, so that the monitor is back in the video mode of
     // the desktop
     glfwSetWindowMonitor(window, nullptr, 0, 0, width, height, GLFW_DONT_CARE);
   }
 
-  int monitorX = 0, monitorY = 0;
-  glfwGetMonitorPos(monitor, &monitorX, &monitorY);
-  const GLFWvidmode* desktopMode = glfwGetVideoMode(monitor);
+  int monitor_x = 0, monitor_y = 0;
+  glfwGetMonitorPos(monitor, &monitor_x, &monitor_y);
+  const GLFWvidmode* desktop_mode = glfwGetVideoMode(monitor);
 
-  if (windowMode == BORDERLESS) {
-    if (isWayland()) {
+  if (window_mode == kBorderless) {
+    if (IsWayland()) {
       // Wayland neither lets windows position themselves nor change the video
       // mode, so full screen is borderless there
-      glfwSetWindowMonitor(window, monitor, 0, 0, desktopMode->width,
-                           desktopMode->height, desktopMode->refreshRate);
+      glfwSetWindowMonitor(window, monitor, 0, 0, desktop_mode->width,
+                           desktop_mode->height, desktop_mode->refreshRate);
     } else {
       // Unlike a full screen window, it stays open behind other windows when
       // switching to them (e.g. Alt+Tab)
-      glfwSetWindowMonitor(window, nullptr, monitorX, monitorY,
-                           desktopMode->width, desktopMode->height,
+      glfwSetWindowMonitor(window, nullptr, monitor_x, monitor_y,
+                           desktop_mode->width, desktop_mode->height,
                            GLFW_DONT_CARE);
     }
     return;
@@ -132,24 +133,24 @@ void display::applyWindowMode(GLFWwindow* window, int windowMode, int width,
 
   // Windowed: centered in the work area of the monitor (without the task bar),
   // including the title bar and border
-  int areaX = 0, areaY = 0, areaWidth = 0, areaHeight = 0;
-  glfwGetMonitorWorkarea(monitor, &areaX, &areaY, &areaWidth, &areaHeight);
+  int area_x = 0, area_y = 0, area_width = 0, area_height = 0;
+  glfwGetMonitorWorkarea(monitor, &area_x, &area_y, &area_width, &area_height);
   glfwSetWindowSize(window, width, height);
   int left = 0, top = 0, right = 0, bottom = 0;
   glfwGetWindowFrameSize(window, &left, &top, &right, &bottom);
   glfwSetWindowPos(
-      window, areaX + left + max(0, (areaWidth - left - right - width) / 2),
-      areaY + top + max(0, (areaHeight - top - bottom - height) / 2));
+      window, area_x + left + max(0, (area_width - left - right - width) / 2),
+      area_y + top + max(0, (area_height - top - bottom - height) / 2));
 }
 
-void display::setWindowIcon(GLFWwindow* window, const char* path) {
+void SetWindowIcon(GLFWwindow* window, const char* path) {
 #if defined(_WIN32) || defined(__APPLE__)
   // Windows: the icon resource of the executable, macOS: windows have no icons
   // (the icon of an application belongs to its bundle)
   (void)window;
   (void)path;
 #else
-  if (isWayland()) {
+  if (IsWayland()) {
     // The compositor shows the icon of the desktop entry, applications cannot
     // set one
     return;
@@ -166,3 +167,5 @@ void display::setWindowIcon(GLFWwindow* window, const char* path) {
   stbi_image_free(icon.pixels);
 #endif
 }
+
+}  // namespace bibo::display

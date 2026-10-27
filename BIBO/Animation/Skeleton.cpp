@@ -4,9 +4,9 @@
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
 
-using namespace bibo::animation;
+namespace bibo::animation {
 
-glm::mat4 Transform::toMatrix() const {
+glm::mat4 Transform::ToMatrix() const {
   glm::mat4 matrix = glm::mat4_cast(rotation);
   matrix[0] *= scale.x;
   matrix[1] *= scale.y;
@@ -15,7 +15,7 @@ glm::mat4 Transform::toMatrix() const {
   return matrix;
 }
 
-Transform Transform::fromMatrix(const glm::mat4& matrix) {
+Transform Transform::FromMatrix(const glm::mat4& matrix) {
   Transform transform;
   transform.translation = glm::vec3(matrix[3]);
   transform.scale = glm::vec3(glm::length(glm::vec3(matrix[0])),
@@ -28,7 +28,7 @@ Transform Transform::fromMatrix(const glm::mat4& matrix) {
   return transform;
 }
 
-Transform Transform::mix(const Transform& a, const Transform& b, float t) {
+Transform Transform::Mix(const Transform& a, const Transform& b, float t) {
   Transform result;
   result.translation = glm::mix(a.translation, b.translation, t);
   result.rotation = glm::slerp(a.rotation, b.rotation,
@@ -37,7 +37,7 @@ Transform Transform::mix(const Transform& a, const Transform& b, float t) {
   return result;
 }
 
-int Skeleton::find(const std::string& name) const {
+int Skeleton::Find(const std::string& name) const {
   for (std::size_t i = 0; i < bones.size(); ++i) {
     if (bones[i].name == name) {
       return static_cast<int>(i);
@@ -46,61 +46,61 @@ int Skeleton::find(const std::string& name) const {
   return -1;
 }
 
-Pose Skeleton::bindPose() const {
+Pose Skeleton::BindPose() const {
   Pose pose;
   pose.reserve(bones.size());
   for (const Bone& bone : bones) {
-    pose.push_back(bone.bindLocal);
+    pose.push_back(bone.bind_local);
   }
   return pose;
 }
 
-void Skeleton::modelMatrices(const Pose& pose, std::vector<glm::mat4>& result,
+void Skeleton::ModelMatrices(const Pose& pose, std::vector<glm::mat4>& result,
                              const glm::mat4& base) const {
   result.resize(bones.size());
   for (std::size_t i = 0; i < bones.size(); ++i) {
     const glm::mat4& parent =
-        bones[i].parent >= 0 ? result[bones[i].parent] : base * rootParent;
-    result[i] = parent * pose[i].toMatrix();
+        bones[i].parent >= 0 ? result[bones[i].parent] : base * root_parent;
+    result[i] = parent * pose[i].ToMatrix();
   }
 }
 
-Pose Skeleton::localPose(const std::vector<glm::mat4>& matrices,
+Pose Skeleton::LocalPose(const std::vector<glm::mat4>& matrices,
                          const glm::mat4& base) const {
   Pose pose(bones.size());
-  glm::mat4 rootSpace = glm::inverse(base * rootParent);
+  glm::mat4 root_space = glm::inverse(base * root_parent);
   for (std::size_t i = 0; i < bones.size(); ++i) {
-    glm::mat4 parentInverse = bones[i].parent >= 0
-                                  ? glm::inverse(matrices[bones[i].parent])
-                                  : rootSpace;
-    pose[i] = Transform::fromMatrix(parentInverse * matrices[i]);
+    glm::mat4 parent_inverse = bones[i].parent >= 0
+                                   ? glm::inverse(matrices[bones[i].parent])
+                                   : root_space;
+    pose[i] = Transform::FromMatrix(parent_inverse * matrices[i]);
   }
   return pose;
 }
 
-void Skeleton::skinMatrices(const std::vector<glm::mat4>& matrices,
+void Skeleton::SkinMatrices(const std::vector<glm::mat4>& matrices,
                             std::vector<glm::mat4>& result) const {
   result.resize(bones.size());
   for (std::size_t i = 0; i < bones.size(); ++i) {
-    result[i] = matrices[i] * bones[i].inverseBind;
+    result[i] = matrices[i] * bones[i].inverse_bind;
   }
 }
 
-void Skeleton::computeInverseBind() {
+void Skeleton::ComputeInverseBind() {
   std::vector<glm::mat4> bind;
-  modelMatrices(bindPose(), bind);
+  ModelMatrices(BindPose(), bind);
   for (std::size_t i = 0; i < bones.size(); ++i) {
-    bones[i].inverseBind = glm::inverse(bind[i]);
+    bones[i].inverse_bind = glm::inverse(bind[i]);
   }
 }
 
-glm::quat bibo::animation::rotationBetween(glm::vec3 from, glm::vec3 to) {
-  float fromLength = glm::length(from), toLength = glm::length(to);
-  if (fromLength < 1e-8f || toLength < 1e-8f) {
+glm::quat RotationBetween(glm::vec3 from, glm::vec3 to) {
+  float from_length = glm::length(from), to_length = glm::length(to);
+  if (from_length < 1e-8f || to_length < 1e-8f) {
     return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
   }
-  from /= fromLength;
-  to /= toLength;
+  from /= from_length;
+  to /= to_length;
   float cosine = glm::dot(from, to);
   if (cosine < -0.99999f) {
     // Opposite directions: half a turn around any perpendicular axis
@@ -114,19 +114,19 @@ glm::quat bibo::animation::rotationBetween(glm::vec3 from, glm::vec3 to) {
   return glm::normalize(glm::quat(1.0f + cosine, axis.x, axis.y, axis.z));
 }
 
-float bibo::animation::smoothingFactor(float halfLife, float timeDelta) {
-  if (halfLife <= 0.0f) {
+float SmoothingFactor(float half_life, float time_delta) {
+  if (half_life <= 0.0f) {
     return 1.0f;
   }
-  return 1.0f - std::exp2(-timeDelta / halfLife);
+  return 1.0f - std::exp2(-time_delta / half_life);
 }
 
-void SpringPoint::update(glm::vec3 target, float stiffness, float damping,
-                         glm::vec3 acceleration, float timeDelta) {
+void SpringPoint::Update(glm::vec3 target, float stiffness, float damping,
+                         glm::vec3 acceleration, float time_delta) {
   // Substeps keep stiff springs stable when a frame takes long
   int steps = std::max(
-      1, static_cast<int>(std::ceil(timeDelta * std::sqrt(stiffness) / 0.5f)));
-  float step = timeDelta / static_cast<float>(steps);
+      1, static_cast<int>(std::ceil(time_delta * std::sqrt(stiffness) / 0.5f)));
+  float step = time_delta / static_cast<float>(steps);
   for (int i = 0; i < steps; ++i) {
     velocity +=
         (stiffness * (target - position) - damping * velocity + acceleration) *
@@ -135,18 +135,20 @@ void SpringPoint::update(glm::vec3 target, float stiffness, float damping,
   }
 }
 
-void SpringPoint::reset(glm::vec3 to) {
+void SpringPoint::Reset(glm::vec3 to) {
   position = to;
   velocity = glm::vec3(0.0f);
 }
 
-void SpringValue::update(float target, float stiffness, float damping,
-                         float timeDelta) {
+void SpringValue::Update(float target, float stiffness, float damping,
+                         float time_delta) {
   int steps = std::max(
-      1, static_cast<int>(std::ceil(timeDelta * std::sqrt(stiffness) / 0.5f)));
-  float step = timeDelta / static_cast<float>(steps);
+      1, static_cast<int>(std::ceil(time_delta * std::sqrt(stiffness) / 0.5f)));
+  float step = time_delta / static_cast<float>(steps);
   for (int i = 0; i < steps; ++i) {
     velocity += (stiffness * (target - value) - damping * velocity) * step;
     value += velocity * step;
   }
 }
+
+}  // namespace bibo::animation

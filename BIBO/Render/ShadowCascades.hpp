@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_RENDER_SHADOWCASCADES_HPP_
+#define BIBO_RENDER_SHADOWCASCADES_HPP_
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -10,37 +11,39 @@ namespace render {
  * smaller it is and the sharper its shadows)
  */
 struct ShadowCascade {
-  glm::mat4 lightView = glm::mat4(1.0f);
-  glm::mat4 lightProjection = glm::mat4(1.0f);
-  glm::mat4 lightSpace = glm::mat4(1.0f);   // projection * view
-  float splitNear = 0.0f, splitFar = 0.0f;  // view depth of the slice
+  glm::mat4 light_view = glm::mat4(1.0f);
+  glm::mat4 light_projection = glm::mat4(1.0f);
+  glm::mat4 light_space = glm::mat4(1.0f);    // projection * view
+  float split_near = 0.0f, split_far = 0.0f;  // view depth of the slice
   float radius = 0.0f;  // half the width of the map in world units
   float depth = 0.0f;   // from the light to the far end of the map
-  float texelSize = 0.0f;
+  float texel_size = 0.0f;
 
   /**
    * @return false if a sphere cannot cast a shadow into the map (it is outside
    * of the volume of the map)
    */
-  bool contains(glm::vec3 center, float sphereRadius) const;
+  bool Contains(glm::vec3 center, float sphere_radius) const;
 };
 
 /**
  * Cascades for a perspective camera
  * @param view View matrix of the camera
- * @param fieldOfView Vertical, in degrees
+ * @param field_of_view Vertical, in degrees
  * @param splits View depth where every cascade ends (the first one starts at
  * near)
- * @param toSun Direction towards the sun
+ * @param to_sun Direction towards the sun
  * @param resolution Of a shadow map in texels
- * @param casterDistance How far between the sun and the slice objects still
+ * @param caster_distance How far between the sun and the slice objects still
  * cast shadows into it
  */
-std::vector<ShadowCascade> computeCascades(const glm::mat4& view,
-                                           float fieldOfView, float aspectRatio,
-                                           float nearPlane,
+std::vector<ShadowCascade> ComputeCascades(const glm::mat4& view,
+                                           float field_of_view,
+                                           float aspect_ratio, float near_plane,
                                            const std::vector<float>& splits,
-                                           glm::vec3 toSun, int resolution,
-                                           float casterDistance);
+                                           glm::vec3 to_sun, int resolution,
+                                           float caster_distance);
 }  // namespace render
 }  // namespace bibo
+
+#endif  // BIBO_RENDER_SHADOWCASCADES_HPP_

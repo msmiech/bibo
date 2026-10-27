@@ -47,6 +47,15 @@ uvx --python 3.13 pre-commit run --all-files    # or only the changed files: --f
 `--python 3.13`: PyYAML, which pre-commit needs, may have no prebuilt package for the newest Python yet.
 Includes are sorted within their group; one that must stay first (`<Jolt/Jolt.h>`) is wrapped in `// clang-format off`/`on`.
 
+Names in the Google style (`.clang-tidy`, checked by the CI): `CamelCase` types and functions, `snake_case` variables and
+struct members, `snake_case_` private/protected class members, `kCamelCase` constants and enumerators. No `using namespace`:
+a source is wrapped in the namespace of its header (`namespace bibo::scene {`) and adds using-declarations for other names,
+headers qualify (`std::`, `glm::`). Headers have `#define` guards named after the path (`BIBO_SCENE_SCENE_HPP_`).
+A function must not be named like a type (`FinishLine FinishLine()` does not compile in the class or namespace scope):
+use a verb (`MakeFinishLine`, `FindNearest`). Check with a Debug build folder configured with
+`-DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_CXX_SCAN_FOR_MODULES=OFF` and `clang-tidy -p <folder> <source>`
+(LLVM-MinGW ships `clang-tidy`).
+
 ## Tests
 ```bash
 ctest --test-dir build -j4 --output-on-failure      # everything (~30 s with a GPU; [gl] tests are skipped without OpenGL 4.3)

@@ -2,71 +2,77 @@
 
 #include <cmath>
 
-using namespace bibo::scene;
-using namespace glm;
+namespace bibo::scene {
 
-void ViewFrustum::setCamInternals(float fieldOfView, float aspectRatio,
-                                  float nearDistance, float farDistance) {
-  this->nearDistance = nearDistance;
-  this->farDistance = farDistance;
+using glm::radians;
+using glm::vec3;
 
-  float tangent = std::tan(radians(fieldOfView) * 0.5f);
-  nearHeight = nearDistance * tangent;
-  nearWidth = nearHeight * aspectRatio;
-  farHeight = farDistance * tangent;
-  farWidth = farHeight * aspectRatio;
+void ViewFrustum::SetCamInternals(float field_of_view, float aspect_ratio,
+                                  float near_distance, float far_distance) {
+  this->near_distance_ = near_distance;
+  this->far_distance_ = far_distance;
+
+  float tangent = std::tan(radians(field_of_view) * 0.5f);
+  near_height_ = near_distance * tangent;
+  near_width_ = near_height_ * aspect_ratio;
+  far_height_ = far_distance * tangent;
+  far_width_ = far_height_ * aspect_ratio;
 }
 
-void ViewFrustum::setCamDef(const vec3& position, const vec3& lookAt,
+void ViewFrustum::SetCamDef(const vec3& position, const vec3& look_at,
                             const vec3& up) {
   // Axes of the camera; the camera looks along -z
-  vec3 z = normalize(position - lookAt);
+  vec3 z = normalize(position - look_at);
   vec3 x = normalize(cross(up, z));
   vec3 y = cross(z, x);
 
-  vec3 nearCenter = position - z * nearDistance;
-  vec3 farCenter = position - z * farDistance;
+  vec3 near_center = position - z * near_distance_;
+  vec3 far_center = position - z * far_distance_;
 
-  vec3 nearTopLeft = nearCenter + y * nearHeight - x * nearWidth;
-  vec3 nearTopRight = nearCenter + y * nearHeight + x * nearWidth;
-  vec3 nearBottomLeft = nearCenter - y * nearHeight - x * nearWidth;
-  vec3 nearBottomRight = nearCenter - y * nearHeight + x * nearWidth;
+  vec3 near_top_left = near_center + y * near_height_ - x * near_width_;
+  vec3 near_top_right = near_center + y * near_height_ + x * near_width_;
+  vec3 near_bottom_left = near_center - y * near_height_ - x * near_width_;
+  vec3 near_bottom_right = near_center - y * near_height_ + x * near_width_;
 
-  vec3 farTopLeft = farCenter + y * farHeight - x * farWidth;
-  vec3 farTopRight = farCenter + y * farHeight + x * farWidth;
-  vec3 farBottomLeft = farCenter - y * farHeight - x * farWidth;
-  vec3 farBottomRight = farCenter - y * farHeight + x * farWidth;
+  vec3 far_top_left = far_center + y * far_height_ - x * far_width_;
+  vec3 far_top_right = far_center + y * far_height_ + x * far_width_;
+  vec3 far_bottom_left = far_center - y * far_height_ - x * far_width_;
+  vec3 far_bottom_right = far_center - y * far_height_ + x * far_width_;
 
   // Counter-clockwise seen from inside of the frustum, so that the normals
   // point inwards
-  planes[TOP].set3Points(nearTopRight, nearTopLeft, farTopLeft);
-  planes[BOTTOM].set3Points(nearBottomLeft, nearBottomRight, farBottomRight);
-  planes[LEFT].set3Points(nearTopLeft, nearBottomLeft, farBottomLeft);
-  planes[RIGHT].set3Points(nearBottomRight, nearTopRight, farBottomRight);
-  planes[NEARP].set3Points(nearTopLeft, nearTopRight, nearBottomRight);
-  planes[FARP].set3Points(farTopRight, farTopLeft, farBottomLeft);
+  planes_[kTop].Set3Points(near_top_right, near_top_left, far_top_left);
+  planes_[kBottom].Set3Points(near_bottom_left, near_bottom_right,
+                              far_bottom_right);
+  planes_[kLeft].Set3Points(near_top_left, near_bottom_left, far_bottom_left);
+  planes_[kRight].Set3Points(near_bottom_right, near_top_right,
+                             far_bottom_right);
+  planes_[kNearp].Set3Points(near_top_left, near_top_right, near_bottom_right);
+  planes_[kFarp].Set3Points(far_top_right, far_top_left, far_bottom_left);
 }
 
-ViewFrustum::Result ViewFrustum::pointInFrustum(const vec3& point) const {
-  for (const resources::Plane& plane : planes) {
-    if (plane.distance(point) < 0.0f) {
-      return OUTSIDE;
+ViewFrustum::Result ViewFrustum::PointInFrustum(const vec3& point) const {
+  for (const resources::Plane& plane : planes_) {
+    if (plane.Distance(point) < 0.0f) {
+      return kOutside;
     }
   }
-  return INSIDE;
+  return kInside;
 }
 
-ViewFrustum::Result ViewFrustum::sphereInFrustum(const vec3& center,
+ViewFrustum::Result ViewFrustum::SphereInFrustum(const vec3& center,
                                                  float radius) const {
-  Result result = INSIDE;
-  for (const resources::Plane& plane : planes) {
-    float distance = plane.distance(center);
+  Result result = kInside;
+  for (const resources::Plane& plane : planes_) {
+    float distance = plane.Distance(center);
     if (distance < -radius) {
-      return OUTSIDE;
+      return kOutside;
     }
     if (distance < radius) {
-      result = INTERSECT;
+      result = kIntersect;
     }
   }
   return result;
 }
+
+}  // namespace bibo::scene

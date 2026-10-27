@@ -10,7 +10,11 @@
 #include "World/TrackTerrain.hpp"
 #include "World/WorldGenerator.hpp"
 
-using namespace bibo::test;
+using bibo::test::NodeModelMatrix;
+using bibo::test::SharedWorldGenerator;
+using bibo::test::TrackNode;
+using bibo::test::TrackScene;
+
 using bibo::scene::Hedgehog;
 using bibo::scene::WaterPool;
 using glm::vec2;
@@ -19,21 +23,22 @@ using glm::vec3;
 TEST_CASE(
     "There are pools of water on the track that are deep enough for salmon",
     "[assets][world][animals]") {
-  const bibo::world::WorldGenerator& generator = worldGenerator();
-  const float sea = generator.getSeaLevel();
-  std::vector<WaterPool> pools = bibo::scene::findWaterPools(generator);
+  const bibo::world::WorldGenerator& generator = SharedWorldGenerator();
+  const float sea = generator.GetSeaLevel();
+  std::vector<WaterPool> pools = bibo::scene::FindWaterPools(generator);
   REQUIRE(pools.size() >= 4);
-  float lastDistance = -1.0f;
+  float last_distance = -1.0f;
   for (const WaterPool& pool : pools) {
-    CAPTURE(pool.center, pool.trackDistance);
+    CAPTURE(pool.center, pool.track_distance);
     CHECK(pool.center.y == sea);
-    CHECK(pool.trackDistance > lastDistance);  // in driving direction
-    lastDistance = pool.trackDistance;
-    CHECK(
-        generator.getPath().nearest(vec2(pool.center.x, pool.center.z)).found);
+    CHECK(pool.track_distance > last_distance);  // in driving direction
+    last_distance = pool.track_distance;
+    CHECK(generator.GetPath()
+              .FindNearest(vec2(pool.center.x, pool.center.z))
+              .found);
     REQUIRE_FALSE(pool.spots.empty());
     for (vec2 spot : pool.spots) {
-      CHECK(generator.height(spot) < sea - 0.6f);
+      CHECK(generator.Height(spot) < sea - 0.6f);
       CHECK(glm::distance(spot, vec2(pool.center.x, pool.center.z)) <=
             pool.radius);
     }
@@ -48,11 +53,11 @@ TEST_CASE(
 TEST_CASE(
     "Mishka lies on dry ground next to the largest pool, beside the trail",
     "[assets][world][animals]") {
-  const bibo::world::WorldGenerator& generator = worldGenerator();
-  const float sea = generator.getSeaLevel();
-  std::vector<WaterPool> pools = bibo::scene::findWaterPools(generator);
+  const bibo::world::WorldGenerator& generator = SharedWorldGenerator();
+  const float sea = generator.GetSeaLevel();
+  std::vector<WaterPool> pools = bibo::scene::FindWaterPools(generator);
   CHECK(pools.size() == 6);
-  int largest = bibo::scene::largestPool(pools);
+  int largest = bibo::scene::LargestPool(pools);
   REQUIRE(largest >= 0);
   const WaterPool& pool = pools[largest];
   for (const WaterPool& other : pools) {
@@ -61,17 +66,17 @@ TEST_CASE(
   }
 
   vec3 spot, look;
-  REQUIRE(bibo::scene::findShoreSpot(generator, pool, spot, look));
+  REQUIRE(bibo::scene::FindShoreSpot(generator, pool, spot, look));
   CAPTURE(spot, look, pool.center);
   CHECK(spot.y > sea + 0.1f);  // dry
   // on the ground
-  CHECK(std::abs(generator.height(vec2(spot.x, spot.z)) - spot.y) < 1e-4f);
+  CHECK(std::abs(generator.Height(vec2(spot.x, spot.z)) - spot.y) < 1e-4f);
   bibo::world::TrackPath::Nearest nearest =
-      generator.getPath().nearest(vec2(spot.x, spot.z));
+      generator.GetPath().FindNearest(vec2(spot.x, spot.z));
   REQUIRE(nearest.found);
   CHECK(std::abs(nearest.lateral) <=
         // on the floor of the track or at the foot of its walls
-        nearest.floorHalfWidth + 4.0f);
+        nearest.floor_half_width + 4.0f);
   CHECK(
       glm::distance(vec2(spot.x, spot.z), vec2(pool.center.x, pool.center.z)) <
       pool.radius + 8.0f);  // it can see the salmon
@@ -80,8 +85,8 @@ TEST_CASE(
 
   // Not in the way of the race: far from the route past the pool (also from the
   // line between its points)
-  std::vector<vec2> route = bibo::scene::runningRoute(
-      generator, pool.trackDistance - 40.0f, pool.trackDistance + 40.0f);
+  std::vector<vec2> route = bibo::scene::RunningRoute(
+      generator, pool.track_distance - 40.0f, pool.track_distance + 40.0f);
   REQUIRE(route.size() > 60);
   float clearance = 1e9f;
   for (std::size_t i = 0; i + 1 < route.size(); ++i) {
@@ -99,17 +104,17 @@ TEST_CASE(
 
 TEST_CASE("The route of runners goes along the trail and around the water",
           "[assets][world][animals]") {
-  const bibo::world::WorldGenerator& generator = worldGenerator();
-  const float sea = generator.getSeaLevel();
-  std::vector<WaterPool> pools = bibo::scene::findWaterPools(generator);
+  const bibo::world::WorldGenerator& generator = SharedWorldGenerator();
+  const float sea = generator.GetSeaLevel();
+  std::vector<WaterPool> pools = bibo::scene::FindWaterPools(generator);
   for (const WaterPool& pool : pools) {
-    std::vector<vec2> route = bibo::scene::runningRoute(
-        generator, pool.trackDistance - 30.0f, pool.trackDistance + 30.0f);
+    std::vector<vec2> route = bibo::scene::RunningRoute(
+        generator, pool.track_distance - 30.0f, pool.track_distance + 30.0f);
     REQUIRE(route.size() > 40);
     int wet = 0;
     for (vec2 point : route) {
-      wet += generator.height(point) < sea ? 1 : 0;
-      CHECK(generator.getPath().nearest(point).found);
+      wet += generator.Height(point) < sea ? 1 : 0;
+      CHECK(generator.GetPath().FindNearest(point).found);
     }
     CAPTURE(pool.center, wet);
     // only where it cuts a corner of the water
@@ -127,26 +132,26 @@ TEST_CASE(
   const int index = GENERATE(range(0, 12));
   vec3 rock;
   float radius;
-  REQUIRE(bibo::world::TrackTerrain::nodeSphere(
-      trackScene(), ("Rock" + std::to_string(index + 1)).c_str(), rock,
+  REQUIRE(bibo::world::TrackTerrain::NodeSphere(
+      TrackScene(), ("Rock" + std::to_string(index + 1)).c_str(), rock,
       radius));
   const vec2 home(rock.x, rock.z);
-  Hedgehog::Ground ground = Hedgehog::trackFloor(worldGenerator());
+  Hedgehog::Ground ground = Hedgehog::TrackFloor(SharedWorldGenerator());
   float height;
   CAPTURE(index, home);
   REQUIRE(ground(home, height));
 
-  Hedgehog hedgehog(home, Hedgehog::startDirection(index),
-                    Hedgehog::seedOf(index), ground);
+  Hedgehog hedgehog(home, Hedgehog::StartDirection(index),
+                    Hedgehog::SeedOf(index), ground);
   // on the ground, not floating like the rocks
-  CHECK(std::abs(hedgehog.getPosition().y - height) < 1e-4f);
+  CHECK(std::abs(hedgehog.GetPosition().y - height) < 1e-4f);
   for (int i = 0; i < 60 * 60; ++i) {
-    hedgehog.update(1.0f / 60.0f);
-    vec3 position = hedgehog.getPosition();
+    hedgehog.Update(1.0f / 60.0f);
+    vec3 position = hedgehog.GetPosition();
     REQUIRE(ground(vec2(position.x, position.z), height));
     REQUIRE(std::abs(position.y - height) < 0.3f);
     REQUIRE(glm::distance(vec2(position.x, position.z), home) <=
-            Hedgehog::HOME_RADIUS + 0.5f);
+            Hedgehog::kHomeRadius + 0.5f);
   }
 }
 
@@ -154,29 +159,29 @@ TEST_CASE(
     "The race track counts as the track for the race quest, the forest and the "
     "sea do not",
     "[assets][world][quest]") {
-  const bibo::world::WorldGenerator& generator = worldGenerator();
-  const bibo::world::TrackPath& path = generator.getPath();
+  const bibo::world::WorldGenerator& generator = SharedWorldGenerator();
+  const bibo::world::TrackPath& path = generator.GetPath();
   int checked = 0;
-  for (std::size_t i = 0; i < path.getSamples().size(); i += 3) {
-    const bibo::world::TrackPath::Sample& sample = path.getSamples()[i];
+  for (std::size_t i = 0; i < path.GetSamples().size(); i += 3) {
+    const bibo::world::TrackPath::Sample& sample = path.GetSamples()[i];
     vec2 right(-sample.tangent.y, sample.tangent.x);
     vec2 center(sample.position.x, sample.position.z);
     CAPTURE(sample.distance);
     // The whole floor, also a bit up the walls
     for (float lateral :
-         {-sample.floorLeft - 1.0f, 0.0f, sample.floorRight + 1.0f}) {
+         {-sample.floor_left - 1.0f, 0.0f, sample.floor_right + 1.0f}) {
       vec2 point = center + right * lateral;
-      REQUIRE(bibo::scene::RaceQuest::isOnTrack(
+      REQUIRE(bibo::scene::RaceQuest::IsOnTrack(
           path, vec3(point.x, sample.position.y, point.y)));
     }
     ++checked;
   }
   CHECK(checked > 100);
   // The start, the forest next to it and the sea
-  const vec3 start(nodeModelMatrix(trackNode("BearBody"))[3]);
-  CHECK(bibo::scene::RaceQuest::isOnTrack(path, start));
+  const vec3 start(NodeModelMatrix(TrackNode("BearBody"))[3]);
+  CHECK(bibo::scene::RaceQuest::IsOnTrack(path, start));
   CHECK_FALSE(
-      bibo::scene::RaceQuest::isOnTrack(path, start + vec3(40.0f, 0.0f, 0.0f)));
+      bibo::scene::RaceQuest::IsOnTrack(path, start + vec3(40.0f, 0.0f, 0.0f)));
   CHECK_FALSE(
-      bibo::scene::RaceQuest::isOnTrack(path, vec3(600.0f, 0.0f, 600.0f)));
+      bibo::scene::RaceQuest::IsOnTrack(path, vec3(600.0f, 0.0f, 600.0f)));
 }

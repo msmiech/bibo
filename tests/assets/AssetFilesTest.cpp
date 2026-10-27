@@ -12,7 +12,10 @@
 
 #include "TestSupport.hpp"
 
-using namespace bibo::test;
+using bibo::test::AssetPath;
+using bibo::test::GameShaderPrograms;
+using bibo::test::ShaderProgram;
+
 namespace fs = std::filesystem;
 
 namespace {
@@ -27,7 +30,7 @@ struct Image {
     rgba.reset(stbi_load(file.string().c_str(), &width, &height, &channels, 4));
   }
 
-  std::array<double, 3> averageColor() const {
+  std::array<double, 3> AverageColor() const {
     std::array<double, 3> sum{};
     for (int i = 0; i < width * height; ++i) {
       for (int c = 0; c < 3; ++c) {
@@ -41,10 +44,10 @@ struct Image {
   }
 };
 
-std::vector<std::string> imageFilesIn(const std::string& folder) {
+std::vector<std::string> ImageFilesIn(const std::string& folder) {
   std::vector<std::string> files;
   for (const auto& entry :
-       fs::recursive_directory_iterator(assetPath(folder))) {
+       fs::recursive_directory_iterator(AssetPath(folder))) {
     std::string extension = entry.path().extension().string();
     std::transform(
         extension.begin(), extension.end(), extension.begin(),
@@ -52,7 +55,7 @@ std::vector<std::string> imageFilesIn(const std::string& folder) {
     if (entry.is_regular_file() &&
         (extension == ".png" || extension == ".jpg" || extension == ".tga")) {
       files.push_back(
-          fs::relative(entry.path(), assetPath("")).generic_string());
+          fs::relative(entry.path(), AssetPath("")).generic_string());
     }
   }
   std::sort(files.begin(), files.end());
@@ -61,10 +64,10 @@ std::vector<std::string> imageFilesIn(const std::string& folder) {
 }  // namespace
 
 TEST_CASE("Every texture file can be decoded", "[assets]") {
-  const std::string file = GENERATE(from_range(imageFilesIn("Texture")));
+  const std::string file = GENERATE(from_range(ImageFilesIn("Texture")));
   CAPTURE(file);
 
-  Image image(assetPath(file));
+  Image image(AssetPath(file));
 
   REQUIRE(image.rgba != nullptr);
   CHECK(image.width > 0);
@@ -78,13 +81,13 @@ TEST_CASE("All textures of the scene exist", "[assets]") {
       values<std::string>({"Texture/wood16.jpg", "Texture/wood16n.jpg"}));
   CAPTURE(file);
 
-  CHECK(Image(assetPath(file)).rgba != nullptr);
+  CHECK(Image(AssetPath(file)).rgba != nullptr);
 }
 
 TEST_CASE("The window icon is a square image with a transparent background",
           "[assets]") {
-  // display::setWindowIcon (rendered from Icon/bibo.svg by tools/build_icon.py)
-  Image icon(assetPath("Icon/bibo.png"));
+  // display::SetWindowIcon (rendered from Icon/bibo.svg by tools/build_icon.py)
+  Image icon(AssetPath("Icon/bibo.png"));
   REQUIRE(icon.rgba != nullptr);
   CHECK(icon.width == icon.height);
   CHECK(icon.width >= 48);
@@ -101,10 +104,10 @@ TEST_CASE("Normal maps contain tangent space normals", "[assets]") {
       values<std::string>({"Texture/snow-normal.jpg", "Texture/wood16n.jpg",
                            "Texture/ground07n.jpg"}));
   CAPTURE(file);
-  Image normalMap(assetPath(file));
-  REQUIRE(normalMap.rgba != nullptr);
+  Image normal_map(AssetPath(file));
+  REQUIRE(normal_map.rgba != nullptr);
 
-  auto [red, green, blue] = normalMap.averageColor();
+  auto [red, green, blue] = normal_map.AverageColor();
   CAPTURE(red, green, blue);
   CHECK(blue > 200.0);
   CHECK(blue > red);
@@ -113,23 +116,23 @@ TEST_CASE("Normal maps contain tangent space normals", "[assets]") {
 
 TEST_CASE("The shader sources of the game exist and declare a GLSL version",
           "[assets]") {
-  const ShaderProgram program = GENERATE(from_range(gameShaderPrograms()));
+  const ShaderProgram program = GENERATE(from_range(GameShaderPrograms()));
   const std::string file =
-      GENERATE_COPY(program.vertexShader, program.fragmentShader);
+      GENERATE_COPY(program.vertex_shader, program.fragment_shader);
   CAPTURE(file);
 
-  std::ifstream source(assetPath(file));
+  std::ifstream source(AssetPath(file));
   REQUIRE(source.good());
-  std::string firstLine;
-  std::getline(source, firstLine);
+  std::string first_line;
+  std::getline(source, first_line);
   // The game needs OpenGL 4.3, newer versions are not supported by every driver
-  CHECK_THAT(firstLine,
+  CHECK_THAT(first_line,
              Catch::Matchers::Matches(R"(#version (330|4[0-3]0)( core)?\s*)"));
 }
 
 TEST_CASE("The font of the HUD exists", "[assets]") {
-  // Main.cpp initFreeType
-  std::ifstream font(assetPath("Font/DejaVuSans.ttf"), std::ios::binary);
+  // Main.cpp InitFreeType
+  std::ifstream font(AssetPath("Font/DejaVuSans.ttf"), std::ios::binary);
   REQUIRE(font.good());
   char magic[4] = {};
   font.read(magic, 4);

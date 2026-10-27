@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_SCENE_BEARCHARACTER_HPP_
+#define BIBO_SCENE_BEARCHARACTER_HPP_
 #include <glm/glm.hpp>
 #include <limits>
 #include <memory>
@@ -41,14 +42,14 @@ struct BearInput {
 class BearCharacter {
  public:
   enum class State {
-    CONTROL,  // the player moves the bear
-    RAGDOLL,  // tumbling after a hit
-    GETTING_UP
+    kControl,  // the player moves the bear
+    kRagdoll,  // tumbling after a hit
+    kGettingUp
   };
   enum class Fish {
-    NONE,
-    CARRIED,  // in the mouth (running, jumping)
-    EATING
+    kNone,
+    kCarried,  // in the mouth (running, jumping)
+    kEating
   };
   /**
    * Where the fish is that the bear holds (in the frame of the fish model: +z
@@ -65,12 +66,12 @@ class BearCharacter {
    * @param model Must stay alive as long as the character
    * @param startPosition Center of the character capsule
    * @param onHit Called when the bear touches a body (e.g. to knock it down
-   * with knockDown)
+   * with KnockDown)
    */
   BearCharacter(physics::PhysicsWorld& world,
-                const resources::SkinnedModel& model, glm::vec3 startPosition,
-                glm::vec3 startDirection,
-                physics::CharacterController::HitCallback onHit);
+                const resources::SkinnedModel& model, glm::vec3 start_position,
+                glm::vec3 start_direction,
+                physics::CharacterController::HitCallback on_hit);
   ~BearCharacter();
   BearCharacter(const BearCharacter&) = delete;
   BearCharacter& operator=(const BearCharacter&) = delete;
@@ -78,240 +79,243 @@ class BearCharacter {
   /**
    * Shape and movement limits of the bear's physics capsule
    */
-  static physics::CharacterControllerDesc characterControllerDesc(
-      glm::vec3 position);
+  static physics::CharacterControllerDesc ControllerDesc(glm::vec3 position);
 
   // Running speed (m/s)
-  static constexpr float FORWARD_SPEED = 10.0f;
+  static constexpr float kForwardSpeed = 10.0f;
   // Jump: how high the bear gets when the button is held until the highest
   // point, and how long it rises (a shorter press jumps lower)
-  static constexpr float JUMP_HEIGHT = 3.0f;
-  static constexpr float JUMP_RISE_TIME = 0.4f;
+  static constexpr float kJumpHeight = 3.0f;
+  static constexpr float kJumpRiseTime = 0.4f;
   // Swimming speed (m/s)
-  static constexpr float SWIM_SPEED = 4.0f;
+  static constexpr float kSwimSpeed = 4.0f;
   // The bear swims when the ground under it is this deep under the water
   // surface (it stops in shallower water), it floats with its paws this deep in
   // the water
-  static constexpr float SWIM_DEPTH = 0.75f, WADE_DEPTH = 0.55f,
-                         FLOAT_DEPTH = 0.85f;
+  static constexpr float kSwimDepth = 0.75f, kWadeDepth = 0.55f,
+                         kFloatDepth = 0.85f;
 
   /**
    * Call after the physics world was updated
    */
-  void update(float timeDelta, const BearInput& input);
+  void Update(float time_delta, const BearInput& input);
   /**
    * The bear falls over and tumbles (at the end of the next update). Ignored
    * while it is down or getting up, and for a moment after it got up.
    */
-  void knockDown(const physics::CharacterController::Hit& hit);
+  void KnockDown(const physics::CharacterController::Hit& hit);
   /**
    * Back to the start, standing (e.g. when the game is restarted)
    */
-  void reset();
+  void Reset();
   /**
    * Where reset puts the bear
    * @param position Center of the character capsule
    */
-  void setStart(glm::vec3 position, glm::vec3 direction);
-  glm::vec3 getStartPosition() const { return startPosition; }
+  void SetStart(glm::vec3 position, glm::vec3 direction);
+  glm::vec3 GetStartPosition() const { return start_position_; }
   /**
    * From the center of the character capsule down to the ground it stands on
    */
-  static float groundOffset();
+  static float GroundOffset();
   /**
    * Puts the bear somewhere else, standing and looking in a direction (e.g. at
    * the start of a race)
    * @param position Center of the character capsule
    */
-  void placeAt(glm::vec3 position, glm::vec3 direction);
+  void PlaceAt(glm::vec3 position, glm::vec3 direction);
   /**
    * Height of the water surface (the sea and the pools of the island), the bear
    * swims where it is deep enough. Without water (the default) it never swims.
    */
-  void setWaterLevel(float level) { waterLevel = level; }
-  float getWaterLevel() const { return waterLevel; }
+  void SetWaterLevel(float level) { water_level_ = level; }
+  float GetWaterLevel() const { return water_level_; }
   /**
    * The bear looks at a point with its head and eyes (e.g. the face of the
    * animal it talks to); it does not start idle animations meanwhile (it stops
    * stretching or yawning)
    */
-  void lookAt(glm::vec3 target) { rig.lookAt(target); }
-  void stopLooking() { rig.stopLooking(); }
+  void LookAt(glm::vec3 target) { rig_.LookAt(target); }
+  void StopLooking() { rig_.StopLooking(); }
   /**
    * Between the eyes (world space)
    */
-  glm::vec3 getHeadPosition() const { return rig.getHeadPosition(); }
+  glm::vec3 GetHeadPosition() const { return rig_.GetHeadPosition(); }
   /**
    * Plays an idle animation now (they also start on their own when the player
    * does not move the bear for a while)
    */
-  void startIdle(BearRig::Idle idle);
+  void StartIdle(BearRig::Idle idle);
   /**
    * @return true if the bear can catch a fish now (it is not tumbling and does
    * not hold one already)
    */
-  bool canCatchFish() const {
-    return state == State::CONTROL && fish == Fish::NONE;
+  bool CanCatchFish() const {
+    return state_ == State::kControl && fish_ == Fish::kNone;
   }
   /**
    * The bear caught a fish: it holds it in its mouth and eats it as soon as it
    * stands on the ground
-   * @return false if it cannot catch one now (see canCatchFish)
+   * @return false if it cannot catch one now (see CanCatchFish)
    */
-  bool catchFish();
-  Fish getFish() const { return fish; }
+  bool CatchFish();
+  Fish GetFish() const { return fish_; }
   /**
    * @return How many fish the bear ate up since the last call (it took the last
    * bite; a fish it dropped does not count)
    */
-  int takeEatenFish();
+  int TakeEatenFish();
   /**
    * @return false if the bear holds no fish
    */
-  bool getHeldFish(HeldFish& held) const;
+  bool GetHeldFish(HeldFish& held) const;
   /**
    * Between the front teeth (world space)
    */
-  glm::vec3 getMouthPosition() const;
+  glm::vec3 GetMouthPosition() const;
 
-  State getState() const { return state; }
+  State GetState() const { return state_; }
   /**
    * Center of the character capsule, or where it would be while the bear
    * tumbles (smooth when the state changes)
    */
-  glm::vec3 getPosition() const;
-  glm::vec3 getDirection() const { return direction; }
+  glm::vec3 GetPosition() const;
+  glm::vec3 GetDirection() const { return direction_; }
   /**
    * How fast the bear moves (m/s), zero while it tumbles or gets up
    */
-  glm::vec3 getVelocity() const {
-    return state == State::CONTROL ? velocity : glm::vec3(0.0f);
+  glm::vec3 GetVelocity() const {
+    return state_ == State::kControl ? velocity_ : glm::vec3(0.0f);
   }
   /**
    * @return true while the bear is in the air (jumping or falling)
    */
-  bool isAirborne() const {
-    return state == State::CONTROL && !standingOnGround && !swimming;
+  bool IsAirborne() const {
+    return state_ == State::kControl && !standing_on_ground_ && !swimming_;
   }
   /**
    * @return true while the bear swims (floats in deep water)
    */
-  bool isSwimming() const { return state == State::CONTROL && swimming; }
+  bool IsSwimming() const { return state_ == State::kControl && swimming_; }
   /**
    * @return How deep the paws are in the water (negative: above the water
    * surface), also while the bear tumbles
    */
-  float getWaterDepth() const;
+  float GetWaterDepth() const;
   /**
    * @return How often the bear went into deep water since the last call (e.g.
    * for a splash)
    */
-  int takeSplashes();
+  int TakeSplashes();
   /**
    * @return true for a moment after getting up, when hits do not knock the bear
    * down
    */
-  bool isProtected() const { return protectedTime > 0.0f; }
+  bool IsProtected() const { return protected_time_ > 0.0f; }
   /**
    * Obstacles that the fur lies on (e.g. rocks)
    */
-  void setObstacles(const std::vector<fur::SphereCollider>& obstacles) {
-    this->obstacles = obstacles;
+  void SetObstacles(const std::vector<fur::SphereCollider>& obstacles) {
+    this->obstacles_ = obstacles;
   }
 
-  const BearRig& getRig() const { return rig; }
-  const resources::SkinnedModel& getModel() const { return model; }
+  const BearRig& GetRig() const { return rig_; }
+  const resources::SkinnedModel& GetModel() const { return model_; }
   // Skinned vertices of the model in world space (updated every frame)
-  const std::vector<glm::vec3>& getPositions() const { return positions; }
-  const std::vector<glm::vec3>& getNormals() const { return normals; }
-  const std::vector<glm::vec3>& getCombDirections() const {
-    return combDirections;
+  const std::vector<glm::vec3>& GetPositions() const { return positions_; }
+  const std::vector<glm::vec3>& GetNormals() const { return normals_; }
+  const std::vector<glm::vec3>& GetCombDirections() const {
+    return comb_directions_;
   }
-  const std::vector<glm::vec3>& getFurOffsets() const {
-    return guideHairs.getOffsets();
+  const std::vector<glm::vec3>& GetFurOffsets() const {
+    return guide_hairs_.GetOffsets();
   }
   /**
    * Sphere around the whole bear (with its fur)
    */
-  glm::vec3 getBoundsCenter() const { return rig.getCenter(); }
-  float getBoundsRadius() const { return 2.2f; }
+  glm::vec3 GetBoundsCenter() const { return rig_.GetCenter(); }
+  float GetBoundsRadius() const { return 2.2f; }
   /**
    * Counts the frames in which the skinned vertices changed
    */
-  unsigned int getVersion() const { return version; }
+  unsigned int GetVersion() const { return version_; }
 
  private:
-  glm::vec3 rawPosition() const;
-  void setState(State newState);
-  void updateControl(float timeDelta, const BearInput& input);
+  glm::vec3 RawPosition() const;
+  void SetState(State new_state);
+  void UpdateControl(float time_delta, const BearInput& input);
   /**
    * @return How deep the paws of the character capsule are in the water
    * (negative: above the water surface)
    */
-  float capsuleWaterDepth() const;
+  float CapsuleWaterDepth() const;
   /**
    * Turns the bear and changes its speed (on the ground)
    * @return The speed the bear should run at (m/s)
    */
-  float steer(float timeDelta, const BearInput& input, bool& hasInput);
-  void updateRagdoll(float timeDelta);
-  void updateGettingUp(float timeDelta);
-  void startRagdoll();
-  void startGettingUp();
-  void updateSkin(float timeDelta);
-  LocomotionInput locomotionInput(bool jumped = false) const;
-  HeldFish carriedFish() const;
+  float Steer(float time_delta, const BearInput& input, bool& has_input);
+  void UpdateRagdoll(float time_delta);
+  void UpdateGettingUp(float time_delta);
+  void StartRagdoll();
+  void StartGettingUp();
+  void UpdateSkin(float time_delta);
+  LocomotionInput MakeLocomotionInput(bool jumped = false) const;
+  HeldFish CarriedFish() const;
 
-  physics::PhysicsWorld& world;
-  const resources::SkinnedModel& model;
-  glm::vec3 startPosition;
-  glm::vec3 startDirection;
-  physics::CharacterController::HitCallback onHit;
-  std::unique_ptr<physics::CharacterController> controller;
-  BearRig rig;
-  std::unique_ptr<physics::Ragdoll> ragdoll;
-  GroundProbe probe;
+  physics::PhysicsWorld& world_;
+  const resources::SkinnedModel& model_;
+  glm::vec3 start_position_;
+  glm::vec3 start_direction_;
+  physics::CharacterController::HitCallback on_hit_;
+  std::unique_ptr<physics::CharacterController> controller_;
+  BearRig rig_;
+  std::unique_ptr<physics::Ragdoll> ragdoll_;
+  GroundProbe probe_;
 
-  State state = State::CONTROL;
-  glm::vec3 direction;
-  float speed = 0.0f;  // along the direction
-  float yawRate = 0.0f;
-  glm::vec3 velocity = glm::vec3(0.0f);
+  State state_ = State::kControl;
+  glm::vec3 direction_;
+  float speed_ = 0.0f;  // along the direction
+  float yaw_rate_ = 0.0f;
+  glm::vec3 velocity_ = glm::vec3(0.0f);
   // Jumping and falling
   // horizontal velocity in the air (the bear keeps its momentum)
-  glm::vec3 airVelocity = glm::vec3(0.0f);
-  float verticalSpeed = 0.0f;
-  float airTime = 0.0f;  // since the bear left the ground
+  glm::vec3 air_velocity_ = glm::vec3(0.0f);
+  float vertical_speed_ = 0.0f;
+  float air_time_ = 0.0f;  // since the bear left the ground
   // jump was pressed this long ago (it still jumps if it lands soon)
-  float jumpBuffer = 0.0f;
-  bool jumping = false;  // rising from a jump (not falling off an edge)
-  bool jumpWasHeld = false;
-  float fallingTime = 0.0f;  // getting up
-  bool standingOnGround = false;
+  float jump_buffer_ = 0.0f;
+  bool jumping_ = false;  // rising from a jump (not falling off an edge)
+  bool jump_was_held_ = false;
+  float falling_time_ = 0.0f;  // getting up
+  bool standing_on_ground_ = false;
   // Swimming
-  float waterLevel = std::numeric_limits<float>::lowest();
-  bool swimming = false;
-  int splashes = 0;
-  bool knockDownPending = false;
-  physics::CharacterController::Hit pendingHit;
-  float stateTime = 0.0f, restTime = 0.0f, protectedTime = 0.0f;
-  float idleWaitTime = 0.0f;  // standing without input
-  int nextIdle = BearRig::IDLE_STRETCH;
-  // smooths getPosition when the state changes
-  glm::vec3 positionOffset = glm::vec3(0.0f);
-  Fish fish = Fish::NONE;
-  bool lastBiteTaken = false;
-  int eatenFish = 0;
-  int tongueRoot, tongueTip, leftPaw, rightPaw;  // bones that hold the fish
+  float water_level_ = std::numeric_limits<float>::lowest();
+  bool swimming_ = false;
+  int splashes_ = 0;
+  bool knock_down_pending_ = false;
+  physics::CharacterController::Hit pending_hit_;
+  float state_time_ = 0.0f, rest_time_ = 0.0f, protected_time_ = 0.0f;
+  float idle_wait_time_ = 0.0f;  // standing without input
+  int next_idle_ = BearRig::kIdleStretch;
+  // smooths GetPosition when the state changes
+  glm::vec3 position_offset_ = glm::vec3(0.0f);
+  Fish fish_ = Fish::kNone;
+  bool last_bite_taken_ = false;
+  int eaten_fish_ = 0;
+  int tongue_root_, tongue_tip_, left_paw_,
+      right_paw_;  // bones that hold the fish
 
   // Skinning and fur
-  std::vector<glm::mat4> skinMatrices;
-  std::vector<glm::vec3> positions, normals, combDirections, bindCombDirections;
-  std::vector<float> furLengths;
-  fur::GuideHairs guideHairs;
-  std::vector<fur::SphereCollider> obstacles;
-  float time = 0.0f;
-  unsigned int version = 0;
+  std::vector<glm::mat4> skin_matrices_;
+  std::vector<glm::vec3> positions_, normals_, comb_directions_,
+      bind_comb_directions_;
+  std::vector<float> fur_lengths_;
+  fur::GuideHairs guide_hairs_;
+  std::vector<fur::SphereCollider> obstacles_;
+  float time_ = 0.0f;
+  unsigned int version_ = 0;
 };
 }  // namespace scene
 }  // namespace bibo
+
+#endif  // BIBO_SCENE_BEARCHARACTER_HPP_

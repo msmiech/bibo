@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_RESOURCES_PLANE_HPP_
+#define BIBO_RESOURCES_PLANE_HPP_
 #include <glm/glm.hpp>
 
 namespace bibo {
@@ -20,18 +21,20 @@ class Plane {
    * Plane through three points, which are counter-clockwise when looking at the
    * plane from the side the normal points to
    */
-  void set3Points(const glm::vec3& v1, const glm::vec3& v2,
+  void Set3Points(const glm::vec3& v1, const glm::vec3& v2,
                   const glm::vec3& v3);
-  void setNormalAndPoint(const glm::vec3& normal, const glm::vec3& point);
+  void SetNormalAndPoint(const glm::vec3& normal, const glm::vec3& point);
   /**
    * Plane a * x + b * y + c * z + d = 0
    */
-  void setCoefficients(float a, float b, float c, float d);
+  void SetCoefficients(float a, float b, float c, float d);
   /**
    * @return Signed distance of the point: positive on the side the normal
    * points to
    */
-  float distance(const glm::vec3& p) const;
+  float Distance(const glm::vec3& p) const;
 };
 }  // namespace resources
 }  // namespace bibo
+
+#endif  // BIBO_RESOURCES_PLANE_HPP_

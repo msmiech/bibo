@@ -16,8 +16,26 @@
 #include "World/VegetationMeshes.hpp"
 #include "World/World.hpp"
 
-using namespace bibo::test;
-using namespace bibo::world;
+using bibo::test::AssetWorkingDirectory;
+using bibo::test::GlContext;
+using bibo::world::Atmosphere;
+using bibo::world::BuildModel;
+using bibo::world::ChunkKey;
+using bibo::world::ChunkMesh;
+using bibo::world::kMaterialLayerCount;
+using bibo::world::kMaterialRock;
+using bibo::world::kMaterialSnow;
+using bibo::world::kModelCount;
+using bibo::world::kVegetationGrass;
+using bibo::world::MaterialTextures;
+using bibo::world::Model;
+using bibo::world::ModelHeight;
+using bibo::world::ModelRadius;
+using bibo::world::SkyRenderer;
+using bibo::world::TerrainRenderer;
+using bibo::world::TerrainVertex;
+using bibo::world::VegetationMesh;
+using bibo::world::VegetationVertex;
 
 namespace {
 struct Statistics {
@@ -25,7 +43,7 @@ struct Statistics {
   float variation = 0.0f;  // standard deviation of the brightness
 };
 
-Statistics statistics(const std::vector<float>& rgba) {
+Statistics ComputeStatistics(const std::vector<float>& rgba) {
   Statistics result;
   std::size_t count = rgba.size() / 4;
   double sum = 0.0, squares = 0.0;
@@ -46,9 +64,9 @@ Statistics statistics(const std::vector<float>& rgba) {
  * The texels of a layer of a texture array (an sRGB texture is converted to
  * linear colors)
  */
-std::vector<float> layer(GLuint texture, int size, int index, bool srgb) {
+std::vector<float> ReadLayer(GLuint texture, int size, int index, bool srgb) {
   std::vector<float> all(static_cast<std::size_t>(size) * size * 4 *
-                         MATERIAL_LAYER_COUNT);
+                         kMaterialLayerCount);
   glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
   glGetTexImage(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, GL_FLOAT, all.data());
   glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
@@ -71,16 +89,17 @@ TEST_CASE(
     "[gl][world]") {
   GlContext gl;
   AssetWorkingDirectory assets;
-  const int SIZE = 64;
-  MaterialTextures materials(SIZE);
-  REQUIRE(gl.errors().empty());
+  const int size = 64;
+  MaterialTextures materials(size);
+  REQUIRE(gl.Errors().empty());
 
-  const int index = GENERATE(range(0, static_cast<int>(MATERIAL_LAYER_COUNT)));
+  const int index = GENERATE(range(0, static_cast<int>(kMaterialLayerCount)));
   CAPTURE(index);
   Statistics albedo =
-      statistics(layer(materials.getAlbedo(), SIZE, index, true));
-  std::vector<float> normals = layer(materials.getNormal(), SIZE, index, false);
-  Statistics normal = statistics(normals);
+      ComputeStatistics(ReadLayer(materials.GetAlbedo(), size, index, true));
+  std::vector<float> normals =
+      ReadLayer(materials.GetNormal(), size, index, false);
+  Statistics normal = ComputeStatistics(normals);
   CAPTURE(albedo.average, albedo.variation, normal.average);
 
   // A pattern, not a plain color
@@ -98,13 +117,13 @@ TEST_CASE(
     REQUIRE(glm::length(xy) <= 1.01f);
     REQUIRE(normals[i + 3] > 0.3f);  // ambient occlusion
   }
-  if (index == MATERIAL_SNOW) {
+  if (index == kMaterialSnow) {
     CHECK(albedo.average.b > 0.6f);  // bright, a bit blue
   }
-  if (index == MATERIAL_ROCK) {
+  if (index == kMaterialRock) {
     CHECK(albedo.average.g < 0.3f);  // dark granite
   }
-  CHECK_THAT(gl.errors(), Catch::Matchers::IsEmpty());
+  CHECK_THAT(gl.Errors(), Catch::Matchers::IsEmpty());
 }
 
 TEST_CASE(
@@ -112,47 +131,47 @@ TEST_CASE(
     "[gl][world]") {
   GlContext gl;
   AssetWorkingDirectory assets;
-  Atmosphere atmosphere = Atmosphere::polarDay();
-  CHECK(atmosphere.toSun.y > 0.3f);
-  CHECK(atmosphere.toSun.y < 0.7f);  // low, polar sun
+  Atmosphere atmosphere = Atmosphere::PolarDay();
+  CHECK(atmosphere.to_sun.y > 0.3f);
+  CHECK(atmosphere.to_sun.y < 0.7f);  // low, polar sun
 
   bibo::render::FrameUniformBuffer frame;
   bibo::render::FrameUniforms uniforms;
-  uniforms.sunDirectionShadows = glm::vec4(atmosphere.toSun, 1.0f);
-  uniforms.sunColorNormalMapping = glm::vec4(atmosphere.sunColor, 1.0f);
-  uniforms.groundAmbient.w = atmosphere.auroraIntensity;
-  uniforms.wind = glm::vec4(atmosphere.windDirection, 1.0f, 0.0f);
-  frame.upload(uniforms);
-  frame.bind();
+  uniforms.sun_direction_shadows = glm::vec4(atmosphere.to_sun, 1.0f);
+  uniforms.sun_color_normal_mapping = glm::vec4(atmosphere.sun_color, 1.0f);
+  uniforms.ground_ambient.w = atmosphere.aurora_intensity;
+  uniforms.wind = glm::vec4(atmosphere.wind_direction, 1.0f, 0.0f);
+  frame.Upload(uniforms);
+  frame.Bind();
   SkyRenderer sky(true);
-  sky.update();
-  REQUIRE(gl.errors().empty());
+  sky.Update();
+  REQUIRE(gl.Errors().empty());
 
   // Faces of the cube map: +x, -x, +y, -y, +z, -z
   auto face = [&](int index) {
     GLint size = 0;
-    glBindTexture(GL_TEXTURE_CUBE_MAP, sky.getEnvironment());
+    glBindTexture(GL_TEXTURE_CUBE_MAP, sky.GetEnvironment());
     glGetTexLevelParameteriv(GL_TEXTURE_CUBE_MAP_POSITIVE_X + index, 0,
                              GL_TEXTURE_WIDTH, &size);
     std::vector<float> pixels(static_cast<std::size_t>(size) * size * 4);
     glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X + index, 0, GL_RGBA, GL_FLOAT,
                   pixels.data());
-    return statistics(pixels).average;
+    return ComputeStatistics(pixels).average;
   };
   glm::vec3 up = face(2), down = face(3);
   CAPTURE(up, down);
   CHECK(up.b > up.r);
   CHECK(up.b > 0.1f);  // a bright day
   CHECK(down.r + down.g + down.b < up.r + up.g + up.b);
-  CHECK_THAT(gl.errors(), Catch::Matchers::IsEmpty());
+  CHECK_THAT(gl.Errors(), Catch::Matchers::IsEmpty());
 }
 
 TEST_CASE("Every vegetation model has levels of detail with fewer triangles",
           "[world][vegetation]") {
   // No graphics needed: the meshes are generated on the CPU
-  const int model = GENERATE(range(0, MODEL_COUNT));
+  const int model = GENERATE(range(0, kModelCount));
   CAPTURE(model);
-  std::vector<VegetationMesh> lods = buildModel(static_cast<Model>(model));
+  std::vector<VegetationMesh> lods = BuildModel(static_cast<Model>(model));
   REQUIRE_FALSE(lods.empty());
   REQUIRE(lods.size() <= 3);
   for (std::size_t lod = 0; lod < lods.size(); ++lod) {
@@ -167,12 +186,12 @@ TEST_CASE("Every vegetation model has levels of detail with fewer triangles",
       CHECK(mesh.indices.size() < lods[lod - 1].indices.size());
     }
     // About as large as the scattering expects
-    CHECK(mesh.radius > 0.3f * modelRadius(static_cast<Model>(model)));
-    CHECK(mesh.radius < 1.5f * (modelHeight(static_cast<Model>(model)) +
-                                modelRadius(static_cast<Model>(model))));
+    CHECK(mesh.radius > 0.3f * ModelRadius(static_cast<Model>(model)));
+    CHECK(mesh.radius < 1.5f * (ModelHeight(static_cast<Model>(model)) +
+                                ModelRadius(static_cast<Model>(model))));
     for (const VegetationVertex& vertex : mesh.vertices) {
       REQUIRE(std::abs(glm::length(vertex.normal) - 1.0f) < 0.01f);
-      REQUIRE(vertex.parameters[0] <= VEGETATION_GRASS);
+      REQUIRE(vertex.parameters[0] <= kVegetationGrass);
     }
   }
 }
@@ -199,32 +218,32 @@ TEST_CASE(
       chunk->vertices.push_back(vertex);
     }
     chunk->indices = {0, 2, 1};
-    chunk->surfaceIndexCount = 3;
-    chunk->bounds = chunkBox(key);
+    chunk->surface_index_count = 3;
+    chunk->bounds = ChunkBox(key);
     return std::shared_ptr<const ChunkMesh>(chunk);
   };
 
   // Loading: a new chunk, and one that changes in the same moment, just appear
-  terrain.apply({key, mesh(2)}, 1.0f);
-  terrain.apply({key, mesh(1)}, 1.0f);
-  CHECK(terrain.getChunkCount() == 1);
-  CHECK(terrain.getFadingCount() == 0);
+  terrain.Apply({key, mesh(2)}, 1.0f);
+  terrain.Apply({key, mesh(1)}, 1.0f);
+  CHECK(terrain.GetChunkCount() == 1);
+  CHECK(terrain.GetFadingCount() == 0);
 
-  terrain.apply({key, mesh(0)}, 2.0f);
-  CHECK(terrain.getChunkCount() == 1);
-  CHECK(terrain.getFadingCount() == 1);
+  terrain.Apply({key, mesh(0)}, 2.0f);
+  CHECK(terrain.GetChunkCount() == 1);
+  CHECK(terrain.GetFadingCount() == 1);
   // Both meshes are drawn while it fades, the old one is released afterwards
-  terrain.draw(nullptr, 2.0f + 0.5f * TerrainRenderer::FADE_TIME);
-  CHECK(terrain.getDrawnTriangles() == 2);
-  CHECK(terrain.getFadingCount() == 1);
-  terrain.draw(nullptr, 2.0f + TerrainRenderer::FADE_TIME);
-  CHECK(terrain.getDrawnTriangles() == 1);
-  CHECK(terrain.getFadingCount() == 0);
+  terrain.Draw(nullptr, 2.0f + 0.5f * TerrainRenderer::kFadeTime);
+  CHECK(terrain.GetDrawnTriangles() == 2);
+  CHECK(terrain.GetFadingCount() == 1);
+  terrain.Draw(nullptr, 2.0f + TerrainRenderer::kFadeTime);
+  CHECK(terrain.GetDrawnTriangles() == 1);
+  CHECK(terrain.GetFadingCount() == 0);
 
   // A chunk without a surface is removed at once
-  terrain.apply({key, mesh(1)}, 5.0f);
-  terrain.apply({key, nullptr}, 5.5f);
-  CHECK(terrain.getChunkCount() == 0);
-  CHECK(terrain.getFadingCount() == 0);
-  CHECK_THAT(gl.errors(), Catch::Matchers::IsEmpty());
+  terrain.Apply({key, mesh(1)}, 5.0f);
+  terrain.Apply({key, nullptr}, 5.5f);
+  CHECK(terrain.GetChunkCount() == 0);
+  CHECK(terrain.GetFadingCount() == 0);
+  CHECK_THAT(gl.Errors(), Catch::Matchers::IsEmpty());
 }

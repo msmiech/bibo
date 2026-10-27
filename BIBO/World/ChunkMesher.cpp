@@ -5,43 +5,44 @@
 
 #include "Chunk.hpp"
 
-using namespace bibo::world;
+using bibo::world::ChunkMesh;
+using bibo::world::WorldGenerator;
 
 namespace {
 // The 12 edges of a voxel as pairs of its corners (corner bits: 1 = +x, 2 = +y,
 // 4 = +z)
-const int EDGES[12][2] = {{0, 1}, {2, 3}, {4, 5}, {6, 7},   // along x
-                          {0, 2}, {1, 3}, {4, 6}, {5, 7},   // along y
-                          {0, 4}, {1, 5}, {2, 6}, {3, 7}};  // along z
+const int kEdges[12][2] = {{0, 1}, {2, 3}, {4, 5}, {6, 7},   // along x
+                           {0, 2}, {1, 3}, {4, 6}, {5, 7},   // along y
+                           {0, 4}, {1, 5}, {2, 6}, {3, 7}};  // along z
 
-std::uint8_t toByte(float value) {
+std::uint8_t ToByte(float value) {
   return static_cast<std::uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f +
                                    0.5f);
 }
 
-glm::vec3 densityGradient(const WorldGenerator& world, glm::vec3 position,
+glm::vec3 DensityGradient(const WorldGenerator& world, glm::vec3 position,
                           float epsilon) {
-  return glm::vec3(world.density(position + glm::vec3(epsilon, 0, 0)) -
-                       world.density(position - glm::vec3(epsilon, 0, 0)),
-                   world.density(position + glm::vec3(0, epsilon, 0)) -
-                       world.density(position - glm::vec3(0, epsilon, 0)),
-                   world.density(position + glm::vec3(0, 0, epsilon)) -
-                       world.density(position - glm::vec3(0, 0, epsilon))) /
+  return glm::vec3(world.Density(position + glm::vec3(epsilon, 0, 0)) -
+                       world.Density(position - glm::vec3(epsilon, 0, 0)),
+                   world.Density(position + glm::vec3(0, epsilon, 0)) -
+                       world.Density(position - glm::vec3(0, epsilon, 0)),
+                   world.Density(position + glm::vec3(0, 0, epsilon)) -
+                       world.Density(position - glm::vec3(0, 0, epsilon))) /
          (2.0f * epsilon);
 }
 }  // namespace
 
-ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
+ChunkMesh bibo::world::MeshChunk(const WorldGenerator& world,
                                  const ChunkKey& key, int lod) {
   ChunkMesh mesh;
   mesh.key = key;
   mesh.lod = lod;
-  const int n = CHUNK_CELLS >> lod;              // voxels per axis
+  const int n = kChunkCells >> lod;              // voxels per axis
   const float h = static_cast<float>(1 << lod);  // size of a voxel
-  Box box = chunkBox(key);
+  Box box = ChunkBox(key);
   box.minimum -= glm::vec3(2.0f * h);
   box.maximum += glm::vec3(2.0f * h);
-  if (!world.mayContainSurface(box)) {
+  if (!world.MayContainSurface(box)) {
     return mesh;
   }
 
@@ -49,28 +50,28 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
   // the chunk has, so that the voxels at the border can be computed like the
   // neighbor does. Global sample index g is at g * h (exact, the same in every
   // chunk).
-  const int S = n + 3;
+  const int s = n + 3;
   const glm::ivec3 first = glm::ivec3(key.x, key.y, key.z) * n - glm::ivec3(1);
-  std::vector<float> densities(static_cast<std::size_t>(S) * S * S);
+  std::vector<float> densities(static_cast<std::size_t>(s) * s * s);
   auto density = [&](int i, int j, int k) -> float& {
-    return densities[(static_cast<std::size_t>(k) * S + i) * S + j];
+    return densities[(static_cast<std::size_t>(k) * s + i) * s + j];
   };
-  bool anySolid = false, anyAir = false;
-  for (int k = 0; k < S; ++k) {
-    for (int i = 0; i < S; ++i) {
+  bool any_solid = false, any_air = false;
+  for (int k = 0; k < s; ++k) {
+    for (int i = 0; i < s; ++i) {
       float* column = &density(i, 0, k);
-      world.densityColumn(static_cast<float>(first.x + i) * h,
-                          static_cast<float>(first.z + k) * h, first.y, h, S,
+      world.DensityColumn(static_cast<float>(first.x + i) * h,
+                          static_cast<float>(first.z + k) * h, first.y, h, s,
                           column);
-      for (int j = 0; j < S; ++j) {
-        (column[j] > 0.0f ? anySolid : anyAir) = true;
+      for (int j = 0; j < s; ++j) {
+        (column[j] > 0.0f ? any_solid : any_air) = true;
       }
     }
   }
-  if (!anySolid || !anyAir) {
+  if (!any_solid || !any_air) {
     return mesh;
   }
-  auto samplePosition = [&](int i, int j, int k) {
+  auto sample_position = [&](int i, int j, int k) {
     return glm::vec3(static_cast<float>(first.x + i),
                      static_cast<float>(first.y + j),
                      static_cast<float>(first.z + k)) *
@@ -81,14 +82,16 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
   // points where its edges cross the surface, moved onto the surface (one
   // Newton step) and kept inside of its voxel. The quads (2.) only use the
   // voxels 0 to n.
-  const int C = n + 1;  // voxels per axis
-  std::vector<int> voxelVertex(static_cast<std::size_t>(C) * C * C, -1);
+  const int voxels = n + 1;  // voxels per axis
+  std::vector<int> voxel_vertex(
+      static_cast<std::size_t>(voxels) * voxels * voxels, -1);
   auto voxel = [&](int i, int j, int k) -> int& {
-    return voxelVertex[(static_cast<std::size_t>(k) * C + j) * C + i];
+    return voxel_vertex[(static_cast<std::size_t>(k) * voxels + j) * voxels +
+                        i];
   };
-  for (int k = 0; k < C; ++k) {
-    for (int j = 0; j < C; ++j) {
-      for (int i = 0; i < C; ++i) {
+  for (int k = 0; k < voxels; ++k) {
+    for (int j = 0; j < voxels; ++j) {
+      for (int i = 0; i < voxels; ++i) {
         float corners[8];
         int solid = 0;
         for (int c = 0; c < 8; ++c) {
@@ -101,7 +104,7 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
         }
         glm::vec3 sum(0.0f);
         int crossings = 0;
-        for (const auto& edge : EDGES) {
+        for (const auto& edge : kEdges) {
           float a = corners[edge[0]], b = corners[edge[1]];
           if ((a > 0.0f) == (b > 0.0f)) {
             continue;
@@ -112,13 +115,13 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
           sum += glm::mix(pa, pb, t);
           ++crossings;
         }
-        glm::vec3 low = samplePosition(i, j, k);
+        glm::vec3 low = sample_position(i, j, k);
         glm::vec3 position = low + h * (sum / static_cast<float>(crossings));
         glm::vec3 gradient =
-            densityGradient(world, position, 0.25f * std::min(h, 2.0f));
+            DensityGradient(world, position, 0.25f * std::min(h, 2.0f));
         float squared = glm::dot(gradient, gradient);
         if (squared > 1e-8f) {
-          position -= gradient * (world.density(position) / squared);
+          position -= gradient * (world.Density(position) / squared);
           position = glm::clamp(position, low - glm::vec3(0.25f * h),
                                 low + glm::vec3(1.25f * h));
         }
@@ -137,11 +140,11 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
     for (int j = 1; j <= n; ++j) {
       for (int i = 1; i <= n; ++i) {
         const int start[3] = {i, j, k};
-        bool startSolid = density(i, j, k) > 0.0f;
+        bool start_solid = density(i, j, k) > 0.0f;
         for (int axis = 0; axis < 3; ++axis) {
           int end[3] = {i, j, k};
           ++end[axis];
-          if (startSolid == (density(end[0], end[1], end[2]) > 0.0f)) {
+          if (start_solid == (density(end[0], end[1], end[2]) > 0.0f)) {
             continue;
           }
           // The 4 voxels around the edge, counterclockwise around the axis (u x
@@ -160,7 +163,7 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
           if (!complete) {
             continue;
           }
-          if (!startSolid) {
+          if (!start_solid) {
             // The ground is on the far side: the surface faces the other way
             std::swap(quad[1], quad[3]);
           }
@@ -190,7 +193,7 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
       }
     }
   }
-  mesh.surfaceIndexCount = mesh.indices.size();
+  mesh.surface_index_count = mesh.indices.size();
   if (mesh.indices.empty()) {
     mesh.vertices.clear();
     return mesh;
@@ -209,34 +212,34 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
   }
   mesh.vertices.swap(used);
   for (TerrainVertex& vertex : mesh.vertices) {
-    glm::vec3 normal = world.normal(vertex.position);
+    glm::vec3 normal = world.Normal(vertex.position);
     vertex.normal = normal;
-    SurfaceMaterial material = world.material(vertex.position, normal);
-    vertex.material[1] = toByte(material.sand);
+    SurfaceMaterial material = world.Material(vertex.position, normal);
+    vertex.material[1] = ToByte(material.sand);
     // In a cave the walls and the roof are rock, the floor is the trail
     float floor = glm::smoothstep(0.55f, 0.8f, normal.y);
     vertex.material[2] =
-        toByte(std::max(material.cave * (1.0f - floor), 0.8f * material.cliff));
+        ToByte(std::max(material.cave * (1.0f - floor), 0.8f * material.cliff));
     vertex.material[0] =
-        toByte(std::max(material.trail, material.cave * floor));
-    float visibility = world.skyVisibility(vertex.position, normal);
+        ToByte(std::max(material.trail, material.cave * floor));
+    float visibility = world.SkyVisibility(vertex.position, normal);
     vertex.material[3] =
-        toByte(world.snowCover(vertex.position, normal, visibility, material));
-    vertex.skyVisibility = toByte(visibility);
+        ToByte(world.SnowCover(vertex.position, normal, visibility, material));
+    vertex.sky_visibility = ToByte(visibility);
   }
 
   // 4. Skirts: the edges at the border of the surface (used by only one
   // triangle) are extended into the ground
-  std::unordered_map<std::uint64_t, int> edgeUse;
-  auto edgeKey = [](std::uint32_t a, std::uint32_t b) {
+  std::unordered_map<std::uint64_t, int> edge_use;
+  auto edge_key = [](std::uint32_t a, std::uint32_t b) {
     return (static_cast<std::uint64_t>(std::min(a, b)) << 32) | std::max(a, b);
   };
-  for (std::size_t t = 0; t < mesh.surfaceIndexCount; t += 3) {
+  for (std::size_t t = 0; t < mesh.surface_index_count; t += 3) {
     for (int e = 0; e < 3; ++e) {
-      ++edgeUse[edgeKey(mesh.indices[t + e], mesh.indices[t + (e + 1) % 3])];
+      ++edge_use[edge_key(mesh.indices[t + e], mesh.indices[t + (e + 1) % 3])];
     }
   }
-  const float skirtDepth = 1.5f * h + 0.5f;
+  const float skirt_depth = 1.5f * h + 0.5f;
   std::unordered_map<std::uint32_t, std::uint32_t> lowered;
   auto lower = [&](std::uint32_t index) {
     auto found = lowered.find(index);
@@ -244,22 +247,22 @@ ChunkMesh bibo::world::meshChunk(const WorldGenerator& world,
       return found->second;
     }
     TerrainVertex vertex = mesh.vertices[index];
-    vertex.position -= vertex.normal * skirtDepth;
+    vertex.position -= vertex.normal * skirt_depth;
     std::uint32_t added = static_cast<std::uint32_t>(mesh.vertices.size());
     mesh.vertices.push_back(vertex);
     lowered[index] = added;
     return added;
   };
-  for (std::size_t t = 0; t < mesh.surfaceIndexCount; t += 3) {
+  for (std::size_t t = 0; t < mesh.surface_index_count; t += 3) {
     for (int e = 0; e < 3; ++e) {
       std::uint32_t a = mesh.indices[t + e], b = mesh.indices[t + (e + 1) % 3];
-      if (edgeUse[edgeKey(a, b)] != 1) {
+      if (edge_use[edge_key(a, b)] != 1) {
         continue;
       }
       // Continues the surface over the edge (reversed edge), folded down into
       // the ground
-      std::uint32_t lowA = lower(a), lowB = lower(b);
-      mesh.indices.insert(mesh.indices.end(), {b, a, lowA, b, lowA, lowB});
+      std::uint32_t low_a = lower(a), low_b = lower(b);
+      mesh.indices.insert(mesh.indices.end(), {b, a, low_a, b, low_a, low_b});
     }
   }
 

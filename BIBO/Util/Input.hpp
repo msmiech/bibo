@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_UTIL_INPUT_HPP_
+#define BIBO_UTIL_INPUT_HPP_
 #include <GLFW/glfw3.h>
 
 #include <bitset>
@@ -39,24 +40,24 @@ struct PlayerInput {
  * position (sticks never rest exactly at 0), positions beyond outer as fully
  * pushed, the range in between is stretched to 0..1 (keeps the direction)
  */
-glm::vec2 applyDeadZone(glm::vec2 stick, float inner, float outer);
+glm::vec2 ApplyDeadZone(glm::vec2 stick, float inner, float outer);
 /**
  * Direction in world space for a movement relative to the camera
  * @param move x: right, y: forward
  * @param forward, right Horizontal directions of the camera
  */
-glm::vec3 cameraRelative(glm::vec2 move, glm::vec3 forward, glm::vec3 right);
+glm::vec3 CameraRelative(glm::vec2 move, glm::vec3 forward, glm::vec3 right);
 
 /**
  * Replaces glfwGetKey for the keys that are held (walking, jumping, the
  * camera): a key is down when it is pressed on the keyboard or by the demo
  * script (see DemoScript)
  */
-bool isKeyDown(GLFWwindow* window, int key);
+bool IsKeyDown(GLFWwindow* window, int key);
 /**
- * Presses or releases a key for isKeyDown, e.g. by the demo script
+ * Presses or releases a key for IsKeyDown, e.g. by the demo script
  */
-void setScriptedKey(int key, bool down);
+void SetScriptedKey(int key, bool down);
 
 /**
  * Keyboard, mouse and gamepads (e.g. Sony DualSense, Xbox Series) via GLFW.
@@ -74,76 +75,79 @@ class Input {
    * Additional gamepad mappings (SDL_GameControllerDB format) are read from
    * this file in the working directory if it exists
    */
-  static const char* const MAPPINGS_FILE;
+  static const char* const kMappingsFile;
 
   explicit Input(GLFWwindow* window);
 
   /**
    * Reads the gamepads (call once per frame, before the other functions)
    */
-  void update();
+  void Update();
   /**
-   * @param freeCamera WASD moves the unlocked camera, not the bear
+   * @param free_camera WASD moves the unlocked camera, not the bear
    */
-  PlayerInput playerInput(float timeDelta, const Settings& settings,
-                          bool freeCamera);
+  PlayerInput ReadPlayerInput(float time_delta, const Settings& settings,
+                              bool free_camera);
   /**
    * No jump until the jump buttons are released (e.g. A on the gamepad and
    * SPACE also press the buttons of the menus, the button that resumes the game
    * would make the bear jump right away)
    */
-  void blockJumpUntilReleased() { jumpBlocked = true; }
+  void BlockJumpUntilReleased() { jump_blocked_ = true; }
 
   /**
    * The mouse turns the camera (cursor hidden and unlimited) or is a normal
    * cursor (menus)
    */
-  void setMouseCaptured(bool captured);
-  bool isMouseCaptured() const { return mouseCaptured; }
+  void SetMouseCaptured(bool captured);
+  bool IsMouseCaptured() const { return mouse_captured_; }
   // Forwarded from the GLFW callbacks
-  void onCursorPos(double x, double y);
-  void onScroll(double yOffset);
+  void OnCursorPos(double x, double y);
+  void OnScroll(double y_offset);
 
   /**
    * @return true if a gamepad is connected (the first one is used)
    */
-  bool hasGamepad() const { return gamepad >= 0; }
-  std::string getGamepadName() const;
+  bool HasGamepad() const { return gamepad_ >= 0; }
+  std::string GetGamepadName() const;
   /**
    * @param button GLFW_GAMEPAD_BUTTON_...
    * @return true if the button of the gamepad was pressed since the last update
    */
-  bool wasPressed(int button) const;
+  bool WasPressed(int button) const;
   /**
    * Keys for navigating the menus with the gamepad, pressed since the last
    * update: arrow keys (D-pad, left stick), ENTER (A) and ESCAPE (B)
    */
-  const std::vector<int>& getMenuKeys() const { return menuKeys; }
+  const std::vector<int>& GetMenuKeys() const { return menu_keys_; }
 
  private:
   /**
    * @return true if the key is down now and was not in the last call
    */
-  bool keyPressed(int key);
+  bool KeyPressed(int key);
 
-  GLFWwindow* window;
-  int gamepad = -1;  // GLFW joystick id
-  GLFWgamepadstate state{}, previousState{};
-  std::vector<int> menuKeys;
+  GLFWwindow* window_;
+  int gamepad_ = -1;  // GLFW joystick id
+  GLFWgamepadstate state_{}, previous_state_{};
+  std::vector<int> menu_keys_;
   // left stick pushed in a direction (for the menus)
-  glm::ivec2 stickDirection = glm::ivec2(0);
+  glm::ivec2 stick_direction_ = glm::ivec2(0);
   // pushed in a direction since the last update
-  glm::ivec2 stickPushed = glm::ivec2(0);
+  glm::ivec2 stick_pushed_ = glm::ivec2(0);
   // of the keys that only count when they are pressed
-  std::bitset<GLFW_KEY_LAST + 1> keysWereDown;
+  std::bitset<GLFW_KEY_LAST + 1> keys_were_down_;
 
-  bool mouseCaptured = false;
-  bool hasCursor = false;
-  glm::dvec2 cursor = glm::dvec2(0.0);
-  glm::vec2 mouseDelta = glm::vec2(0.0f);  // pixels since the last playerInput
-  float scroll = 0.0f;
-  bool middleButtonWasPressed = false;
-  bool jumpBlocked = false;
+  bool mouse_captured_ = false;
+  bool has_cursor_ = false;
+  glm::dvec2 cursor_ = glm::dvec2(0.0);
+  glm::vec2 mouse_delta_ =
+      glm::vec2(0.0f);  // pixels since the last playerInput
+  float scroll_ = 0.0f;
+  bool middle_button_was_pressed_ = false;
+  bool jump_blocked_ = false;
 };
 }  // namespace input
 }  // namespace bibo
+
+#endif  // BIBO_UTIL_INPUT_HPP_

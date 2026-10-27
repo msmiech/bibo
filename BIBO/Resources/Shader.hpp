@@ -1,10 +1,9 @@
-#pragma once
+#ifndef BIBO_RESOURCES_SHADER_HPP_
+#define BIBO_RESOURCES_SHADER_HPP_
 
 #include <GL/glew.h>
 
 #include <string>
-
-using namespace std;
 
 namespace bibo {
 
@@ -15,24 +14,24 @@ namespace bibo {
 class Shader {
  public:
   /**
-   * @param vertexShader Path of the *.vert file
-   * @param fragmentShader Path of the *.frag file
+   * @param vertex_shader Path of the *.vert file
+   * @param fragment_shader Path of the *.frag file
    * @param defines Names separated by spaces that are defined in both shaders
    * (variants of a shader, e.g. "LOD_DITHER")
    */
-  Shader(const string& vertexShader, const string& fragmentShader,
-         const string& defines = "");
+  Shader(const std::string& vertex_shader, const std::string& fragment_shader,
+         const std::string& defines = "");
   ~Shader();
   Shader(const Shader&) = delete;
   Shader& operator=(const Shader&) = delete;
 
   // Makes it the current program
-  void enable() const;
+  void Enable() const;
 
-  GLint getUniformLocation(const char* name);
+  GLint GetUniformLocation(const char* name);
   // Prints an error if the attribute does not exist
-  GLint getAttribLocation(const char* name);
-  GLuint programHandle = 0;
+  GLint GetAttribLocation(const char* name);
+  GLuint program_handle = 0;
 
   /**
    * Reads a shader file and replaces the lines #include "file" with the content
@@ -41,20 +40,23 @@ class Shader {
    * @param error Description of a missing file
    * @return The source code, empty if a file is missing
    */
-  static string preprocess(const string& path, string& error);
+  static std::string Preprocess(const std::string& path, std::string& error);
   /**
    * @param defines Names separated by spaces
    * @return The code with a line #define NAME for every name after the #version
    * line
    */
-  static string addDefines(const string& code, const string& defines);
+  static std::string AddDefines(const std::string& code,
+                                const std::string& defines);
 
  private:
-  void loadShader(const string& shader, GLenum shaderType, GLuint& handle,
-                  const string& defines);
-  void link();
+  void LoadShader(const std::string& shader, GLenum shader_type, GLuint& handle,
+                  const std::string& defines);
+  void Link();
 
-  GLuint vertexHandle = 0;
-  GLuint fragmentHandle = 0;
+  GLuint vertex_handle_ = 0;
+  GLuint fragment_handle_ = 0;
 };
 }  // namespace bibo
+
+#endif  // BIBO_RESOURCES_SHADER_HPP_

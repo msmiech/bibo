@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_WORLD_HPP_
+#define BIBO_WORLD_WORLD_HPP_
 #include <GL/glew.h>
 
 #include <glm/glm.hpp>
@@ -14,6 +15,7 @@
 #include "WorldGenerator.hpp"
 #include "WorldStreamer.hpp"
 
+// NOLINTNEXTLINE(readability-identifier-naming): Assimp type
 struct aiScene;
 
 namespace bibo {
@@ -30,23 +32,23 @@ class SnowRenderer;
  * lights and a bit of snow
  */
 struct Atmosphere {
-  glm::vec3 toSun;     // direction towards the sun
-  glm::vec3 sunColor;  // radiance
-  float auroraIntensity = 1.0f;
+  glm::vec3 to_sun;     // direction towards the sun
+  glm::vec3 sun_color;  // radiance
+  float aurora_intensity = 1.0f;
   // how much of the upper sides of the trees and stones is covered with snow
-  float snowOnObjects = 0.3f;
-  float fogDensity = 0.0011f;  // at the sea level
-  float fogFalloff = 0.012f;   // the fog gets thinner with the height
-  float fogMaximum = 0.93f;
-  float fogSunScattering = 0.25f;
-  glm::vec2 windDirection = glm::normalize(glm::vec2(0.8f, 0.6f));
-  float windStrength = 1.0f;
+  float snow_on_objects = 0.3f;
+  float fog_density = 0.0011f;  // at the sea level
+  float fog_falloff = 0.012f;   // the fog gets thinner with the height
+  float fog_maximum = 0.93f;
+  float fog_sun_scattering = 0.25f;
+  glm::vec2 wind_direction = glm::normalize(glm::vec2(0.8f, 0.6f));
+  float wind_strength = 1.0f;
 
   /**
    * @param elevation Of the sun above the horizon (degrees)
    * @param azimuth Of the sun, from +z towards +x (degrees)
    */
-  static Atmosphere polarDay(float elevation = 27.0f, float azimuth = 40.0f);
+  static Atmosphere PolarDay(float elevation = 27.0f, float azimuth = 40.0f);
 };
 
 /**
@@ -60,9 +62,9 @@ class World {
   struct Statistics {
     WorldStreamer::Statistics streaming;
     int meshes = 0;  // chunks with a mesh on the graphics card
-    int drawnChunks = 0;
-    std::size_t drawnTriangles = 0;
-    int drawnInstances = 0;
+    int drawn_chunks = 0;
+    std::size_t drawn_triangles = 0;
+    int drawn_instances = 0;
     std::size_t instances = 0;
   };
 
@@ -76,10 +78,10 @@ class World {
    * the finish line, the rocks)
    * @param physicsWorld Gets the terrain and the trees around the bear
    */
-  World(const aiScene& track, glm::vec2 start, glm::vec2 startDirection,
+  World(const aiScene& track, glm::vec2 start, glm::vec2 start_direction,
         const std::vector<glm::vec2>& checkpoints,
-        const std::vector<KeepClear>& keepClear,
-        physics::PhysicsWorld* physicsWorld);
+        const std::vector<KeepClear>& keep_clear,
+        physics::PhysicsWorld* physics_world);
   ~World();
   World(const World&) = delete;
   World& operator=(const World&) = delete;
@@ -90,80 +92,82 @@ class World {
    * @param bodies The bear and the animals that push the plants aside (in the
    * same order every frame)
    */
-  void update(float timeDelta, glm::vec3 camera, glm::vec3 bear,
+  void Update(float time_delta, glm::vec3 camera, glm::vec3 bear,
               const std::vector<FoliageInteraction::Body>& bodies = {});
   /**
    * Waits until the world around the camera and the bear is complete (loading)
    */
-  void finishLoading(glm::vec3 camera, glm::vec3 bear, float timeoutSeconds);
+  void FinishLoading(glm::vec3 camera, glm::vec3 bear, float timeout_seconds);
   /**
    * The ground under the bear is in the physics world right now (e.g. after it
    * was moved back to the start)
    */
-  void ensureCollision(glm::vec3 bear, glm::vec3 camera);
+  void EnsureCollision(glm::vec3 bear, glm::vec3 camera);
 
   /**
    * Sun, sky, fog, wind, time and the world map (the camera, the shadows and
    * the settings are set by the renderer)
    */
-  void fillFrameUniforms(render::FrameUniforms& uniforms) const;
+  void FillFrameUniforms(render::FrameUniforms& uniforms) const;
   /**
    * Renders what the frame needs before the scene (the sky cube map), after the
    * frame uniforms were uploaded
    */
-  void prepareFrame();
+  void PrepareFrame();
   /**
    * Binds the textures of the world that the shaders of the scene use
    * (materials, sky, world map)
    */
-  void bindTextures() const;
-  void drawShadows(const render::ShadowCascade& cascade, glm::vec3 camera);
+  void BindTextures() const;
+  void DrawShadows(const render::ShadowCascade& cascade, glm::vec3 camera);
   /**
    * Terrain and vegetation
    * @param culling Leave out what is outside of the view frustum
    */
-  void drawOpaque(const scene::ViewFrustum& frustum, glm::vec3 camera,
+  void DrawOpaque(const scene::ViewFrustum& frustum, glm::vec3 camera,
                   bool culling);
-  void drawSky();
+  void DrawSky();
   /**
    * Water and snow (after everything else)
    */
-  void drawTransparent(bool transparency);
+  void DrawTransparent(bool transparency);
 
   /**
    * @param level 0 low, 1 medium, 2 high: how far the levels of detail and the
    * vegetation reach
    */
-  void setDetail(int level);
-  const WorldGenerator& getGenerator() const { return *generator; }
-  const Atmosphere& getAtmosphere() const { return atmosphere; }
-  const FoliageInteraction& getFoliageInteraction() const { return foliage; }
-  float getTime() const { return time; }
-  Statistics getStatistics() const;
+  void SetDetail(int level);
+  const WorldGenerator& GetGenerator() const { return *generator_; }
+  const Atmosphere& GetAtmosphere() const { return atmosphere_; }
+  const FoliageInteraction& GetFoliageInteraction() const { return foliage_; }
+  float GetTime() const { return time_; }
+  Statistics GetStatistics() const;
 
  private:
-  void createWorldMap();
+  void CreateWorldMap();
 
-  std::unique_ptr<WorldGenerator> generator;
-  Atmosphere atmosphere;
-  FoliageInteraction foliage;
-  bool lowDetail;
-  int detailLevel = 2;
-  float time = 0.0f;
-  std::unique_ptr<MaterialTextures> materials;
-  std::unique_ptr<SkyRenderer> sky;
-  std::unique_ptr<TerrainRenderer> terrain;
-  std::unique_ptr<VegetationRenderer> vegetation;
-  std::unique_ptr<WaterRenderer> water;
-  std::unique_ptr<SnowRenderer> snow;
-  GLuint worldMap = 0;
-  glm::vec2 worldMapOrigin = glm::vec2(0.0f);
-  float worldMapSize = 1.0f;
-  int drawnChunks = 0;
-  int drawnInstances = 0;
+  std::unique_ptr<WorldGenerator> generator_;
+  Atmosphere atmosphere_;
+  FoliageInteraction foliage_;
+  bool low_detail_;
+  int detail_level_ = 2;
+  float time_ = 0.0f;
+  std::unique_ptr<MaterialTextures> materials_;
+  std::unique_ptr<SkyRenderer> sky_;
+  std::unique_ptr<TerrainRenderer> terrain_;
+  std::unique_ptr<VegetationRenderer> vegetation_;
+  std::unique_ptr<WaterRenderer> water_;
+  std::unique_ptr<SnowRenderer> snow_;
+  GLuint world_map_ = 0;
+  glm::vec2 world_map_origin_ = glm::vec2(0.0f);
+  float world_map_size_ = 1.0f;
+  int drawn_chunks_ = 0;
+  int drawn_instances_ = 0;
   // Declared last: destroyed first (it removes its bodies from the physics
   // world and stops its threads)
-  std::unique_ptr<WorldStreamer> streamer;
+  std::unique_ptr<WorldStreamer> streamer_;
 };
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_WORLD_HPP_

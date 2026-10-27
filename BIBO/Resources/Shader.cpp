@@ -6,18 +6,23 @@
 
 #include "../Util/Console.hpp"
 
-using namespace bibo;
-using namespace std;
+namespace bibo {
 
-Shader::Shader(const string& vertexShader, const string& fragmentShader,
+using std::cerr;
+using std::endl;
+using std::ifstream;
+using std::istringstream;
+using std::string;
+
+Shader::Shader(const string& vertex_shader, const string& fragment_shader,
                const string& defines)
-    : programHandle(glCreateProgram()) {
-  if (programHandle == 0) {
-    util::fatalError("Failed to create shader program");
+    : program_handle(glCreateProgram()) {
+  if (program_handle == 0) {
+    util::FatalError("Failed to create shader program");
   }
-  loadShader(vertexShader, GL_VERTEX_SHADER, vertexHandle, defines);
-  loadShader(fragmentShader, GL_FRAGMENT_SHADER, fragmentHandle, defines);
-  link();
+  LoadShader(vertex_shader, GL_VERTEX_SHADER, vertex_handle_, defines);
+  LoadShader(fragment_shader, GL_FRAGMENT_SHADER, fragment_handle_, defines);
+  Link();
 }
 
 Shader::~Shader() {
@@ -26,22 +31,22 @@ Shader::~Shader() {
   // longer exists
   GLint current = 0;
   glGetIntegerv(GL_CURRENT_PROGRAM, &current);
-  if (static_cast<GLuint>(current) == programHandle) {
+  if (static_cast<GLuint>(current) == program_handle) {
     glUseProgram(0);
   }
-  glDeleteProgram(programHandle);
-  glDeleteShader(vertexHandle);
-  glDeleteShader(fragmentHandle);
+  glDeleteProgram(program_handle);
+  glDeleteShader(vertex_handle_);
+  glDeleteShader(fragment_handle_);
 }
 
-void Shader::enable() const { glUseProgram(programHandle); }
+void Shader::Enable() const { glUseProgram(program_handle); }
 
-GLint Shader::getUniformLocation(const char* name) {
-  return glGetUniformLocation(programHandle, name);
+GLint Shader::GetUniformLocation(const char* name) {
+  return glGetUniformLocation(program_handle, name);
 }
 
-GLint Shader::getAttribLocation(const char* name) {
-  GLint location = glGetAttribLocation(programHandle, name);
+GLint Shader::GetAttribLocation(const char* name) {
+  GLint location = glGetAttribLocation(program_handle, name);
   if (location == -1) {
     cerr << "Unable to get attribute location for " << name << endl;
   }
@@ -49,7 +54,7 @@ GLint Shader::getAttribLocation(const char* name) {
 }
 
 namespace {
-string readIncluding(const string& path, int depth, string& error) {
+string ReadIncluding(const string& path, int depth, string& error) {
   ifstream file(path);
   if (!file) {
     error = "Shader file could not be found or does not exist: " + path;
@@ -73,7 +78,7 @@ string readIncluding(const string& path, int depth, string& error) {
         error = "Invalid #include in " + path + ": " + line;
         return "";
       }
-      string included = readIncluding(
+      string included = ReadIncluding(
           folder + line.substr(open + 1, close - open - 1), depth + 1, error);
       if (!error.empty()) {
         return "";
@@ -87,12 +92,12 @@ string readIncluding(const string& path, int depth, string& error) {
 }
 }  // namespace
 
-string Shader::preprocess(const string& path, string& error) {
+string Shader::Preprocess(const string& path, string& error) {
   error.clear();
-  return readIncluding(path, 0, error);
+  return ReadIncluding(path, 0, error);
 }
 
-string Shader::addDefines(const string& code, const string& defines) {
+string Shader::AddDefines(const string& code, const string& defines) {
   string lines;
   istringstream names(defines);
   string name;
@@ -112,16 +117,16 @@ string Shader::addDefines(const string& code, const string& defines) {
   return code.substr(0, end + 1) + lines + code.substr(end + 1);
 }
 
-void Shader::loadShader(const string& shader, GLenum shaderType, GLuint& handle,
-                        const string& defines) {
+void Shader::LoadShader(const string& shader, GLenum shader_type,
+                        GLuint& handle, const string& defines) {
   string error;
-  string code = addDefines(preprocess(shader, error), defines);
+  string code = AddDefines(Preprocess(shader, error), defines);
   if (!error.empty()) {
-    util::fatalError(error);
+    util::FatalError(error);
   }
-  handle = glCreateShader(shaderType);
+  handle = glCreateShader(shader_type);
   if (handle == 0) {
-    util::fatalError("Failed to create shader " + shader);
+    util::FatalError("Failed to create shader " + shader);
   }
   const char* source = code.c_str();
   glShaderSource(handle, 1, &source, nullptr);
@@ -129,25 +134,27 @@ void Shader::loadShader(const string& shader, GLenum shaderType, GLuint& handle,
   GLint succeeded;
   glGetShaderiv(handle, GL_COMPILE_STATUS, &succeeded);
   if (!succeeded) {
-    GLint logSize;
-    glGetShaderiv(handle, GL_INFO_LOG_LENGTH, &logSize);
-    string log(logSize, '\0');
-    glGetShaderInfoLog(handle, logSize, nullptr, log.data());
-    util::fatalError("Failed to compile shader " + shader + "\n" + log);
+    GLint log_size;
+    glGetShaderiv(handle, GL_INFO_LOG_LENGTH, &log_size);
+    string log(log_size, '\0');
+    glGetShaderInfoLog(handle, log_size, nullptr, log.data());
+    util::FatalError("Failed to compile shader " + shader + "\n" + log);
   }
 }
 
-void Shader::link() {
-  glAttachShader(programHandle, vertexHandle);
-  glAttachShader(programHandle, fragmentHandle);
-  glLinkProgram(programHandle);
+void Shader::Link() {
+  glAttachShader(program_handle, vertex_handle_);
+  glAttachShader(program_handle, fragment_handle_);
+  glLinkProgram(program_handle);
   GLint succeeded;
-  glGetProgramiv(programHandle, GL_LINK_STATUS, &succeeded);
+  glGetProgramiv(program_handle, GL_LINK_STATUS, &succeeded);
   if (!succeeded) {
-    GLint logSize;
-    glGetProgramiv(programHandle, GL_INFO_LOG_LENGTH, &logSize);
-    string log(logSize, '\0');
-    glGetProgramInfoLog(programHandle, logSize, nullptr, log.data());
-    util::fatalError("Failed to link the shader program\n" + log);
+    GLint log_size;
+    glGetProgramiv(program_handle, GL_INFO_LOG_LENGTH, &log_size);
+    string log(log_size, '\0');
+    glGetProgramInfoLog(program_handle, log_size, nullptr, log.data());
+    util::FatalError("Failed to link the shader program\n" + log);
   }
 }
+
+}  // namespace bibo

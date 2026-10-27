@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_WATERRENDERER_HPP_
+#define BIBO_WORLD_WATERRENDERER_HPP_
 #include <GL/glew.h>
 
 #include <memory>
@@ -22,11 +23,11 @@ class WaterRenderer {
    * @param transparent Blended with what is below (shallow water shows the
    * sand)
    */
-  void draw(bool transparent);
+  void Draw(bool transparent);
 
  private:
-  std::unique_ptr<Shader> shader;
-  GLuint vertexArray = 0;
+  std::unique_ptr<Shader> shader_;
+  GLuint vertex_array_ = 0;
 };
 
 /**
@@ -42,12 +43,14 @@ class SnowRenderer {
   SnowRenderer(const SnowRenderer&) = delete;
   SnowRenderer& operator=(const SnowRenderer&) = delete;
 
-  void draw();
+  void Draw();
 
  private:
-  std::unique_ptr<Shader> shader;
-  GLuint vertexArray = 0;
-  int flakes;
+  std::unique_ptr<Shader> shader_;
+  GLuint vertex_array_ = 0;
+  int flakes_;
 };
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_WATERRENDERER_HPP_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_SKYRENDERER_HPP_
+#define BIBO_WORLD_SKYRENDERER_HPP_
 #include <GL/glew.h>
 
 #include <memory>
@@ -20,7 +21,7 @@ class SkyRenderer {
    * @param lowDetail Smaller cube map and fewer samples of the polar lights
    * (software rendering)
    */
-  explicit SkyRenderer(bool lowDetail);
+  explicit SkyRenderer(bool low_detail);
   ~SkyRenderer();
   SkyRenderer(const SkyRenderer&) = delete;
   SkyRenderer& operator=(const SkyRenderer&) = delete;
@@ -29,29 +30,31 @@ class SkyRenderer {
    * Renders the next face of the cube map (all of them the first time). Needs
    * the uniforms of the frame (sun, time).
    */
-  void update();
+  void Update();
   /**
-   * Binds the cube map to its texture unit (render::TextureUnit::ENVIRONMENT)
+   * Binds the cube map to its texture unit (render::texture_unit::kEnvironment)
    */
-  void bind() const;
+  void Bind() const;
   /**
    * Draws the sky where nothing was drawn yet (at the far plane)
    */
-  void draw();
-  GLuint getEnvironment() const { return environment; }
+  void Draw();
+  GLuint GetEnvironment() const { return environment_; }
 
  private:
-  void renderFace(int face);
+  void RenderFace(int face);
 
-  std::unique_ptr<Shader> environmentShader;
-  std::unique_ptr<Shader> skyShader;
-  render::FullscreenTriangle triangle;
-  GLuint environment = 0;
-  GLuint framebuffer = 0;
-  int size;
-  int auroraSteps;
-  int nextFace = 0;
-  bool complete = false;
+  std::unique_ptr<Shader> environment_shader_;
+  std::unique_ptr<Shader> sky_shader_;
+  render::FullscreenTriangle triangle_;
+  GLuint environment_ = 0;
+  GLuint framebuffer_ = 0;
+  int size_;
+  int aurora_steps_;
+  int next_face_ = 0;
+  bool complete_ = false;
 };
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_SKYRENDERER_HPP_

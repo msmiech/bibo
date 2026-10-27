@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_AUDIO_SOUNDEFFECTS_HPP_
+#define BIBO_AUDIO_SOUNDEFFECTS_HPP_
 #include <vector>
 
 namespace bibo {
@@ -9,34 +10,36 @@ namespace audio {
 enum class SoundEffect {
   // a short squeaky, nasal chatter of the beaver while it talks (several
   // variants)
-  BEAVER,
+  kBeaver,
   // a low, warm grumble of the bear at the pool while it talks (several
   // variants)
-  BEAR,
+  kBear,
   // a high chitter and trill of a raccoon while it talks or cheers (several
   // variants)
-  RACCOON,
-  COUNTDOWN,   // beep of 3, 2, 1
-  GO,          // the higher, longer beep at the start
-  CHECKPOINT,  // a bright ding
-  SUCCESS,     // a cheerful jingle when a quest is completed
-  FAILURE,     // a sad "wah wah" when it failed
-  SPLASH,      // the bear falls into the water
-  COUNT
+  kRaccoon,
+  kCountdown,   // beep of 3, 2, 1
+  kGo,          // the higher, longer beep at the start
+  kCheckpoint,  // a bright ding
+  kSuccess,     // a cheerful jingle when a quest is completed
+  kFailure,     // a sad "wah wah" when it failed
+  kSplash,      // the bear falls into the water
+  kCount
 };
-constexpr int SOUND_EFFECT_COUNT = static_cast<int>(SoundEffect::COUNT);
+constexpr int kSoundEffectCount = static_cast<int>(SoundEffect::kCount);
 
 /**
  * @return How many different versions of the sound there are (e.g. the beaver
  * does not always make the same sound)
  */
-int soundEffectVariants(SoundEffect effect);
+int SoundEffectVariants(SoundEffect effect);
 /**
  * Synthesizes a sound (no sound files), the same every time
- * @param variant 0 to soundEffectVariants - 1
+ * @param variant 0 to SoundEffectVariants - 1
  * @return Mono samples between -1 and 1
  */
-std::vector<float> synthesizeSoundEffect(SoundEffect effect, int variant,
-                                         int sampleRate);
+std::vector<float> SynthesizeSoundEffect(SoundEffect effect, int variant,
+                                         int sample_rate);
 }  // namespace audio
 }  // namespace bibo
+
+#endif  // BIBO_AUDIO_SOUNDEFFECTS_HPP_

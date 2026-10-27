@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_SCENE_SCENEOBJECT_HPP_
+#define BIBO_SCENE_SCENEOBJECT_HPP_
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -9,29 +10,29 @@
 
 #include "../Resources/Shader.hpp"
 
-using namespace glm;
-
 namespace bibo {
 namespace scene {
 class SceneObject {
  public:
   SceneObject(GLFWwindow& window);
-  SceneObject(mat4 modelMatrix, GLFWwindow& window);
+  SceneObject(glm::mat4 model_matrix, GLFWwindow& window);
 
   virtual ~SceneObject() = default;
 
-  virtual void update(float time_delta) = 0;
-  virtual void draw(Shader* shader) = 0;
+  virtual void Update(float time_delta) = 0;
+  virtual void Draw(Shader* shader) = 0;
 
-  virtual vec3 getPosition();
-  virtual void setPosition(vec3 position);
+  virtual glm::vec3 GetPosition();
+  virtual void SetPosition(glm::vec3 position);
   // Here the Euler angles of the model matrix (yaw, pitch, roll in radians),
   // the bear and the camera return the direction they face
-  virtual vec3 getDirection();
-  mat4 modelMatrix;
+  virtual glm::vec3 GetDirection();
+  glm::mat4 model_matrix;
 
  protected:
-  GLFWwindow* window;
+  GLFWwindow* window_;
 };
 }  // namespace scene
 }  // namespace bibo
+
+#endif  // BIBO_SCENE_SCENEOBJECT_HPP_

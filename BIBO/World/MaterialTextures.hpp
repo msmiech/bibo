@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_MATERIALTEXTURES_HPP_
+#define BIBO_WORLD_MATERIALTEXTURES_HPP_
 #include <GL/glew.h>
 
 namespace bibo {
@@ -7,15 +8,15 @@ namespace world {
  * Layers of the material textures (the shaders use the same numbers)
  */
 enum MaterialLayer {
-  MATERIAL_SNOW,
-  MATERIAL_FOREST_FLOOR,  // moss, soil and fallen needles
-  MATERIAL_DIRT,          // the trail with pebbles
-  MATERIAL_ROCK,          // granite with cracks and lichen
-  MATERIAL_SAND,
-  MATERIAL_BARK,
-  MATERIAL_NEEDLES,  // spruce branches
-  MATERIAL_LEAVES,
-  MATERIAL_LAYER_COUNT
+  kMaterialSnow,
+  kMaterialForestFloor,  // moss, soil and fallen needles
+  kMaterialDirt,         // the trail with pebbles
+  kMaterialRock,         // granite with cracks and lichen
+  kMaterialSand,
+  kMaterialBark,
+  kMaterialNeedles,  // spruce branches
+  kMaterialLeaves,
+  kMaterialLayerCount
 };
 
 /**
@@ -39,14 +40,16 @@ class MaterialTextures {
    * Binds the color and the normal texture array to their texture units
    * (render::TextureUnit)
    */
-  void bind() const;
-  GLuint getAlbedo() const { return albedo; }
-  GLuint getNormal() const { return normal; }
-  int getSize() const { return size; }
+  void Bind() const;
+  GLuint GetAlbedo() const { return albedo_; }
+  GLuint GetNormal() const { return normal_; }
+  int GetSize() const { return size_; }
 
  private:
-  int size;
-  GLuint albedo = 0, normal = 0;
+  int size_;
+  GLuint albedo_ = 0, normal_ = 0;
 };
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_MATERIALTEXTURES_HPP_

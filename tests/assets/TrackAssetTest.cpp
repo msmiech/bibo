@@ -9,17 +9,24 @@
 #include "TestSupport.hpp"
 #include "World/WorldGenerator.hpp"
 
-using namespace bibo::test;
+using bibo::test::GameNodeNames;
+using bibo::test::NodeModelMatrix;
+using bibo::test::NormalMappedNodeNames;
+using bibo::test::SharedWorldGenerator;
+using bibo::test::TrackFinishLine;
+using bibo::test::TrackNode;
+using bibo::test::TrackScene;
+
 namespace rules = bibo::scene::rules;
 using glm::vec3;
 
 namespace {
 /**
- * Meshes the game creates for a node (Model::createMeshes): the meshes of the
+ * Meshes the game creates for a node (Model::CreateMeshes): the meshes of the
  * node, or of its children if it has any
  */
-std::vector<const aiMesh*> meshesOf(const aiNode& node) {
-  const aiScene& scene = trackScene();
+std::vector<const aiMesh*> MeshesOf(const aiNode& node) {
+  const aiScene& scene = TrackScene();
   std::vector<const aiMesh*> meshes;
   if (node.mNumChildren == 0) {
     for (unsigned int i = 0; i < node.mNumMeshes; ++i) {
@@ -35,18 +42,18 @@ std::vector<const aiMesh*> meshesOf(const aiNode& node) {
   return meshes;
 }
 
-vec3 startPosition(const std::string& nodeName) {
-  return vec3(nodeModelMatrix(trackNode(nodeName))[3]);
+vec3 StartPosition(const std::string& node_name) {
+  return vec3(NodeModelMatrix(TrackNode(node_name))[3]);
 }
 }  // namespace
 
 TEST_CASE("Every node the game loads is a triangle mesh in the track",
           "[assets]") {
-  const std::string name = GENERATE(from_range(gameNodeNames()));
+  const std::string name = GENERATE(from_range(GameNodeNames()));
   CAPTURE(name);
 
   // The game uses meshes[0] of several of these nodes without checking
-  std::vector<const aiMesh*> meshes = meshesOf(trackNode(name));
+  std::vector<const aiMesh*> meshes = MeshesOf(TrackNode(name));
   REQUIRE_FALSE(meshes.empty());
 
   for (const aiMesh* mesh : meshes) {
@@ -69,10 +76,10 @@ TEST_CASE("Every node the game loads is a triangle mesh in the track",
 
 TEST_CASE("Normal mapped nodes have texture coordinates and tangents",
           "[assets]") {
-  const std::string name = GENERATE(from_range(normalMappedNodeNames()));
+  const std::string name = GENERATE(from_range(NormalMappedNodeNames()));
   CAPTURE(name);
 
-  for (const aiMesh* mesh : meshesOf(trackNode(name))) {
+  for (const aiMesh* mesh : MeshesOf(TrackNode(name))) {
     CAPTURE(mesh->mName.C_Str());
     CHECK(mesh->HasTextureCoords(0));
     CHECK(mesh->HasTangentsAndBitangents());
@@ -81,46 +88,47 @@ TEST_CASE("Normal mapped nodes have texture coordinates and tangents",
 
 TEST_CASE("The track contains the sun light", "[assets]") {
   // The scene uses the first light for lighting and shadows
-  CHECK(trackScene().mNumLights >= 1);
+  CHECK(TrackScene().mNumLights >= 1);
 }
 
 TEST_CASE(
     "The bear starts on the finish line, the lap is only complete after all "
     "checkpoints",
     "[assets][rules]") {
-  const vec3 bear = startPosition("BearBody");
-  const rules::FinishLine finishLine = trackFinishLine();
+  const vec3 bear = StartPosition("BearBody");
+  const rules::FinishLine finish_line = TrackFinishLine();
 
-  CAPTURE(bear, finishLine.center, finishLine.halfWidth);
-  CHECK(bear.y > worldGenerator().getSeaLevel() + 2.0f);  // not in the water
-  CHECK(rules::isOnFinishLine(bear, finishLine));         // the race is a lap
-  CHECK(rules::passCheckpoint(bear, 0) == 0);  // no checkpoint at the start
-  CHECK_FALSE(rules::hasCompletedLap(0, bear, finishLine));
-  CHECK(rules::hasCompletedLap(rules::CHECKPOINT_COUNT, bear, finishLine));
+  CAPTURE(bear, finish_line.center, finish_line.half_width);
+  CHECK(bear.y >
+        SharedWorldGenerator().GetSeaLevel() + 2.0f);  // not in the water
+  CHECK(rules::IsOnFinishLine(bear, finish_line));     // the race is a lap
+  CHECK(rules::PassCheckpoint(bear, 0) == 0);  // no checkpoint at the start
+  CHECK_FALSE(rules::HasCompletedLap(0, bear, finish_line));
+  CHECK(rules::HasCompletedLap(rules::kCheckpointCount, bear, finish_line));
 }
 
 TEST_CASE("The finish line goes across the whole track", "[assets][rules]") {
   // The track is about 15 units wide at the finish line and goes along the z
   // axis (the bear starts looking along -z)
-  const rules::FinishLine finishLine = trackFinishLine();
+  const rules::FinishLine finish_line = TrackFinishLine();
 
-  CAPTURE(finishLine.across, finishLine.halfWidth);
-  CHECK(std::abs(finishLine.across.x) > 0.99f);
-  CHECK(finishLine.halfWidth > 7.0f);
+  CAPTURE(finish_line.across, finish_line.half_width);
+  CHECK(std::abs(finish_line.across.x) > 0.99f);
+  CHECK(finish_line.half_width > 7.0f);
 }
 
 TEST_CASE("The checkpoints are apart from each other and from the start",
           "[assets][rules]") {
   // Otherwise the bear could pass two checkpoints at once or one at the start
-  const vec3 bear = startPosition("BearBody");
+  const vec3 bear = StartPosition("BearBody");
   const glm::vec2 start(bear.x, bear.z);
-  for (std::size_t i = 0; i < rules::CHECKPOINT_COUNT; ++i) {
+  for (std::size_t i = 0; i < rules::kCheckpointCount; ++i) {
     CAPTURE(i);
-    CHECK(glm::distance(rules::CHECKPOINTS[i], start) >
-          rules::CHECKPOINT_RADIUS);
+    CHECK(glm::distance(rules::kCheckpoints[i], start) >
+          rules::kCheckpointRadius);
     if (i > 0) {
-      CHECK(glm::distance(rules::CHECKPOINTS[i], rules::CHECKPOINTS[i - 1]) >
-            2.0f * rules::CHECKPOINT_RADIUS);
+      CHECK(glm::distance(rules::kCheckpoints[i], rules::kCheckpoints[i - 1]) >
+            2.0f * rules::kCheckpointRadius);
     }
   }
 }

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_SCENE_RACCOON_HPP_
+#define BIBO_SCENE_RACCOON_HPP_
 #include <cstdint>
 #include <functional>
 #include <glm/glm.hpp>
@@ -27,21 +28,21 @@ class Raccoon {
   using Ground = std::function<bool(glm::vec2 position, float& height)>;
 
   enum class Activity {
-    HIDDEN,    // in the woods, not drawn
-    COMING,    // trots out of the woods to its spot
-    CHEERING,  // stands up at its spot and cheers for the bear
-    LEAVING,   // trots back into the woods
-    SITTING    // sits at its place (Chonk)
+    kHidden,    // in the woods, not drawn
+    kComing,    // trots out of the woods to its spot
+    kCheering,  // stands up at its spot and cheers for the bear
+    kLeaving,   // trots back into the woods
+    kSitting    // sits at its place (Chonk)
   };
 
   // Size of the model (RaccoonModel) in the world
-  static constexpr float SCALE = 2.1f;
-  static constexpr float TROT_SPEED = 3.2f;
+  static constexpr float kScale = 2.1f;
+  static constexpr float kTrotSpeed = 3.2f;
   // It notices the bear within this distance (sitting)
-  static constexpr float ATTENTION_DISTANCE = 14.0f;
+  static constexpr float kAttentionDistance = 14.0f;
 
   /**
-   * @param girth How round it is (RaccoonModel::build), its collision sphere is
+   * @param girth How round it is (RaccoonModel::Build), its collision sphere is
    * larger
    */
   Raccoon(Ground ground, std::uint32_t seed, float girth = 1.0f);
@@ -49,117 +50,117 @@ class Raccoon {
   /**
    * It appears at a point in the woods and trots to the spot, where it cheers
    */
-  void comeAndCheer(glm::vec2 from, glm::vec2 spot);
+  void ComeAndCheer(glm::vec2 from, glm::vec2 spot);
   /**
    * Trots back to where it came from and disappears there (nothing happens if
    * it is hidden or sitting)
    */
-  void leave();
+  void Leave();
   /**
    * Sits at a place, looking in a direction (when the bear is not close)
    */
-  void sitAt(glm::vec3 position, glm::vec3 direction);
+  void SitAt(glm::vec3 position, glm::vec3 direction);
   /**
    * @param bear Where the head of the bear is (it turns to it and looks at it)
    */
-  void update(float timeDelta, glm::vec3 bear);
+  void Update(float time_delta, glm::vec3 bear);
   /**
    * A big jump with both paws up (if it is out of the woods)
    */
-  void cheer();
+  void Cheer();
   /**
    * Talking (the dialog is open): it gestures with its paws and does not wash
    * them
    */
-  void setTalking(bool talking);
+  void SetTalking(bool talking);
   /**
    * One sound while talking: the mouth opens and closes, the head nods
    */
-  void speak();
+  void Speak();
   /**
    * Back to how it was at the start (hidden, or at its place)
    */
-  void reset();
+  void Reset();
 
-  Activity getActivity() const { return activity; }
-  bool isVisible() const { return activity != Activity::HIDDEN; }
+  Activity GetActivity() const { return activity_; }
+  bool IsVisible() const { return activity_ != Activity::kHidden; }
   /**
    * Seconds since the activity changed
    */
-  float getActivityTime() const { return activityTime; }
+  float GetActivityTime() const { return activity_time_; }
   /**
    * On the ground under its middle
    */
-  glm::vec3 getPosition() const { return position; }
-  glm::vec3 getDirection() const {
-    return glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw));
+  glm::vec3 GetPosition() const { return position_; }
+  glm::vec3 GetDirection() const {
+    return glm::vec3(std::sin(yaw_), 0.0f, std::cos(yaw_));
   }
   /**
    * 0 on all fours, 1 upright on its hind legs
    */
-  float getUpright() const { return rear; }
-  float getMouthOpen() const { return mouth; }
-  bool isTalking() const { return talking; }
+  float GetUpright() const { return rear_; }
+  float GetMouthOpen() const { return mouth_; }
+  bool IsTalking() const { return talking_; }
   /**
    * Between its eyes (world space)
    */
-  glm::vec3 getFacePosition() const;
+  glm::vec3 GetFacePosition() const;
   /**
    * Where the exclamation mark floats (above its head), it bobs up and down; it
    * turns slowly
    */
-  glm::vec3 getMarkerPosition() const;
-  glm::quat getMarkerRotation() const;
+  glm::vec3 GetMarkerPosition() const;
+  glm::quat GetMarkerRotation() const;
   /**
    * Its collision sphere (the bear cannot walk through Chonk)
    */
-  glm::vec3 getColliderCenter() const;
-  float getColliderRadius() const;
+  glm::vec3 GetColliderCenter() const;
+  float GetColliderRadius() const;
   /**
    * @return The number of chatters since the last call (when it hops and
    * cheers)
    */
-  int takeChatters();
+  int TakeChatters();
 
   /**
    * Model matrices of the parts of the RaccoonModel (with the scale), indexed
    * by RaccoonModel::Part
    */
-  std::vector<glm::mat4> getPose() const;
+  std::vector<glm::mat4> GetPose() const;
 
  private:
-  float uniform(float from, float to);
-  void setActivity(Activity next);
+  float Uniform(float from, float to);
+  void SetActivity(Activity next);
   // Walks towards the target, true when it is there (or cannot go on)
-  bool walk(float timeDelta, float speed);
-  void turnTo(float wantedYaw, float rate, float timeDelta);
+  bool Walk(float time_delta, float speed);
+  void TurnTo(float wanted_yaw, float rate, float time_delta);
 
-  Ground ground;
-  std::uint32_t seed;
-  float girth;
-  std::mt19937 random;
+  Ground ground_;
+  std::uint32_t seed_;
+  float girth_;
+  std::mt19937 random_;
 
-  Activity activity = Activity::HIDDEN;
-  float activityTime = 0.0f;
-  glm::vec3 home = glm::vec3(0.0f);  // where it sits
-  glm::vec3 homeDirection = glm::vec3(0.0f, 0.0f, 1.0f);
-  bool sits = false;  // it has a place (sitAt)
-  glm::vec2 origin = glm::vec2(0.0f), target = glm::vec2(0.0f);
+  Activity activity_ = Activity::kHidden;
+  float activity_time_ = 0.0f;
+  glm::vec3 home_ = glm::vec3(0.0f);  // where it sits
+  glm::vec3 home_direction_ = glm::vec3(0.0f, 0.0f, 1.0f);
+  bool sits_ = false;  // it has a place (SitAt)
+  glm::vec2 origin_ = glm::vec2(0.0f), target_ = glm::vec2(0.0f);
 
-  glm::vec3 position = glm::vec3(0.0f);
-  float yaw = 0.0f;
-  float rear = 0.0f;  // 0 to 1: upright
-  float gaitPhase = 0.0f, stride = 0.0f;
-  float headYaw = 0.0f, headPitch = 0.0f;
-  float time = 0.0f;
-  bool talking = false;
-  float talkBlend = 0.0f;
-  float mouth = 0.0f, mouthTime = -1.0f;
-  float nod = 0.0f;
-  float hopTime = -1.0f, nextHop = 1.0f;  // small hops while cheering
-  float jumpTime = -1.0f;                 // the big jump (cheer)
-  float washTime = -1.0f, nextWash = 4.0f;
-  int chatters = 0;
+  glm::vec3 position_ = glm::vec3(0.0f);
+  float yaw_ = 0.0f;
+  float rear_ = 0.0f;  // 0 to 1: upright
+  float gait_phase_ = 0.0f, stride_ = 0.0f;
+  float head_yaw_ = 0.0f, head_pitch_ = 0.0f;
+  float time_ = 0.0f;
+  bool talking_ = false;
+  float talk_blend_ = 0.0f;
+  float mouth_ = 0.0f, mouth_time_ = -1.0f;
+  float nod_ = 0.0f;
+  float hop_time_ = -1.0f, next_hop_ = 1.0f;  // small hops while cheering
+  float jump_time_ = -1.0f;                   // the big jump (cheer)
+  float wash_time_ = -1.0f, next_wash_ = 4.0f;
+  int chatters_ = 0;
 };
 
 /**
@@ -171,13 +172,13 @@ class Raccoon {
  */
 class RaccoonFans {
  public:
-  static constexpr std::size_t COUNT = 4;
-  static constexpr int MAX_WATCHING = 3;
+  static constexpr std::size_t kCount = 4;
+  static constexpr int kMaxWatching = 3;
   // A raccoon watches at most this long, and goes when the bear is this far
   // away
-  static constexpr float WATCH_TIME = 9.0f, GONE_DISTANCE = 38.0f;
+  static constexpr float kWatchTime = 9.0f, kGoneDistance = 38.0f;
   // They keep this distance to each other
-  static constexpr float SPACING = 3.5f;
+  static constexpr float kSpacing = 3.5f;
 
   /**
    * Finds a spot for a raccoon ahead of the bear beside its way and where it
@@ -197,29 +198,31 @@ class RaccoonFans {
    * @param bear Where the bear is, its head, where it goes (horizontal, length
    * 1)
    */
-  void update(float timeDelta, bool cheering, glm::vec3 bear,
-              glm::vec3 bearHead, glm::vec3 heading);
+  void Update(float time_delta, bool cheering, glm::vec3 bear,
+              glm::vec3 bear_head, glm::vec3 heading);
   /**
    * All raccoons that are out jump with their paws up
    */
-  void celebrate();
+  void Celebrate();
   /**
    * All back in the woods
    */
-  void reset();
-  const std::vector<Raccoon>& getRaccoons() const { return raccoons; }
-  int getWatchingCount() const;
+  void Reset();
+  const std::vector<Raccoon>& GetRaccoons() const { return raccoons_; }
+  int GetWatchingCount() const;
   /**
    * @return The number of chatters of all raccoons since the last call
    */
-  int takeChatters();
+  int TakeChatters();
 
  private:
-  Finder finder;
-  std::uint32_t seed;
-  std::mt19937 random;
-  std::vector<Raccoon> raccoons;
-  float nextArrival = 1.0f;
+  Finder finder_;
+  std::uint32_t seed_;
+  std::mt19937 random_;
+  std::vector<Raccoon> raccoons_;
+  float next_arrival_ = 1.0f;
 };
 }  // namespace scene
 }  // namespace bibo
+
+#endif  // BIBO_SCENE_RACCOON_HPP_

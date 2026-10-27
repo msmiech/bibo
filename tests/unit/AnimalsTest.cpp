@@ -15,23 +15,39 @@
 #include "Scene/Salmon.hpp"
 #include "TestSupport.hpp"
 
-using namespace bibo::scene;
+using bibo::scene::Beaver;
+using bibo::scene::BeaverModel;
+using bibo::scene::CreatureModel;
+using bibo::scene::Hedgehog;
+using bibo::scene::HedgehogModel;
+using bibo::scene::kBeaverHeight;
+using bibo::scene::kBeaverNeck;
+using bibo::scene::kCreatureModelCount;
+using bibo::scene::kRaccoonHeight;
+using bibo::scene::kRaccoonShoulder;
+using bibo::scene::LargestPool;
+using bibo::scene::Raccoon;
+using bibo::scene::RaccoonFans;
+using bibo::scene::RaccoonModel;
+using bibo::scene::SalmonPools;
+using bibo::scene::WaterPool;
+
 using glm::vec2;
 using glm::vec3;
 
 namespace {
-const float FRAME = 1.0f / 60.0f;
+const float kFrame = 1.0f / 60.0f;
 
 /**
  * Flat ground at y = 2 on a strip along z (|x| < 5), like the floor of the
  * track
  */
-bool strip(vec2 position, float& height) {
+bool Strip(vec2 position, float& height) {
   height = 2.0f;
   return std::abs(position.x) < 5.0f;
 }
 
-WaterPool pool(vec3 center) {
+WaterPool Pool(vec3 center) {
   WaterPool water;
   water.center = center;
   water.radius = 3.0f;
@@ -45,53 +61,53 @@ WaterPool pool(vec3 center) {
 TEST_CASE("A hedgehog strolls around its home on the ground it can walk on",
           "[animals]") {
   const vec2 home(0.0f, 10.0f);
-  Hedgehog hedgehog(home, vec2(0.0f, 1.0f), 7u, strip);
-  CHECK(hedgehog.getPosition() == vec3(0.0f, 2.0f, 10.0f));
-  CHECK_FALSE(hedgehog.isWalking());  // sniffs first
+  Hedgehog hedgehog(home, vec2(0.0f, 1.0f), 7u, Strip);
+  CHECK(hedgehog.GetPosition() == vec3(0.0f, 2.0f, 10.0f));
+  CHECK_FALSE(hedgehog.IsWalking());  // sniffs first
 
   float walked = 0.0f, farthest = 0.0f;
-  vec3 last = hedgehog.getPosition();
-  bool walkedOnce = false;
+  vec3 last = hedgehog.GetPosition();
+  bool walked_once = false;
   for (int i = 0; i < 60 * 60; ++i) {
-    hedgehog.update(FRAME);
-    vec3 position = hedgehog.getPosition();
+    hedgehog.Update(kFrame);
+    vec3 position = hedgehog.GetPosition();
     walked += glm::distance(position, last);
     last = position;
-    walkedOnce = walkedOnce || hedgehog.isWalking();
+    walked_once = walked_once || hedgehog.IsWalking();
     farthest =
         std::max(farthest, glm::distance(vec2(position.x, position.z), home));
     REQUIRE(std::abs(position.x) < 5.0f);  // stays on the strip
     REQUIRE(position.y == 2.0f);
     // The collision sphere is around the body, which stands on the ground
-    REQUIRE(hedgehog.getColliderCenter().y - hedgehog.getColliderRadius() >
+    REQUIRE(hedgehog.GetColliderCenter().y - hedgehog.GetColliderRadius() >
             1.9f);
   }
   CAPTURE(walked, farthest);
-  CHECK(walkedOnce);
+  CHECK(walked_once);
   CHECK(walked > 15.0f);  // it walks, but slowly (and pauses)
-  CHECK(walked < Hedgehog::WALK_SPEED * 60.0f);
-  CHECK(farthest <= Hedgehog::HOME_RADIUS + 0.5f);
+  CHECK(walked < Hedgehog::kWalkSpeed * 60.0f);
+  CHECK(farthest <= Hedgehog::kHomeRadius + 0.5f);
 
   SECTION("Its feet are under its body and step while it walks") {
-    Hedgehog::Pose pose = hedgehog.getPose();
+    Hedgehog::Pose pose = hedgehog.GetPose();
     for (const vec3& foot : pose.feet) {
       CHECK(glm::distance(vec2(foot.x, foot.z), vec2(last.x, last.z)) <
-            0.4f * Hedgehog::SCALE);
+            0.4f * Hedgehog::kScale);
       CHECK(foot.y >= 2.0f - 1e-4f);
     }
   }
   SECTION("Reset: back home") {
-    hedgehog.reset();
-    CHECK(hedgehog.getPosition() == vec3(0.0f, 2.0f, 10.0f));
+    hedgehog.Reset();
+    CHECK(hedgehog.GetPosition() == vec3(0.0f, 2.0f, 10.0f));
   }
   SECTION("Startled it hops up and lands again") {
-    float before = hedgehog.getColliderCenter().y;
-    hedgehog.startle();
-    hedgehog.update(0.2f);
-    CHECK(hedgehog.getColliderCenter().y > before + 0.2f);
-    hedgehog.update(0.5f);
+    float before = hedgehog.GetColliderCenter().y;
+    hedgehog.Startle();
+    hedgehog.Update(0.2f);
+    CHECK(hedgehog.GetColliderCenter().y > before + 0.2f);
+    hedgehog.Update(0.5f);
     // it may bob with its steps
-    CHECK(std::abs(hedgehog.getColliderCenter().y - before) < 0.1f);
+    CHECK(std::abs(hedgehog.GetColliderCenter().y - before) < 0.1f);
   }
 }
 
@@ -99,122 +115,122 @@ TEST_CASE(
     "Salmon only jump while the bear is close to their pool, out of the water "
     "and back into it",
     "[animals]") {
-  SalmonPools salmon({pool(vec3(0.0f, -0.5f, 0.0f))}, 3u);
+  SalmonPools salmon({Pool(vec3(0.0f, -0.5f, 0.0f))}, 3u);
   const vec3 far(0.0f, 1.0f, 100.0f);
   for (int i = 0; i < 5 * 60; ++i) {
-    salmon.update(FRAME, far, far, true);
+    salmon.Update(kFrame, far, far, true);
   }
-  CHECK(salmon.getJumps().empty());
+  CHECK(salmon.GetJumps().empty());
 
   const vec3 near(0.0f, 1.0f, 15.0f);  // not close enough to catch one
   float highest = -1e9f;
   int jumps = 0;
   for (int i = 0; i < 10 * 60; ++i) {
-    std::size_t before = salmon.getJumps().size();
-    REQUIRE(salmon.update(FRAME, near, near, true) == -1);
-    jumps += salmon.getJumps().size() > before ? 1 : 0;
-    for (const SalmonPools::Jump& jump : salmon.getJumps()) {
-      vec3 position = jump.position();
+    std::size_t before = salmon.GetJumps().size();
+    REQUIRE(salmon.Update(kFrame, near, near, true) == -1);
+    jumps += salmon.GetJumps().size() > before ? 1 : 0;
+    for (const SalmonPools::Jump& jump : salmon.GetJumps()) {
+      vec3 position = jump.Position();
       highest = std::max(highest, position.y);
       REQUIRE(position.y >= -0.5f - 0.31f);  // from just below the surface
       CHECK(glm::distance(vec2(position.x, position.z), vec2(0.0f)) <
             3.0f + 4.0f);  // not far from its pool
     }
-    REQUIRE(salmon.getJumps().size() <= 2);
+    REQUIRE(salmon.GetJumps().size() <= 2);
   }
   CAPTURE(jumps, highest);
   CHECK(jumps >= 4);  // every now and then
   // high enough for the bear to catch it in a jump
   CHECK(highest > -0.5f + 2.0f);
-  CHECK_FALSE(salmon.getDroplets().empty());  // splashes
+  CHECK_FALSE(salmon.GetDroplets().empty());  // splashes
 }
 
 TEST_CASE("The bear catches salmon in the air, none jump out of closed pools",
           "[animals]") {
   SalmonPools salmon(
-      {pool(vec3(0.0f, -0.5f, 0.0f)), pool(vec3(0.0f, -0.5f, 40.0f))}, 5u);
+      {Pool(vec3(0.0f, -0.5f, 0.0f)), Pool(vec3(0.0f, -0.5f, 40.0f))}, 5u);
   const vec3 near(0.0f, 1.0f, 8.0f);
   // Waits for a salmon of the first pool, then puts its mouth where the salmon
   // is
-  auto catchOne = [&](const std::vector<bool>& closed) {
+  auto catch_one = [&](const std::vector<bool>& closed) {
     int caught = -1;
     for (int i = 0; i < 10 * 60 && caught < 0; ++i) {
       vec3 mouth = near;
-      if (!salmon.getJumps().empty() && salmon.getJumps().front().time > 0.3f) {
-        mouth = salmon.getJumps().front().position();
+      if (!salmon.GetJumps().empty() && salmon.GetJumps().front().time > 0.3f) {
+        mouth = salmon.GetJumps().front().Position();
       }
-      caught = salmon.update(FRAME, near, mouth, true, closed);
+      caught = salmon.Update(kFrame, near, mouth, true, closed);
     }
     return caught;
   };
-  REQUIRE(catchOne({}) == 0);
+  REQUIRE(catch_one({}) == 0);
 
   SECTION("Open pools stay open: the bear can catch another one there") {
-    CHECK(catchOne({}) == 0);
-    CHECK(catchOne({false, false}) == 0);
+    CHECK(catch_one({}) == 0);
+    CHECK(catch_one({false, false}) == 0);
   }
   SECTION(
       "No more salmon jump out of a closed pool, and none can be caught "
       "there") {
     const std::vector<bool> closed = {true, false};
     for (int i = 0; i < 3 * 60; ++i) {
-      salmon.update(FRAME, near, near, true, closed);
+      salmon.Update(kFrame, near, near, true, closed);
     }
     for (int i = 0; i < 5 * 60; ++i) {
-      for (const SalmonPools::Jump& jump : salmon.getJumps()) {
+      for (const SalmonPools::Jump& jump : salmon.GetJumps()) {
         REQUIRE(jump.pool != 0);
       }
-      vec3 mouth = salmon.getJumps().empty()
+      vec3 mouth = salmon.GetJumps().empty()
                        ? near
-                       : salmon.getJumps().front().position();
-      REQUIRE(salmon.update(FRAME, near, mouth, true, closed) == -1);
+                       : salmon.GetJumps().front().Position();
+      REQUIRE(salmon.Update(kFrame, near, mouth, true, closed) == -1);
     }
   }
   SECTION(
       "The salmon of a pool that is closed while they are in the air cannot be "
       "caught") {
-    for (int i = 0; i < 10 * 60 && (salmon.getJumps().empty() ||
-                                    salmon.getJumps().front().time < 0.3f);
+    for (int i = 0; i < 10 * 60 && (salmon.GetJumps().empty() ||
+                                    salmon.GetJumps().front().time < 0.3f);
          ++i) {
-      salmon.update(FRAME, near, near, false);
+      salmon.Update(kFrame, near, near, false);
     }
-    REQUIRE_FALSE(salmon.getJumps().empty());
-    CHECK(salmon.update(FRAME, near, salmon.getJumps().front().position(), true,
-                        {true, true}) == -1);
+    REQUIRE_FALSE(salmon.GetJumps().empty());
+    CHECK(salmon.Update(kFrame, near, salmon.GetJumps().front().Position(),
+                        true, {true, true}) == -1);
   }
   SECTION("Not while the bear cannot catch one (it holds one already)") {
     const vec3 second(0.0f, 1.0f, 48.0f);
     for (int i = 0; i < 10 * 60; ++i) {
-      vec3 mouth = salmon.getJumps().empty()
+      vec3 mouth = salmon.GetJumps().empty()
                        ? second
-                       : salmon.getJumps().front().position();
-      REQUIRE(salmon.update(FRAME, second, mouth, false) == -1);
+                       : salmon.GetJumps().front().Position();
+      REQUIRE(salmon.Update(kFrame, second, mouth, false) == -1);
     }
   }
   SECTION("Reset: no salmon in the air") {
-    salmon.reset();
-    CHECK(salmon.getJumps().empty());
-    CHECK(salmon.getDroplets().empty());
+    salmon.Reset();
+    CHECK(salmon.GetJumps().empty());
+    CHECK(salmon.GetDroplets().empty());
   }
 }
 
 TEST_CASE("The largest pool is the one with the most water", "[animals]") {
-  CHECK(largestPool({}) == -1);
-  std::vector<WaterPool> pools = {pool(vec3(0.0f)),
-                                  pool(vec3(0.0f, 0.0f, 40.0f)),
-                                  pool(vec3(0.0f, 0.0f, 80.0f))};
+  CHECK(LargestPool({}) == -1);
+  std::vector<WaterPool> pools = {Pool(vec3(0.0f)),
+                                  Pool(vec3(0.0f, 0.0f, 40.0f)),
+                                  Pool(vec3(0.0f, 0.0f, 80.0f))};
   pools[0].area = 30.0f;
   pools[1].area = 75.0f;
   pools[2].area = 50.0f;
-  CHECK(largestPool(pools) == 1);
+  CHECK(LargestPool(pools) == 1);
 }
 
 TEST_CASE("The models of the animals are closed meshes of the right size",
           "[animals]") {
-  const int index = GENERATE(range(0, CREATURE_MODEL_COUNT));
+  const int index = GENERATE(range(0, kCreatureModelCount));
   CAPTURE(index);
   bibo::world::VegetationMesh mesh =
-      buildCreatureModel(static_cast<CreatureModel>(index));
+      BuildCreatureModel(static_cast<CreatureModel>(index));
   REQUIRE_FALSE(mesh.vertices.empty());
   REQUIRE(mesh.indices.size() % 3 == 0);
   for (std::uint32_t i : mesh.indices) {
@@ -237,7 +253,7 @@ TEST_CASE(
     "nose and claws",
     "[animals]") {
   using bibo::resources::SkinnedModel;
-  HedgehogModel model = HedgehogModel::build();
+  HedgehogModel model = HedgehogModel::Build();
   const std::size_t vertices = model.positions.size();
   REQUIRE(vertices > 0);
   REQUIRE(model.normals.size() == vertices);
@@ -250,15 +266,15 @@ TEST_CASE(
   for (unsigned int index : model.indices) {
     REQUIRE(index < vertices);
   }
-  CAPTURE(model.spineTriangles.size(), model.furTriangles.size());
+  CAPTURE(model.spine_triangles.size(), model.fur_triangles.size());
   // mostly spines
-  CHECK(model.spineTriangles.size() > model.furTriangles.size());
-  CHECK_FALSE(model.furTriangles.empty());
-  for (std::size_t i = 0; i < model.spineTriangles.size(); i += 3) {
+  CHECK(model.spine_triangles.size() > model.fur_triangles.size());
+  CHECK_FALSE(model.fur_triangles.empty());
+  for (std::size_t i = 0; i < model.spine_triangles.size(); i += 3) {
     // Down to the belly (they hide the legs) and behind the face
-    vec3 center = (model.positions[model.spineTriangles[i]] +
-                   model.positions[model.spineTriangles[i + 1]] +
-                   model.positions[model.spineTriangles[i + 2]]) /
+    vec3 center = (model.positions[model.spine_triangles[i]] +
+                   model.positions[model.spine_triangles[i + 1]] +
+                   model.positions[model.spine_triangles[i + 2]]) /
                   3.0f;
     REQUIRE(center.y > 0.03f);
     REQUIRE(center.z < 0.45f);
@@ -267,18 +283,18 @@ TEST_CASE(
   for (std::size_t v = 0; v < vertices; ++v) {
     surfaces[static_cast<int>(model.surfaces[v])]++;
     REQUIRE(std::abs(glm::length(model.normals[v]) - 1.0f) < 1e-3f);
-    if (model.parts[v] == HedgehogModel::BODY &&
-        static_cast<int>(model.surfaces[v]) == SkinnedModel::FUR) {
+    if (model.parts[v] == HedgehogModel::kBody &&
+        static_cast<int>(model.surfaces[v]) == SkinnedModel::kFur) {
       REQUIRE(model.positions[v].y >= 0.0f);  // not in the ground
     }
   }
-  CHECK(surfaces[SkinnedModel::EYE] > 0);
-  CHECK(surfaces[SkinnedModel::NOSE] > 0);
-  CHECK(surfaces[SkinnedModel::CLAW] > 0);
+  CHECK(surfaces[SkinnedModel::kEye] > 0);
+  CHECK(surfaces[SkinnedModel::kNose] > 0);
+  CHECK(surfaces[SkinnedModel::kClaw] > 0);
   // The snout points forward, it is the front of the hedgehog
   float front = -1e9f;
   for (std::size_t v = 0; v < vertices; ++v) {
-    if (model.parts[v] == HedgehogModel::BODY) {
+    if (model.parts[v] == HedgehogModel::kBody) {
       front = std::max(front, model.positions[v].z);
     }
   }
@@ -290,7 +306,7 @@ TEST_CASE(
     "claws and a flat tail",
     "[animals][beaver]") {
   using bibo::resources::SkinnedModel;
-  BeaverModel model = BeaverModel::build();
+  BeaverModel model = BeaverModel::Build();
   const std::size_t vertices = model.positions.size();
   REQUIRE(vertices > 0);
   REQUIRE(model.normals.size() == vertices);
@@ -302,33 +318,33 @@ TEST_CASE(
   for (unsigned int index : model.indices) {
     REQUIRE(index < vertices);
   }
-  CHECK(model.spineTriangles.empty());  // no spines
+  CHECK(model.spine_triangles.empty());  // no spines
   // fur on most of it
-  CHECK(model.furTriangles.size() > model.indices.size() / 3);
+  CHECK(model.fur_triangles.size() > model.indices.size() / 3);
 
   int surfaces[7] = {};
-  int parts[BeaverModel::PART_COUNT] = {};
+  int parts[BeaverModel::kPartCount] = {};
   for (std::size_t v = 0; v < vertices; ++v) {
     surfaces[static_cast<int>(model.surfaces[v])]++;
     REQUIRE(model.parts[v] >= 0);
-    REQUIRE(model.parts[v] < BeaverModel::PART_COUNT);
+    REQUIRE(model.parts[v] < BeaverModel::kPartCount);
     parts[model.parts[v]]++;
     REQUIRE(std::abs(glm::length(model.normals[v]) - 1.0f) < 1e-3f);
     REQUIRE(std::abs(glm::length(model.combs[v]) - 1.0f) < 1e-3f);
   }
-  CHECK(surfaces[SkinnedModel::EYE] > 0);
-  CHECK(surfaces[SkinnedModel::NOSE] > 0);
-  CHECK(surfaces[SkinnedModel::TEETH] > 0);
-  CHECK(surfaces[SkinnedModel::MOUTH] > 0);
-  CHECK(surfaces[SkinnedModel::TONGUE] > 0);
-  CHECK(surfaces[SkinnedModel::CLAW] > 0);
-  for (int part = 0; part < BeaverModel::PART_COUNT; ++part) {
+  CHECK(surfaces[SkinnedModel::kEye] > 0);
+  CHECK(surfaces[SkinnedModel::kNose] > 0);
+  CHECK(surfaces[SkinnedModel::kTeeth] > 0);
+  CHECK(surfaces[SkinnedModel::kMouth] > 0);
+  CHECK(surfaces[SkinnedModel::kTongue] > 0);
+  CHECK(surfaces[SkinnedModel::kClaw] > 0);
+  for (int part = 0; part < BeaverModel::kPartCount; ++part) {
     CAPTURE(part);
     CHECK(parts[part] > 0);
   }
   // The teeth are orange
   for (std::size_t v = 0; v < vertices; ++v) {
-    if (static_cast<int>(model.surfaces[v]) == SkinnedModel::TEETH) {
+    if (static_cast<int>(model.surfaces[v]) == SkinnedModel::kTeeth) {
       REQUIRE(model.colors[v].r > 2.0f * model.colors[v].g);
       REQUIRE(model.colors[v].g > model.colors[v].b);
     }
@@ -337,17 +353,17 @@ TEST_CASE(
   // in the space of the neck)
   float bottom = 1e9f, top = -1e9f;
   for (std::size_t v = 0; v < vertices; ++v) {
-    if (model.parts[v] == BeaverModel::BODY) {
+    if (model.parts[v] == BeaverModel::kBody) {
       bottom = std::min(bottom, model.positions[v].y);
     }
-    if (model.parts[v] == BeaverModel::HEAD) {
-      top = std::max(top, model.positions[v].y + BEAVER_NECK.y);
+    if (model.parts[v] == BeaverModel::kHead) {
+      top = std::max(top, model.positions[v].y + kBeaverNeck.y);
     }
   }
   CHECK(bottom >= -0.01f);
   CHECK(bottom < 0.05f);
-  CHECK(top > 0.9f * BEAVER_HEIGHT);
-  CHECK(top < 1.1f * BEAVER_HEIGHT);
+  CHECK(top > 0.9f * kBeaverHeight);
+  CHECK(top < 1.1f * kBeaverHeight);
 }
 
 TEST_CASE(
@@ -356,71 +372,71 @@ TEST_CASE(
     "[animals][beaver]") {
   const vec3 home(10.0f, 2.0f, -5.0f);
   Beaver beaver(home, vec3(1.0f, 0.0f, 0.0f));
-  std::vector<glm::mat4> pose = beaver.getPose();
-  REQUIRE(pose.size() == static_cast<std::size_t>(BeaverModel::PART_COUNT));
+  std::vector<glm::mat4> pose = beaver.GetPose();
+  REQUIRE(pose.size() == static_cast<std::size_t>(BeaverModel::kPartCount));
   auto forward = [&]() {
-    glm::mat4 body = beaver.getPose()[BeaverModel::BODY];
+    glm::mat4 body = beaver.GetPose()[BeaverModel::kBody];
     return glm::normalize(vec3(body[2].x, 0.0f, body[2].z));
   };
   CHECK(glm::dot(forward(), vec3(1.0f, 0.0f, 0.0f)) > 0.99f);
   // Sitting on the ground, the marker above its head
-  CHECK(std::abs(vec3(pose[BeaverModel::BODY][3]).y - home.y) < 0.05f);
-  CHECK(beaver.getMarkerPosition().y > home.y + BEAVER_HEIGHT * Beaver::SCALE);
-  CHECK(beaver.getColliderRadius() > 0.5f);
+  CHECK(std::abs(vec3(pose[BeaverModel::kBody][3]).y - home.y) < 0.05f);
+  CHECK(beaver.GetMarkerPosition().y > home.y + kBeaverHeight * Beaver::kScale);
+  CHECK(beaver.GetColliderRadius() > 0.5f);
 
   SECTION("A bear far away is not noticed") {
     for (int i = 0; i < 120; ++i) {
-      beaver.update(FRAME, home + vec3(0.0f, 1.0f, -40.0f));
+      beaver.Update(kFrame, home + vec3(0.0f, 1.0f, -40.0f));
     }
     CHECK(glm::dot(forward(), vec3(1.0f, 0.0f, 0.0f)) > 0.99f);
   }
   SECTION("A bear close by: it turns to it") {
     for (int i = 0; i < 120; ++i) {
-      beaver.update(FRAME, home + vec3(0.0f, 1.0f, -6.0f));
+      beaver.Update(kFrame, home + vec3(0.0f, 1.0f, -6.0f));
     }
     CHECK(glm::dot(forward(), vec3(0.0f, 0.0f, -1.0f)) > 0.95f);
   }
   SECTION("Its eyes look at the bear: up when the bear is above its face") {
-    auto gazeY = [&](vec3 bear) {
+    auto gaze_y = [&](vec3 bear) {
       for (int i = 0; i < 120; ++i) {
-        beaver.update(FRAME, bear);
+        beaver.Update(kFrame, bear);
       }
-      glm::mat3 eye(beaver.getPose()[BeaverModel::EYE_LEFT]);
-      return glm::normalize(eye * BeaverModel::eyeGaze(true)).y;
+      glm::mat3 eye(beaver.GetPose()[BeaverModel::kEyeLeft]);
+      return glm::normalize(eye * BeaverModel::EyeGaze(true)).y;
     };
-    vec3 face = beaver.getFacePosition();
-    float level = gazeY(face + vec3(4.0f, 0.0f, 0.0f));
-    float above = gazeY(face + vec3(3.0f, 3.0f, 0.0f));
+    vec3 face = beaver.GetFacePosition();
+    float level = gaze_y(face + vec3(4.0f, 0.0f, 0.0f));
+    float above = gaze_y(face + vec3(3.0f, 3.0f, 0.0f));
     CHECK(above > level + 0.2f);
-    CHECK(beaver.getFacePosition().y > face.y - 0.5f);
+    CHECK(beaver.GetFacePosition().y > face.y - 0.5f);
   }
   SECTION("Every sound opens and closes the mouth") {
-    beaver.setTalking(true);
-    CHECK(beaver.isTalking());
-    beaver.update(FRAME, home);
-    CHECK(beaver.getMouthOpen() < 0.05f);
-    beaver.speak();
+    beaver.SetTalking(true);
+    CHECK(beaver.IsTalking());
+    beaver.Update(kFrame, home);
+    CHECK(beaver.GetMouthOpen() < 0.05f);
+    beaver.Speak();
     float widest = 0.0f;
     for (int i = 0; i < 12; ++i) {
-      beaver.update(FRAME, home);
-      widest = std::max(widest, beaver.getMouthOpen());
+      beaver.Update(kFrame, home);
+      widest = std::max(widest, beaver.GetMouthOpen());
     }
     CHECK(widest > 0.8f);
-    CHECK(beaver.getMouthOpen() < 0.1f);
+    CHECK(beaver.GetMouthOpen() < 0.1f);
   }
   SECTION("Cheering: it hops") {
-    beaver.cheer();
+    beaver.Cheer();
     float highest = home.y;
     for (int i = 0; i < 60; ++i) {
-      beaver.update(FRAME, home + vec3(0.0f, 1.0f, -6.0f));
+      beaver.Update(kFrame, home + vec3(0.0f, 1.0f, -6.0f));
       highest =
-          std::max(highest, vec3(beaver.getPose()[BeaverModel::BODY][3]).y);
+          std::max(highest, vec3(beaver.GetPose()[BeaverModel::kBody][3]).y);
     }
     CHECK(highest > home.y + 0.1f);
-    CHECK(std::abs(vec3(beaver.getPose()[BeaverModel::BODY][3]).y - home.y) <
+    CHECK(std::abs(vec3(beaver.GetPose()[BeaverModel::kBody][3]).y - home.y) <
           0.05f);  // back on the ground
   }
-  for (const glm::mat4& part : beaver.getPose()) {
+  for (const glm::mat4& part : beaver.GetPose()) {
     REQUIRE(std::isfinite(part[3].x + part[3].y + part[3].z));
   }
 }
@@ -428,29 +444,29 @@ TEST_CASE(
 TEST_CASE("A hedgehog scurries away from the bear when it comes close",
           "[animals]") {
   const vec2 home(0.0f, 10.0f);
-  Hedgehog hedgehog(home, vec2(0.0f, 1.0f), 7u, strip);
-  hedgehog.update(FRAME);
-  vec3 start = hedgehog.getPosition();
+  Hedgehog hedgehog(home, vec2(0.0f, 1.0f), 7u, Strip);
+  hedgehog.Update(kFrame);
+  vec3 start = hedgehog.GetPosition();
   // The bear comes from -z
   vec3 bear = start + vec3(0.0f, 0.0f, -3.0f);
-  hedgehog.watch(bear);
-  hedgehog.update(FRAME);
-  CHECK(hedgehog.isScurrying());
+  hedgehog.Watch(bear);
+  hedgehog.Update(kFrame);
+  CHECK(hedgehog.IsScurrying());
   for (int i = 0; i < 60 * 2; ++i) {
-    hedgehog.watch(bear);
-    hedgehog.update(FRAME);
-    REQUIRE(std::abs(hedgehog.getPosition().x) < 5.0f);
+    hedgehog.Watch(bear);
+    hedgehog.Update(kFrame);
+    REQUIRE(std::abs(hedgehog.GetPosition().x) < 5.0f);
   }
-  CHECK(glm::distance(hedgehog.getPosition(), bear) >
+  CHECK(glm::distance(hedgehog.GetPosition(), bear) >
         glm::distance(start, bear) + 1.5f);
-  CHECK(glm::distance(vec2(hedgehog.getPosition().x, hedgehog.getPosition().z),
-                      home) <= 1.5f * Hedgehog::HOME_RADIUS + 0.1f);
+  CHECK(glm::distance(vec2(hedgehog.GetPosition().x, hedgehog.GetPosition().z),
+                      home) <= 1.5f * Hedgehog::kHomeRadius + 0.1f);
 
   SECTION("A bear far away does not bother it") {
-    hedgehog.reset();
-    hedgehog.watch(start + vec3(0.0f, 0.0f, -20.0f));
-    hedgehog.update(FRAME);
-    CHECK_FALSE(hedgehog.isScurrying());
+    hedgehog.Reset();
+    hedgehog.Watch(start + vec3(0.0f, 0.0f, -20.0f));
+    hedgehog.Update(kFrame);
+    CHECK_FALSE(hedgehog.IsScurrying());
   }
 }
 
@@ -458,22 +474,22 @@ TEST_CASE("The beaver waves at the bear when it comes close",
           "[animals][beaver]") {
   const vec3 home(10.0f, 2.0f, -5.0f);
   Beaver beaver(home, vec3(1.0f, 0.0f, 0.0f));
-  beaver.update(FRAME, home + vec3(0.0f, 1.0f, -40.0f));
-  CHECK_FALSE(beaver.isWaving());
-  beaver.update(FRAME, home + vec3(0.0f, 1.0f, -8.0f));
-  CHECK(beaver.isWaving());
+  beaver.Update(kFrame, home + vec3(0.0f, 1.0f, -40.0f));
+  CHECK_FALSE(beaver.IsWaving());
+  beaver.Update(kFrame, home + vec3(0.0f, 1.0f, -8.0f));
+  CHECK(beaver.IsWaving());
   // The right paw goes up
-  glm::mat4 arm = beaver.getPose()[BeaverModel::ARM_RIGHT];
+  glm::mat4 arm = beaver.GetPose()[BeaverModel::kArmRight];
   for (int i = 0; i < 30; ++i) {
-    beaver.update(FRAME, home + vec3(0.0f, 1.0f, -8.0f));
+    beaver.Update(kFrame, home + vec3(0.0f, 1.0f, -8.0f));
   }
-  vec3 hand = vec3(beaver.getPose()[BeaverModel::ARM_RIGHT] *
+  vec3 hand = vec3(beaver.GetPose()[BeaverModel::kArmRight] *
                    glm::vec4(0.0f, -0.2f, 0.09f, 1.0f));
   CHECK(hand.y > vec3(arm * glm::vec4(0.0f, -0.2f, 0.09f, 1.0f)).y + 0.2f);
   for (int i = 0; i < 120; ++i) {
-    beaver.update(FRAME, home + vec3(0.0f, 1.0f, -8.0f));
+    beaver.Update(kFrame, home + vec3(0.0f, 1.0f, -8.0f));
   }
-  CHECK_FALSE(beaver.isWaving());  // once, while the bear stays
+  CHECK_FALSE(beaver.IsWaving());  // once, while the bear stays
 }
 
 TEST_CASE(
@@ -483,7 +499,7 @@ TEST_CASE(
   using bibo::resources::SkinnedModel;
   for (float girth : {1.0f, 1.45f}) {
     CAPTURE(girth);
-    RaccoonModel model = RaccoonModel::build(girth);
+    RaccoonModel model = RaccoonModel::Build(girth);
     const std::size_t vertices = model.positions.size();
     REQUIRE(vertices > 0);
     REQUIRE(model.normals.size() == vertices);
@@ -494,56 +510,56 @@ TEST_CASE(
     for (unsigned int index : model.indices) {
       REQUIRE(index < vertices);
     }
-    CHECK(model.spineTriangles.empty());
-    CHECK(model.furTriangles.size() > model.indices.size() / 3);
+    CHECK(model.spine_triangles.empty());
+    CHECK(model.fur_triangles.size() > model.indices.size() / 3);
     int surfaces[7] = {};
-    int parts[RaccoonModel::PART_COUNT] = {};
-    int dark = 0, light = 0, tailDark = 0, tailLight = 0;
+    int parts[RaccoonModel::kPartCount] = {};
+    int dark = 0, light = 0, tail_dark = 0, tail_light = 0;
     for (std::size_t v = 0; v < vertices; ++v) {
       surfaces[static_cast<int>(model.surfaces[v])]++;
       REQUIRE(model.parts[v] >= 0);
-      REQUIRE(model.parts[v] < RaccoonModel::PART_COUNT);
+      REQUIRE(model.parts[v] < RaccoonModel::kPartCount);
       parts[model.parts[v]]++;
       REQUIRE(std::abs(glm::length(model.normals[v]) - 1.0f) < 1e-3f);
       REQUIRE(std::abs(glm::length(model.combs[v]) - 1.0f) < 1e-3f);
-      if (static_cast<int>(model.surfaces[v]) == SkinnedModel::FUR &&
-          model.parts[v] == RaccoonModel::HEAD) {
+      if (static_cast<int>(model.surfaces[v]) == SkinnedModel::kFur &&
+          model.parts[v] == RaccoonModel::kHead) {
         dark += model.colors[v].g < 0.03f ? 1 : 0;  // the mask
         light += model.colors[v].g > 0.4f ? 1 : 0;  // the white around it
       }
-      if (model.parts[v] == RaccoonModel::TAIL) {
-        tailDark += model.colors[v].g < 0.05f ? 1 : 0;
-        tailLight += model.colors[v].g > 0.15f ? 1 : 0;
+      if (model.parts[v] == RaccoonModel::kTail) {
+        tail_dark += model.colors[v].g < 0.05f ? 1 : 0;
+        tail_light += model.colors[v].g > 0.15f ? 1 : 0;
       }
     }
-    CHECK(surfaces[SkinnedModel::EYE] > 0);
-    CHECK(surfaces[SkinnedModel::NOSE] > 0);
-    CHECK(surfaces[SkinnedModel::MOUTH] > 0);
-    CHECK(surfaces[SkinnedModel::TONGUE] > 0);
-    CHECK(surfaces[SkinnedModel::TEETH] > 0);
-    CHECK(surfaces[SkinnedModel::CLAW] > 0);
-    for (int part = 0; part < RaccoonModel::PART_COUNT; ++part) {
+    CHECK(surfaces[SkinnedModel::kEye] > 0);
+    CHECK(surfaces[SkinnedModel::kNose] > 0);
+    CHECK(surfaces[SkinnedModel::kMouth] > 0);
+    CHECK(surfaces[SkinnedModel::kTongue] > 0);
+    CHECK(surfaces[SkinnedModel::kTeeth] > 0);
+    CHECK(surfaces[SkinnedModel::kClaw] > 0);
+    for (int part = 0; part < RaccoonModel::kPartCount; ++part) {
       CAPTURE(part);
       CHECK(parts[part] > 0);
     }
     CHECK(dark > 50);
     CHECK(light > 50);
-    CHECK(tailDark > 50);
-    CHECK(tailLight > 50);
-    // The legs reach the ground, the back is about RACCOON_HEIGHT high
+    CHECK(tail_dark > 50);
+    CHECK(tail_light > 50);
+    // The legs reach the ground, the back is about kRaccoonHeight high
     float lowest = 1e9f, top = -1e9f;
     for (std::size_t v = 0; v < vertices; ++v) {
       int part = model.parts[v];
-      if (part == RaccoonModel::FRONT_LEFT) {
-        lowest = std::min(lowest, model.positions[v].y + RACCOON_SHOULDER.y);
+      if (part == RaccoonModel::kFrontLeft) {
+        lowest = std::min(lowest, model.positions[v].y + kRaccoonShoulder.y);
       }
-      if (part == RaccoonModel::BODY) {
+      if (part == RaccoonModel::kBody) {
         top = std::max(top, model.positions[v].y);
       }
     }
     CHECK(std::abs(lowest) < 0.02f);
-    CHECK(top > 0.85f * RACCOON_HEIGHT);
-    CHECK(top < 1.15f * RACCOON_HEIGHT);
+    CHECK(top > 0.85f * kRaccoonHeight);
+    CHECK(top < 1.15f * kRaccoonHeight);
   }
 }
 
@@ -556,49 +572,49 @@ TEST_CASE(
     return true;
   };
   Raccoon raccoon(flat, 9u);
-  CHECK_FALSE(raccoon.isVisible());
+  CHECK_FALSE(raccoon.IsVisible());
   const vec3 bear(0.0f, 3.0f, 0.0f);
-  raccoon.comeAndCheer(vec2(20.0f, 0.0f), vec2(6.0f, 0.0f));
-  CHECK(raccoon.getActivity() == Raccoon::Activity::COMING);
-  CHECK(raccoon.getPosition() == vec3(20.0f, 2.0f, 0.0f));
+  raccoon.ComeAndCheer(vec2(20.0f, 0.0f), vec2(6.0f, 0.0f));
+  CHECK(raccoon.GetActivity() == Raccoon::Activity::kComing);
+  CHECK(raccoon.GetPosition() == vec3(20.0f, 2.0f, 0.0f));
   for (int i = 0;
-       i < 60 * 8 && raccoon.getActivity() == Raccoon::Activity::COMING; ++i) {
-    raccoon.update(FRAME, bear);
-    REQUIRE(raccoon.getUpright() < 0.5f);  // on all fours
+       i < 60 * 8 && raccoon.GetActivity() == Raccoon::Activity::kComing; ++i) {
+    raccoon.Update(kFrame, bear);
+    REQUIRE(raccoon.GetUpright() < 0.5f);  // on all fours
   }
-  REQUIRE(raccoon.getActivity() == Raccoon::Activity::CHEERING);
-  CHECK(glm::distance(raccoon.getPosition(), vec3(6.0f, 2.0f, 0.0f)) < 0.5f);
+  REQUIRE(raccoon.GetActivity() == Raccoon::Activity::kCheering);
+  CHECK(glm::distance(raccoon.GetPosition(), vec3(6.0f, 2.0f, 0.0f)) < 0.5f);
   // Stands up, turns to the bear, hops and chatters
   float highest = 0.0f;
   for (int i = 0; i < 60 * 3; ++i) {
-    raccoon.update(FRAME, bear);
+    raccoon.Update(kFrame, bear);
     highest = std::max(highest,
-                       vec3(raccoon.getPose()[RaccoonModel::HIND_LEFT][3]).y);
+                       vec3(raccoon.GetPose()[RaccoonModel::kHindLeft][3]).y);
   }
-  CHECK(raccoon.getUpright() > 0.9f);
-  CHECK(glm::dot(raccoon.getDirection(), vec3(-1.0f, 0.0f, 0.0f)) > 0.95f);
-  CHECK(raccoon.takeChatters() > 0);
+  CHECK(raccoon.GetUpright() > 0.9f);
+  CHECK(glm::dot(raccoon.GetDirection(), vec3(-1.0f, 0.0f, 0.0f)) > 0.95f);
+  CHECK(raccoon.TakeChatters() > 0);
   CHECK(highest > 2.0f + 0.1f);
-  CHECK(raccoon.getFacePosition().y > 2.0f + 1.0f);
+  CHECK(raccoon.GetFacePosition().y > 2.0f + 1.0f);
   // The big jump
-  raccoon.cheer();
+  raccoon.Cheer();
   float jump = 0.0f;
   for (int i = 0; i < 30; ++i) {
-    raccoon.update(FRAME, bear);
+    raccoon.Update(kFrame, bear);
     jump =
-        std::max(jump, vec3(raccoon.getPose()[RaccoonModel::HIND_LEFT][3]).y);
+        std::max(jump, vec3(raccoon.GetPose()[RaccoonModel::kHindLeft][3]).y);
   }
   CHECK(jump > highest + 0.2f);
-  for (const glm::mat4& part : raccoon.getPose()) {
+  for (const glm::mat4& part : raccoon.GetPose()) {
     REQUIRE(std::isfinite(part[3].x + part[3].y + part[3].z));
   }
 
-  raccoon.leave();
-  CHECK(raccoon.getActivity() == Raccoon::Activity::LEAVING);
-  for (int i = 0; i < 60 * 8 && raccoon.isVisible(); ++i) {
-    raccoon.update(FRAME, bear);
+  raccoon.Leave();
+  CHECK(raccoon.GetActivity() == Raccoon::Activity::kLeaving);
+  for (int i = 0; i < 60 * 8 && raccoon.IsVisible(); ++i) {
+    raccoon.Update(kFrame, bear);
   }
-  CHECK_FALSE(raccoon.isVisible());
+  CHECK_FALSE(raccoon.IsVisible());
 }
 
 TEST_CASE(
@@ -610,33 +626,33 @@ TEST_CASE(
     return true;
   };
   Raccoon chonk(flat, 3u, 1.45f);
-  chonk.sitAt(vec3(0.0f), vec3(0.0f, 0.0f, 1.0f));
-  CHECK(chonk.getActivity() == Raccoon::Activity::SITTING);
-  CHECK(chonk.isVisible());
-  chonk.leave();  // it stays
-  CHECK(chonk.getActivity() == Raccoon::Activity::SITTING);
+  chonk.SitAt(vec3(0.0f), vec3(0.0f, 0.0f, 1.0f));
+  CHECK(chonk.GetActivity() == Raccoon::Activity::kSitting);
+  CHECK(chonk.IsVisible());
+  chonk.Leave();  // it stays
+  CHECK(chonk.GetActivity() == Raccoon::Activity::kSitting);
   for (int i = 0; i < 120; ++i) {
-    chonk.update(FRAME, vec3(0.0f, 1.0f, -40.0f));
+    chonk.Update(kFrame, vec3(0.0f, 1.0f, -40.0f));
   }
-  CHECK(glm::dot(chonk.getDirection(), vec3(0.0f, 0.0f, 1.0f)) > 0.99f);
-  CHECK(chonk.getUpright() > 0.6f);
-  CHECK(chonk.getMarkerPosition().y > chonk.getFacePosition().y + 0.5f);
+  CHECK(glm::dot(chonk.GetDirection(), vec3(0.0f, 0.0f, 1.0f)) > 0.99f);
+  CHECK(chonk.GetUpright() > 0.6f);
+  CHECK(chonk.GetMarkerPosition().y > chonk.GetFacePosition().y + 0.5f);
   for (int i = 0; i < 120; ++i) {
-    chonk.update(FRAME, vec3(6.0f, 1.0f, 0.0f));
+    chonk.Update(kFrame, vec3(6.0f, 1.0f, 0.0f));
   }
-  CHECK(glm::dot(chonk.getDirection(), vec3(1.0f, 0.0f, 0.0f)) > 0.95f);
+  CHECK(glm::dot(chonk.GetDirection(), vec3(1.0f, 0.0f, 0.0f)) > 0.95f);
 
-  chonk.setTalking(true);
-  chonk.speak();
+  chonk.SetTalking(true);
+  chonk.Speak();
   float widest = 0.0f;
   for (int i = 0; i < 12; ++i) {
-    chonk.update(FRAME, vec3(6.0f, 1.0f, 0.0f));
-    widest = std::max(widest, chonk.getMouthOpen());
+    chonk.Update(kFrame, vec3(6.0f, 1.0f, 0.0f));
+    widest = std::max(widest, chonk.GetMouthOpen());
   }
   CHECK(widest > 0.8f);
   // A larger collision sphere than an ordinary raccoon
   Raccoon other(flat, 4u);
-  CHECK(chonk.getColliderRadius() > other.getColliderRadius());
+  CHECK(chonk.GetColliderRadius() > other.GetColliderRadius());
 }
 
 TEST_CASE(
@@ -663,31 +679,31 @@ TEST_CASE(
   const vec3 heading(1.0f, 0.0f, 0.0f);
   vec3 bear(0.0f);
   for (int i = 0; i < 60 * 5; ++i) {
-    fans.update(FRAME, false, bear, bear + vec3(0.0f, 1.0f, 0.0f), heading);
+    fans.Update(kFrame, false, bear, bear + vec3(0.0f, 1.0f, 0.0f), heading);
   }
-  CHECK(fans.getWatchingCount() == 0);
+  CHECK(fans.GetWatchingCount() == 0);
   CHECK(asked == 0);
 
   int most = 0;
   for (int i = 0; i < 60 * 20; ++i) {
-    fans.update(FRAME, true, bear, bear + vec3(0.0f, 1.0f, 0.0f), heading);
-    most = std::max(most, fans.getWatchingCount());
-    REQUIRE(fans.getWatchingCount() <= RaccoonFans::MAX_WATCHING);
+    fans.Update(kFrame, true, bear, bear + vec3(0.0f, 1.0f, 0.0f), heading);
+    most = std::max(most, fans.GetWatchingCount());
+    REQUIRE(fans.GetWatchingCount() <= RaccoonFans::kMaxWatching);
   }
   CHECK(most >= 2);
   int cheering = 0;
-  for (const Raccoon& raccoon : fans.getRaccoons()) {
-    cheering += raccoon.getActivity() == Raccoon::Activity::CHEERING ? 1 : 0;
+  for (const Raccoon& raccoon : fans.GetRaccoons()) {
+    cheering += raccoon.GetActivity() == Raccoon::Activity::kCheering ? 1 : 0;
   }
   CHECK(cheering >= 1);
-  fans.celebrate();
-  CHECK(fans.takeChatters() > 0);
+  fans.Celebrate();
+  CHECK(fans.TakeChatters() > 0);
 
   // The quest is over: back into the woods
   for (int i = 0; i < 60 * 10; ++i) {
-    fans.update(FRAME, false, bear, bear + vec3(0.0f, 1.0f, 0.0f), heading);
+    fans.Update(kFrame, false, bear, bear + vec3(0.0f, 1.0f, 0.0f), heading);
   }
-  for (const Raccoon& raccoon : fans.getRaccoons()) {
-    CHECK_FALSE(raccoon.isVisible());
+  for (const Raccoon& raccoon : fans.GetRaccoons()) {
+    CHECK_FALSE(raccoon.IsVisible());
   }
 }

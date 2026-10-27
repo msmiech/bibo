@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_VEGETATION_HPP_
+#define BIBO_WORLD_VEGETATION_HPP_
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -15,52 +16,52 @@ namespace world {
  * model is drawn instanced.
  */
 enum class Model : std::uint8_t {
-  SPRUCE_TALL,
-  SPRUCE_WIDE,
-  SPRUCE_YOUNG,
-  PINE,
-  BUSH,
-  JUNIPER,
-  FERN,
-  GRASS,
-  GRASS_DRY,
-  MUSHROOM_RED,
-  MUSHROOM_BROWN,
-  MUSHROOM_GLOW,
-  STONE_ROUND,
-  STONE_FLAT,
-  STONE_SHARP,
-  STONE_STANDING,
-  LOG,
-  STUMP,
-  COUNT
+  kSpruceTall,
+  kSpruceWide,
+  kSpruceYoung,
+  kPine,
+  kBush,
+  kJuniper,
+  kFern,
+  kGrass,
+  kGrassDry,
+  kMushroomRed,
+  kMushroomBrown,
+  kMushroomGlow,
+  kStoneRound,
+  kStoneFlat,
+  kStoneSharp,
+  kStoneStanding,
+  kLog,
+  kStump,
+  kCount
 };
-constexpr int MODEL_COUNT = static_cast<int>(Model::COUNT);
+constexpr int kModelCount = static_cast<int>(Model::kCount);
 
 /**
  * Small things are only placed (and drawn) close to the camera, large ones
  * everywhere
  */
 enum class Layer {
-  LARGE,  // trees, bushes, boulders, logs
-  SMALL   // grass, ferns, mushrooms, pebbles
+  kLarge,  // trees, bushes, boulders, logs
+  kSmall   // grass, ferns, mushrooms, pebbles
 };
 
 /**
  * A placed model (48 bytes, uploaded to the graphics card as it is)
  */
 struct Instance {
-  glm::vec4 positionScale;  // position of the foot, uniform scale
-  glm::vec4 rotation;       // quaternion x, y, z, w
+  glm::vec4 position_scale;  // position of the foot, uniform scale
+  glm::vec4 rotation;        // quaternion x, y, z, w
   // x: tint (-1 to 1, color variation), y: random number (0 to 1), z, w: unused
   glm::vec4 parameters;
-  Model model() const {
+  Model GetModel() const {
     return static_cast<Model>(static_cast<int>(parameters.z));
   }
 };
 
 /**
- * Columns of the world (CHUNK_SIZE wide, all the way up) are the unit of the
+ * Columns of the world (kChunkSize wide, all the way up) are the unit of the
  * scattering
  */
 struct ColumnKey {
@@ -83,17 +84,19 @@ struct ColumnKeyHash {
  * @param collision Gets the trunks of the trees and the boulders (nullptr: not
  * needed)
  */
-std::vector<Instance> scatter(
+std::vector<Instance> Scatter(
     const WorldGenerator& world, ColumnKey column, Layer layer,
     std::vector<physics::ShapePart>* collision = nullptr);
 
 /**
  * Height of the model at scale 1 (e.g. for the bounding sphere)
  */
-float modelHeight(Model model);
+float ModelHeight(Model model);
 /**
  * Radius of the model at scale 1 around its vertical axis
  */
-float modelRadius(Model model);
+float ModelRadius(Model model);
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_VEGETATION_HPP_

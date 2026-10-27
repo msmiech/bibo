@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_RENDER_RENDERUTIL_HPP_
+#define BIBO_RENDER_RENDERUTIL_HPP_
 #include <GL/glew.h>
 
 namespace bibo {
@@ -7,25 +8,25 @@ namespace render {
  * Texture units of the scene (the shaders declare them with layout(binding =
  * ...))
  */
-namespace TextureUnit {
-const int COLOR = 0;        // legacy geometries: their texture
-const int SHADOW_MAPS = 1;  // cascaded shadow maps (sampler2DArrayShadow)
-const int NORMAL_MAP = 2;   // legacy geometries: their normal map
+namespace texture_unit {
+const int kColor = 0;       // legacy geometries: their texture
+const int kShadowMaps = 1;  // cascaded shadow maps (sampler2DArrayShadow)
+const int kNormalMap = 2;   // legacy geometries: their normal map
 // generated materials (sampler2DArray): color and roughness
-const int MATERIAL_ALBEDO = 3;
+const int kMaterialAlbedo = 3;
 // generated materials: normal, height and occlusion
-const int MATERIAL_NORMAL = 4;
-const int ENVIRONMENT = 5;  // sky cube map
+const int kMaterialNormal = 4;
+const int kEnvironment = 5;  // sky cube map
 // top view of the island: height of the ground and of the cave roofs
-const int WORLD_MAP = 6;
-}  // namespace TextureUnit
+const int kWorldMap = 6;
+}  // namespace texture_unit
 
 /**
  * @return true for a renderer without a graphics card (e.g. Mesa's llvmpipe on
  * servers without GPU): the world is drawn with less detail, so that it is not
  * too slow (e.g. the tests and the recording of the README GIF)
  */
-bool isSoftwareRenderer();
+bool IsSoftwareRenderer();
 
 /**
  * Draws a triangle that covers the viewport (for full screen passes with
@@ -37,11 +38,11 @@ class FullscreenTriangle {
   ~FullscreenTriangle();
   FullscreenTriangle(const FullscreenTriangle&) = delete;
   FullscreenTriangle& operator=(const FullscreenTriangle&) = delete;
-  void draw() const;
+  void Draw() const;
 
  private:
   // the core profile needs one, even without attributes
-  GLuint vertexArray = 0;
+  GLuint vertex_array_ = 0;
 };
 
 /**
@@ -56,10 +57,12 @@ class StateGuard {
   StateGuard& operator=(const StateGuard&) = delete;
 
  private:
-  GLint framebuffer = 0, program = 0, viewport[4] = {}, vertexArray = 0,
-        activeTexture = 0;
-  GLboolean depthTest = GL_FALSE, blend = GL_FALSE, cullFace = GL_FALSE,
-            depthMask = GL_TRUE;
+  GLint framebuffer_ = 0, program_ = 0, viewport_[4] = {}, vertex_array_ = 0,
+        active_texture_ = 0;
+  GLboolean depth_test_ = GL_FALSE, blend_ = GL_FALSE, cull_face_ = GL_FALSE,
+            depth_mask_ = GL_TRUE;
 };
 }  // namespace render
 }  // namespace bibo
+
+#endif  // BIBO_RENDER_RENDERUTIL_HPP_

@@ -2,37 +2,40 @@
 
 #include <GL/glew.h>
 
-using namespace std;
-using namespace bibo;
+namespace bibo {
+
+using std::string;
 
 FrameRecorder::FrameRecorder(const string& path, int width, int height)
-    : width(width),
-      height(height),
-      pixels(static_cast<size_t>(width) * height * 3) {
-  file = fopen(path.c_str(), "wb");
+    : width_(width),
+      height_(height),
+      pixels_(static_cast<size_t>(width) * height * 3) {
+  file_ = fopen(path.c_str(), "wb");
 }
 
 FrameRecorder::~FrameRecorder() {
-  if (file) {
-    fclose(file);
+  if (file_) {
+    fclose(file_);
   }
 }
 
-bool FrameRecorder::isOpen() const { return file != nullptr; }
+bool FrameRecorder::IsOpen() const { return file_ != nullptr; }
 
-bool FrameRecorder::recordFrame(int width, int height) {
-  if (!file || width != this->width || height != this->height) {
+bool FrameRecorder::RecordFrame(int width, int height) {
+  if (!file_ || width != this->width_ || height != this->height_) {
     return false;
   }
   glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
   glReadBuffer(GL_BACK);
   glPixelStorei(GL_PACK_ALIGNMENT, 1);  // rows without padding
-  glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
-  if (fwrite(pixels.data(), 1, pixels.size(), file) != pixels.size()) {
+  glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels_.data());
+  if (fwrite(pixels_.data(), 1, pixels_.size(), file_) != pixels_.size()) {
     return false;
   }
-  ++frameCount;
+  ++frame_count_;
   return true;
 }
 
-int FrameRecorder::getFrameCount() const { return frameCount; }
+int FrameRecorder::GetFrameCount() const { return frame_count_; }
+
+}  // namespace bibo

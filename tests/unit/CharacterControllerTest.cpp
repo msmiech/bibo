@@ -9,23 +9,28 @@
 #include "Scene/Bear.hpp"
 #include "TestSupport.hpp"
 
-using namespace bibo::physics;
+using bibo::physics::BodyHandle;
+using bibo::physics::CharacterController;
+using bibo::physics::CharacterControllerDesc;
+using bibo::physics::PhysicsWorld;
+using bibo::physics::RayHit;
+
 using bibo::scene::Bear;
 using bibo::test::IsNear;
 using Catch::Matchers::WithinAbs;
 using glm::vec3;
 
 namespace {
-const float FRAME = 1.0f / 60.0f;
-const float GROUND_TOP = -5.0f;
+const float kFrame = 1.0f / 60.0f;
+const float kGroundTop = -5.0f;
 // Pushes the character onto the ground every frame (like the gravity in
-// Bear::update)
-const vec3 DOWN(0.0f, -5.0f, 0.0f);
+// Bear::Update)
+const vec3 kDown(0.0f, -5.0f, 0.0f);
 // Speeds of the bear (Bear.cpp)
-const float FORWARD_SPEED = 10.0f;
-const float BACKWARD_SPEED = 7.5f;
+const float kForwardSpeed = 10.0f;
+const float kBackwardSpeed = 7.5f;
 
-bool contains(const std::vector<BodyHandle>& bodies, BodyHandle body) {
+bool Contains(const std::vector<BodyHandle>& bodies, BodyHandle body) {
   return std::ranges::find(bodies, body) != bodies.end();
 }
 
@@ -37,68 +42,68 @@ struct BearOnGround {
   PhysicsWorld world;
   BodyHandle ground;
   CharacterControllerDesc desc =
-      Bear::characterControllerDesc(vec3(0.0f, GROUND_TOP + 3.0f, 0.0f));
-  std::vector<BodyHandle> touchedBodies;
+      Bear::ControllerDesc(vec3(0.0f, kGroundTop + 3.0f, 0.0f));
+  std::vector<BodyHandle> touched_bodies;
   CharacterController bear{world, desc,
                            [this](const CharacterController::Hit& hit) {
-                             touchedBodies.push_back(hit.body);
+                             touched_bodies.push_back(hit.body);
                            }};
   // Height of the center of the capsule when the bear stands on the ground
-  const float standingHeight = GROUND_TOP + 0.5f * desc.height + desc.radius;
+  const float standing_height = kGroundTop + 0.5f * desc.height + desc.radius;
 
   BearOnGround()
-      : ground(world.createStaticBox(vec3(0.0f, GROUND_TOP - 1.0f, 0.0f),
+      : ground(world.CreateStaticBox(vec3(0.0f, kGroundTop - 1.0f, 0.0f),
                                      vec3(1000.0f, 1.0f, 1000.0f))) {}
 
   /**
    * Moves the bear every frame with the given velocity, like the game loop
-   * (Scene::update, Bear::update)
+   * (Scene::Update, Bear::Update)
    * @return true if the bear stands on the ground afterwards
    */
-  bool moveFor(float seconds, vec3 velocity) {
+  bool MoveFor(float seconds, vec3 velocity) {
     bool supported = false;
-    int frames = static_cast<int>(std::lround(seconds / FRAME));
+    int frames = static_cast<int>(std::lround(seconds / kFrame));
     for (int i = 0; i < frames; ++i) {
-      world.update(FRAME);
-      supported = bear.move(velocity * FRAME, FRAME);
+      world.Update(kFrame);
+      supported = bear.Move(velocity * kFrame, kFrame);
     }
     return supported;
   }
 
-  void land() { REQUIRE(moveFor(1.0f, DOWN)); }
+  void Land() { REQUIRE(MoveFor(1.0f, kDown)); }
 };
 }  // namespace
 
 TEST_CASE_METHOD(BearOnGround, "The bear lands on the ground",
                  "[physics][bear]") {
-  CHECK(moveFor(2.0f, DOWN));
-  CHECK_THAT(bear.getPosition(), IsNear(vec3(0.0f, standingHeight, 0.0f),
-                                        desc.contactOffset + 0.01f));
+  CHECK(MoveFor(2.0f, kDown));
+  CHECK_THAT(bear.GetPosition(), IsNear(vec3(0.0f, standing_height, 0.0f),
+                                        desc.contact_offset + 0.01f));
 
   SECTION(
       "The ground is reported as touched body (Scene::onBearHit only reacts to "
       "rocks)") {
-    CHECK(contains(touchedBodies, ground));
+    CHECK(Contains(touched_bodies, ground));
   }
 
   SECTION(
       "Pushing down on flat ground neither moves the bear nor lets it sink "
       "in") {
-    vec3 standing = bear.getPosition();
-    CHECK(moveFor(2.0f, DOWN));
-    CHECK_THAT(bear.getPosition(), IsNear(standing, 1e-3f));
+    vec3 standing = bear.GetPosition();
+    CHECK(MoveFor(2.0f, kDown));
+    CHECK_THAT(bear.GetPosition(), IsNear(standing, 1e-3f));
   }
 }
 
 TEST_CASE_METHOD(BearOnGround, "The bear walks with its speed on flat ground",
                  "[physics][bear]") {
-  land();
-  vec3 start = bear.getPosition();
+  Land();
+  vec3 start = bear.GetPosition();
 
-  CHECK(moveFor(1.0f, vec3(0.0f, 0.0f, -FORWARD_SPEED) + DOWN));
+  CHECK(MoveFor(1.0f, vec3(0.0f, 0.0f, -kForwardSpeed) + kDown));
 
-  vec3 walked = bear.getPosition() - start;
-  CHECK_THAT(walked.z, WithinAbs(-FORWARD_SPEED, 0.3f));
+  vec3 walked = bear.GetPosition() - start;
+  CHECK_THAT(walked.z, WithinAbs(-kForwardSpeed, 0.3f));
   CHECK_THAT(walked.x, WithinAbs(0.0f, 1e-3f));
   CHECK_THAT(walked.y, WithinAbs(0.0f, 0.01f));
 }
@@ -106,69 +111,69 @@ TEST_CASE_METHOD(BearOnGround, "The bear walks with its speed on flat ground",
 TEST_CASE_METHOD(BearOnGround,
                  "A frame without duration does not move the bear",
                  "[physics][bear]") {
-  land();
-  vec3 start = bear.getPosition();
+  Land();
+  vec3 start = bear.GetPosition();
 
-  CHECK(bear.move(vec3(5.0f, 0.0f, 5.0f), 0.0f));  // still reports the ground
-  CHECK(bear.getPosition() == start);
+  CHECK(bear.Move(vec3(5.0f, 0.0f, 5.0f), 0.0f));  // still reports the ground
+  CHECK(bear.GetPosition() == start);
 }
 
 TEST_CASE_METHOD(BearOnGround, "The bear cannot walk through a thin wall",
                  "[physics][bear]") {
   // 14 x 14 wall, 2 cm thick, 3 units behind the bear (like the wall that once
   // blocked the way back from the start)
-  const float wallZ = 3.0f;
-  world.createStaticBox(vec3(0.0f, standingHeight, wallZ),
+  const float wall_z = 3.0f;
+  world.CreateStaticBox(vec3(0.0f, standing_height, wall_z),
                         vec3(7.0f, 7.0f, 0.01f));
-  land();
+  Land();
 
   // would walk 15 units without the wall
-  moveFor(2.0f, vec3(0.0f, 0.0f, BACKWARD_SPEED) + DOWN);
+  MoveFor(2.0f, vec3(0.0f, 0.0f, kBackwardSpeed) + kDown);
 
-  float frontOfBear = bear.getPosition().z + desc.radius;
-  CHECK(frontOfBear < wallZ);
-  CHECK(frontOfBear > wallZ - 0.2f);
+  float front_of_bear = bear.GetPosition().z + desc.radius;
+  CHECK(front_of_bear < wall_z);
+  CHECK(front_of_bear > wall_z - 0.2f);
 }
 
 TEST_CASE_METHOD(BearOnGround,
                  "Touching a rock is reported with the body of the rock",
                  "[physics][bear]") {
-  // Scene::initPhysicsBodies: rocks are static spheres with a radius of 0.7
-  const float rockRadius = 0.7f;
+  // Scene::InitPhysicsBodies: rocks are static spheres with a radius of 0.7
+  const float rock_radius = 0.7f;
 
   SECTION("Rock in the way") {
-    BodyHandle rock = world.createStaticSphere(
-        vec3(0.0f, GROUND_TOP + rockRadius, -5.0f), rockRadius);
-    land();
-    REQUIRE_FALSE(contains(touchedBodies, rock));
+    BodyHandle rock = world.CreateStaticSphere(
+        vec3(0.0f, kGroundTop + rock_radius, -5.0f), rock_radius);
+    Land();
+    REQUIRE_FALSE(Contains(touched_bodies, rock));
 
-    moveFor(1.0f, vec3(0.0f, 0.0f, -FORWARD_SPEED) + DOWN);
+    MoveFor(1.0f, vec3(0.0f, 0.0f, -kForwardSpeed) + kDown);
 
-    CHECK(contains(touchedBodies, rock));
+    CHECK(Contains(touched_bodies, rock));
   }
 
   SECTION("Rock next to the way") {
-    BodyHandle rock = world.createStaticSphere(
-        vec3(3.0f, GROUND_TOP + rockRadius, -5.0f), rockRadius);
-    land();
+    BodyHandle rock = world.CreateStaticSphere(
+        vec3(3.0f, kGroundTop + rock_radius, -5.0f), rock_radius);
+    Land();
 
-    moveFor(1.0f, vec3(0.0f, 0.0f, -FORWARD_SPEED) + DOWN);
+    MoveFor(1.0f, vec3(0.0f, 0.0f, -kForwardSpeed) + kDown);
 
-    CHECK_FALSE(contains(touchedBodies, rock));
-    CHECK(bear.getPosition().z < -9.0f);
+    CHECK_FALSE(Contains(touched_bodies, rock));
+    CHECK(bear.GetPosition().z < -9.0f);
   }
 }
 
 TEST_CASE("The bear can be created without a hit callback", "[physics][bear]") {
   PhysicsWorld world;
-  world.createStaticBox(vec3(0.0f, -1.0f, 0.0f), vec3(10.0f, 1.0f, 10.0f));
-  CharacterController bear(
-      world, Bear::characterControllerDesc(vec3(0.0f, 2.0f, 0.0f)), nullptr);
+  world.CreateStaticBox(vec3(0.0f, -1.0f, 0.0f), vec3(10.0f, 1.0f, 10.0f));
+  CharacterController bear(world, Bear::ControllerDesc(vec3(0.0f, 2.0f, 0.0f)),
+                           nullptr);
 
   bool supported = false;
   for (int i = 0; i < 60; ++i) {
-    world.update(FRAME);
-    supported = bear.move(DOWN * FRAME, FRAME);
+    world.Update(kFrame);
+    supported = bear.Move(kDown * kFrame, kFrame);
   }
   CHECK(supported);
 }
@@ -176,31 +181,31 @@ TEST_CASE("The bear can be created without a hit callback", "[physics][bear]") {
 TEST_CASE_METHOD(BearOnGround,
                  "The bear climbs obstacles up to its step offset",
                  "[physics][bear]") {
-  land();
+  Land();
 
   SECTION("Step lower than the step offset") {
-    const float stepHeight = 0.5f * desc.stepOffset;
-    world.createStaticBox(vec3(0.0f, GROUND_TOP + 0.5f * stepHeight, -13.0f),
-                          vec3(5.0f, 0.5f * stepHeight, 10.0f));
+    const float step_height = 0.5f * desc.step_offset;
+    world.CreateStaticBox(vec3(0.0f, kGroundTop + 0.5f * step_height, -13.0f),
+                          vec3(5.0f, 0.5f * step_height, 10.0f));
 
-    moveFor(1.5f, vec3(0.0f, 0.0f, -FORWARD_SPEED) + DOWN);
+    MoveFor(1.5f, vec3(0.0f, 0.0f, -kForwardSpeed) + kDown);
 
-    CHECK(bear.getPosition().z < -5.0f);
-    CHECK_THAT(bear.getPosition().y,
-               WithinAbs(standingHeight + stepHeight, 0.1f));
+    CHECK(bear.GetPosition().z < -5.0f);
+    CHECK_THAT(bear.GetPosition().y,
+               WithinAbs(standing_height + step_height, 0.1f));
   }
 
   SECTION("Obstacle higher than the step offset") {
-    const float obstacleHeight = 1.5f * desc.stepOffset;
-    const float obstacleFront = -3.0f;
-    world.createStaticBox(
-        vec3(0.0f, GROUND_TOP + 0.5f * obstacleHeight, obstacleFront - 1.0f),
-        vec3(5.0f, 0.5f * obstacleHeight, 1.0f));
+    const float obstacle_height = 1.5f * desc.step_offset;
+    const float obstacle_front = -3.0f;
+    world.CreateStaticBox(
+        vec3(0.0f, kGroundTop + 0.5f * obstacle_height, obstacle_front - 1.0f),
+        vec3(5.0f, 0.5f * obstacle_height, 1.0f));
 
-    moveFor(1.5f, vec3(0.0f, 0.0f, -FORWARD_SPEED) + DOWN);
+    MoveFor(1.5f, vec3(0.0f, 0.0f, -kForwardSpeed) + kDown);
 
-    CHECK(bear.getPosition().z - desc.radius > obstacleFront - 0.2f);
-    CHECK_THAT(bear.getPosition().y, WithinAbs(standingHeight, 0.1f));
+    CHECK(bear.GetPosition().z - desc.radius > obstacle_front - 0.2f);
+    CHECK_THAT(bear.GetPosition().y, WithinAbs(standing_height, 0.1f));
   }
 }
 
@@ -212,80 +217,80 @@ TEST_CASE("The bear stands on gentle slopes and slides down steep ones",
                             20.0f,  0.0f, 20.0f,  20.0f,  0.0f, -20.0f};
   const unsigned int indices[] = {0, 1, 2, 0, 2, 3};
   const CharacterControllerDesc desc =
-      Bear::characterControllerDesc(vec3(0.0f, 3.0f, 0.0f));
+      Bear::ControllerDesc(vec3(0.0f, 3.0f, 0.0f));
 
-  auto slideOnSlope = [&](float slopeDegrees) {
-    world.createStaticMesh(
+  auto slide_on_slope = [&](float slope_degrees) {
+    world.CreateStaticMesh(
         vertices, 4, indices, 2, 1.0f, vec3(0.0f),
-        glm::angleAxis(glm::radians(slopeDegrees), vec3(1.0f, 0.0f, 0.0f)));
+        glm::angleAxis(glm::radians(slope_degrees), vec3(1.0f, 0.0f, 0.0f)));
     CharacterController bear(world, desc, nullptr);
     for (int i = 0; i < 60; ++i)  // land
     {
-      world.update(FRAME);
-      bear.move(DOWN * FRAME, FRAME);
+      world.Update(kFrame);
+      bear.Move(kDown * kFrame, kFrame);
     }
-    vec3 landed = bear.getPosition();
+    vec3 landed = bear.GetPosition();
     for (int i = 0; i < 120; ++i) {
-      world.update(FRAME);
-      bear.move(DOWN * FRAME, FRAME);
+      world.Update(kFrame);
+      bear.Move(kDown * kFrame, kFrame);
     }
-    return glm::distance(landed, bear.getPosition());
+    return glm::distance(landed, bear.GetPosition());
   };
 
   SECTION("Slope below the slope limit") {
-    REQUIRE(glm::radians(30.0f) < desc.slopeLimit);
-    CHECK(slideOnSlope(30.0f) < 0.05f);
+    REQUIRE(glm::radians(30.0f) < desc.slope_limit);
+    CHECK(slide_on_slope(30.0f) < 0.05f);
   }
 
   SECTION("Slope above the slope limit") {
-    REQUIRE(glm::radians(60.0f) > desc.slopeLimit);
-    CHECK(slideOnSlope(60.0f) > 2.0f);
+    REQUIRE(glm::radians(60.0f) > desc.slope_limit);
+    CHECK(slide_on_slope(60.0f) > 2.0f);
   }
 }
 
 TEST_CASE_METHOD(BearOnGround, "Jumping lifts the bear off the ground",
                  "[physics][bear]") {
-  land();
-  const float jumpSpeed = 10.0f - 2.0f * 0.981f,
-              maxJumpTime = 0.5f;  // Bear.cpp (jumpVelocity)
+  Land();
+  const float jump_speed = 10.0f - 2.0f * 0.981f,
+              max_jump_time = 0.5f;  // Bear.cpp (jumpVelocity)
 
-  bool supported = moveFor(maxJumpTime, vec3(0.0f, jumpSpeed, 0.0f));
+  bool supported = MoveFor(max_jump_time, vec3(0.0f, jump_speed, 0.0f));
 
   CHECK_FALSE(supported);
-  CHECK_THAT(bear.getPosition().y - standingHeight,
-             WithinAbs(jumpSpeed * maxJumpTime, 0.3f));
+  CHECK_THAT(bear.GetPosition().y - standing_height,
+             WithinAbs(jump_speed * max_jump_time, 0.3f));
 }
 
 TEST_CASE_METHOD(BearOnGround,
                  "A kinematic sphere (a hedgehog) that walks into the standing "
                  "bear touches it, ray casts for the ground do not find it",
                  "[physics][bear][animals]") {
-  land();
+  Land();
   const float radius = 1.4f;
-  vec3 position(6.0f, standingHeight, 0.0f);
-  BodyHandle hedgehog = world.createKinematicSphere(position, radius);
-  for (int i = 0; i < 4 * 60 && !contains(touchedBodies, hedgehog); ++i) {
-    position.x -= 1.5f * FRAME;  // walks towards the bear
-    world.moveKinematic(hedgehog, position, glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-                        FRAME);
-    world.update(FRAME);
-    bear.move(DOWN * FRAME, FRAME);
+  vec3 position(6.0f, standing_height, 0.0f);
+  BodyHandle hedgehog = world.CreateKinematicSphere(position, radius);
+  for (int i = 0; i < 4 * 60 && !Contains(touched_bodies, hedgehog); ++i) {
+    position.x -= 1.5f * kFrame;  // walks towards the bear
+    world.MoveKinematic(hedgehog, position, glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+                        kFrame);
+    world.Update(kFrame);
+    bear.Move(kDown * kFrame, kFrame);
   }
-  CHECK(contains(touchedBodies, hedgehog));
-  CHECK_THAT(world.getTransform(hedgehog)[3].x,
+  CHECK(Contains(touched_bodies, hedgehog));
+  CHECK_THAT(world.GetTransform(hedgehog)[3].x,
              WithinAbs(position.x, 0.01f));  // where it was moved to
 
   RayHit hit;
-  CHECK(world.castRay(position + vec3(0.0f, 5.0f, 0.0f),
+  CHECK(world.CastRay(position + vec3(0.0f, 5.0f, 0.0f),
                       vec3(0.0f, -20.0f, 0.0f), hit, true));
   CHECK(hit.body == ground);
-  CHECK(world.castRay(position + vec3(0.0f, 5.0f, 0.0f),
+  CHECK(world.CastRay(position + vec3(0.0f, 5.0f, 0.0f),
                       vec3(0.0f, -20.0f, 0.0f), hit, false));
   CHECK(hit.body == hedgehog);
 
   SECTION("Moving it without time puts it there at once") {
-    world.moveKinematic(hedgehog, vec3(20.0f, 0.0f, 0.0f),
+    world.MoveKinematic(hedgehog, vec3(20.0f, 0.0f, 0.0f),
                         glm::quat(1.0f, 0.0f, 0.0f, 0.0f), 0.0f);
-    CHECK_THAT(world.getTransform(hedgehog)[3].x, WithinAbs(20.0f, 1e-4f));
+    CHECK_THAT(world.GetTransform(hedgehog)[3].x, WithinAbs(20.0f, 1e-4f));
   }
 }

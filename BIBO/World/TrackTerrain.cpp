@@ -6,7 +6,7 @@
 #include <cmath>
 #include <limits>
 
-using namespace bibo::world;
+namespace bibo::world {
 
 TrackTerrain::TrackTerrain(const std::vector<glm::vec3>& vertices,
                            const std::vector<unsigned int>& indices) {
@@ -19,11 +19,11 @@ TrackTerrain::TrackTerrain(const std::vector<glm::vec3>& vertices,
   if (vertices.empty()) {
     low = high = glm::vec3(0.0f);
   }
-  origin = glm::vec2(low.x, low.z);
-  columns = static_cast<int>((high.x - low.x) / CELL_SIZE) + 2;
-  rows = static_cast<int>((high.z - low.z) / CELL_SIZE) + 2;
-  const float EMPTY = std::numeric_limits<float>::lowest();
-  heights.assign(static_cast<std::size_t>(columns) * rows, EMPTY);
+  origin_ = glm::vec2(low.x, low.z);
+  columns_ = static_cast<int>((high.x - low.x) / kCellSize) + 2;
+  rows_ = static_cast<int>((high.z - low.z) / kCellSize) + 2;
+  const float empty = std::numeric_limits<float>::lowest();
+  heights_.assign(static_cast<std::size_t>(columns_) * rows_, empty);
 
   // Highest triangle above the center of every cell
   for (std::size_t t = 0; t + 2 < indices.size(); t += 3) {
@@ -35,19 +35,20 @@ TrackTerrain::TrackTerrain(const std::vector<glm::vec3>& vertices,
     }
     int i0 = std::max(
         0, static_cast<int>(
-               std::ceil((std::min({a.x, b.x, c.x}) - origin.x) / CELL_SIZE)));
-    int i1 = std::min(columns - 1,
-                      static_cast<int>(std::floor(
-                          (std::max({a.x, b.x, c.x}) - origin.x) / CELL_SIZE)));
+               std::ceil((std::min({a.x, b.x, c.x}) - origin_.x) / kCellSize)));
+    int i1 = std::min(
+        columns_ - 1,
+        static_cast<int>(
+            std::floor((std::max({a.x, b.x, c.x}) - origin_.x) / kCellSize)));
     int j0 = std::max(
         0, static_cast<int>(
-               std::ceil((std::min({a.z, b.z, c.z}) - origin.y) / CELL_SIZE)));
-    int j1 = std::min(rows - 1,
-                      static_cast<int>(std::floor(
-                          (std::max({a.z, b.z, c.z}) - origin.y) / CELL_SIZE)));
+               std::ceil((std::min({a.z, b.z, c.z}) - origin_.y) / kCellSize)));
+    int j1 = std::min(
+        rows_ - 1, static_cast<int>(std::floor(
+                       (std::max({a.z, b.z, c.z}) - origin_.y) / kCellSize)));
     for (int j = j0; j <= j1; ++j) {
       for (int i = i0; i <= i1; ++i) {
-        float x = origin.x + i * CELL_SIZE, z = origin.y + j * CELL_SIZE;
+        float x = origin_.x + i * kCellSize, z = origin_.y + j * kCellSize;
         float l1 =
             ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / determinant;
         float l2 =
@@ -56,7 +57,7 @@ TrackTerrain::TrackTerrain(const std::vector<glm::vec3>& vertices,
         if (l1 < -1e-4f || l2 < -1e-4f || l3 < -1e-4f) {
           continue;
         }
-        float& cell = heights[static_cast<std::size_t>(j) * columns + i];
+        float& cell = heights_[static_cast<std::size_t>(j) * columns_ + i];
         cell = std::max(cell, l1 * a.y + l2 * b.y + l3 * c.y);
       }
     }
@@ -67,10 +68,10 @@ TrackTerrain::TrackTerrain(const std::vector<glm::vec3>& vertices,
   bool changed = true;
   while (changed) {
     changed = false;
-    std::vector<float> filled = heights;
-    for (int j = 0; j < rows; ++j) {
-      for (int i = 0; i < columns; ++i) {
-        if (heights[static_cast<std::size_t>(j) * columns + i] != EMPTY) {
+    std::vector<float> filled = heights_;
+    for (int j = 0; j < rows_; ++j) {
+      for (int i = 0; i < columns_; ++i) {
+        if (heights_[static_cast<std::size_t>(j) * columns_ + i] != empty) {
           continue;
         }
         float sum = 0.0f;
@@ -78,49 +79,52 @@ TrackTerrain::TrackTerrain(const std::vector<glm::vec3>& vertices,
         for (int dj = -1; dj <= 1; ++dj) {
           for (int di = -1; di <= 1; ++di) {
             int ni = i + di, nj = j + dj;
-            if (ni >= 0 && nj >= 0 && ni < columns && nj < rows &&
-                heights[static_cast<std::size_t>(nj) * columns + ni] != EMPTY) {
-              sum += heights[static_cast<std::size_t>(nj) * columns + ni];
+            if (ni >= 0 && nj >= 0 && ni < columns_ && nj < rows_ &&
+                heights_[static_cast<std::size_t>(nj) * columns_ + ni] !=
+                    empty) {
+              sum += heights_[static_cast<std::size_t>(nj) * columns_ + ni];
               ++count;
             }
           }
         }
         if (count > 0) {
-          filled[static_cast<std::size_t>(j) * columns + i] =
+          filled[static_cast<std::size_t>(j) * columns_ + i] =
               sum / static_cast<float>(count);
           changed = true;
         }
       }
     }
-    heights.swap(filled);
+    heights_.swap(filled);
   }
 
-  minimum = glm::vec2(low.x, low.z) + glm::vec2(BORDER_MARGIN);
-  maximum = glm::vec2(high.x, high.z) - glm::vec2(BORDER_MARGIN);
-  lowest = std::numeric_limits<float>::max();
-  highest = std::numeric_limits<float>::lowest();
-  for (float h : heights) {
-    lowest = std::min(lowest, h == EMPTY ? lowest : h);
-    highest = std::max(highest, h);
+  minimum_ = glm::vec2(low.x, low.z) + glm::vec2(kBorderMargin);
+  maximum_ = glm::vec2(high.x, high.z) - glm::vec2(kBorderMargin);
+  lowest_ = std::numeric_limits<float>::max();
+  highest_ = std::numeric_limits<float>::lowest();
+  for (float h : heights_) {
+    lowest_ = std::min(lowest_, h == empty ? lowest_ : h);
+    highest_ = std::max(highest_, h);
   }
-  if (heights.empty() || highest == EMPTY) {
-    lowest = highest = 0.0f;
+  if (heights_.empty() || highest_ == empty) {
+    lowest_ = highest_ = 0.0f;
   }
 
   // Blurred copy (box filter along both axes, twice: close to a Gaussian)
-  smoothHeights = heights;
+  smooth_heights_ = heights_;
   std::vector<float> line;
-  const int radius = static_cast<int>(SMOOTH_RADIUS / CELL_SIZE);
+  const int radius = static_cast<int>(kSmoothRadius / kCellSize);
   for (int pass = 0; pass < 2; ++pass) {
     for (int axis = 0; axis < 2; ++axis) {
-      int count = axis == 0 ? columns : rows,
-          lines = axis == 0 ? rows : columns;
+      int count = axis == 0 ? columns_ : rows_,
+          lines = axis == 0 ? rows_ : columns_;
       line.resize(count);
       for (int l = 0; l < lines; ++l) {
         auto cell = [&](int k) -> float& {
           return axis == 0
-                     ? smoothHeights[static_cast<std::size_t>(l) * columns + k]
-                     : smoothHeights[static_cast<std::size_t>(k) * columns + l];
+                     ? smooth_heights_[static_cast<std::size_t>(l) * columns_ +
+                                       k]
+                     : smooth_heights_[static_cast<std::size_t>(k) * columns_ +
+                                       l];
         };
         // Running sum, the border cells are repeated
         float sum = 0.0f;
@@ -140,16 +144,16 @@ TrackTerrain::TrackTerrain(const std::vector<glm::vec3>& vertices,
   }
 }
 
-bool TrackTerrain::loadNodeMesh(const aiScene& scene, const char* nodeName,
+bool TrackTerrain::LoadNodeMesh(const aiScene& scene, const char* node_name,
                                 std::vector<glm::vec3>& vertices,
                                 std::vector<unsigned int>& indices) {
   const aiNode* node =
-      scene.mRootNode ? scene.mRootNode->FindNode(nodeName) : nullptr;
+      scene.mRootNode ? scene.mRootNode->FindNode(node_name) : nullptr;
   if (!node || node->mNumMeshes == 0) {
     return false;
   }
   // Global transformation: the transformations of all parents (like
-  // resources::Model::transformNode)
+  // resources::Model::TransformNode)
   aiMatrix4x4 transformation = node->mTransformation;
   for (const aiNode* parent = node->mParent; parent; parent = parent->mParent) {
     transformation = parent->mTransformation * transformation;
@@ -175,11 +179,11 @@ bool TrackTerrain::loadNodeMesh(const aiScene& scene, const char* nodeName,
   return !indices.empty();
 }
 
-bool TrackTerrain::nodeSphere(const aiScene& scene, const char* nodeName,
+bool TrackTerrain::NodeSphere(const aiScene& scene, const char* node_name,
                               glm::vec3& center, float& radius) {
   std::vector<glm::vec3> vertices;
   std::vector<unsigned int> indices;
-  if (!loadNodeMesh(scene, nodeName, vertices, indices)) {
+  if (!LoadNodeMesh(scene, node_name, vertices, indices)) {
     return false;
   }
   glm::vec3 low(std::numeric_limits<float>::max()),
@@ -196,53 +200,55 @@ bool TrackTerrain::nodeSphere(const aiScene& scene, const char* nodeName,
   return true;
 }
 
-float TrackTerrain::bilinear(const std::vector<float>& grid,
+float TrackTerrain::Bilinear(const std::vector<float>& grid,
                              glm::vec2 position) const {
   if (grid.empty()) {
     return 0.0f;
   }
-  float x = std::clamp((position.x - origin.x) / CELL_SIZE, 0.0f,
-                       static_cast<float>(columns - 1) - 1e-3f);
-  float z = std::clamp((position.y - origin.y) / CELL_SIZE, 0.0f,
-                       static_cast<float>(rows - 1) - 1e-3f);
+  float x = std::clamp((position.x - origin_.x) / kCellSize, 0.0f,
+                       static_cast<float>(columns_ - 1) - 1e-3f);
+  float z = std::clamp((position.y - origin_.y) / kCellSize, 0.0f,
+                       static_cast<float>(rows_ - 1) - 1e-3f);
   int i = static_cast<int>(x), j = static_cast<int>(z);
   float fx = x - static_cast<float>(i), fz = z - static_cast<float>(j);
-  int i1 = std::min(i + 1, columns - 1), j1 = std::min(j + 1, rows - 1);
+  int i1 = std::min(i + 1, columns_ - 1), j1 = std::min(j + 1, rows_ - 1);
   auto at = [&](int column, int row) {
-    return grid[static_cast<std::size_t>(row) * columns + column];
+    return grid[static_cast<std::size_t>(row) * columns_ + column];
   };
   return (at(i, j) * (1.0f - fx) + at(i1, j) * fx) * (1.0f - fz) +
          (at(i, j1) * (1.0f - fx) + at(i1, j1) * fx) * fz;
 }
 
-float TrackTerrain::height(glm::vec2 position) const {
-  return bilinear(heights, position);
+float TrackTerrain::Height(glm::vec2 position) const {
+  return Bilinear(heights_, position);
 }
 
-float TrackTerrain::smoothHeight(glm::vec2 position) const {
-  return bilinear(smoothHeights, position);
+float TrackTerrain::SmoothHeight(glm::vec2 position) const {
+  return Bilinear(smooth_heights_, position);
 }
 
-float TrackTerrain::distanceInside(glm::vec2 position) const {
+float TrackTerrain::DistanceInside(glm::vec2 position) const {
   // Signed distance of a rectangle with rounded corners: the rectangle shrunk
   // by the radius, grown by it again
-  glm::vec2 middle = 0.5f * (minimum + maximum);
-  glm::vec2 half = 0.5f * (maximum - minimum) - glm::vec2(CORNER_RADIUS);
+  glm::vec2 middle = 0.5f * (minimum_ + maximum_);
+  glm::vec2 half = 0.5f * (maximum_ - minimum_) - glm::vec2(kCornerRadius);
   glm::vec2 q = glm::abs(position - middle) - half;
   float outside = glm::length(glm::max(q, glm::vec2(0.0f))) +
-                  std::min(std::max(q.x, q.y), 0.0f) - CORNER_RADIUS;
+                  std::min(std::max(q.x, q.y), 0.0f) - kCornerRadius;
   return -outside;
 }
 
-glm::vec2 TrackTerrain::clampInside(glm::vec2 position) const {
-  glm::vec2 middle = 0.5f * (minimum + maximum);
-  glm::vec2 half = 0.5f * (maximum - minimum) - glm::vec2(CORNER_RADIUS);
+glm::vec2 TrackTerrain::ClampInside(glm::vec2 position) const {
+  glm::vec2 middle = 0.5f * (minimum_ + maximum_);
+  glm::vec2 half = 0.5f * (maximum_ - minimum_) - glm::vec2(kCornerRadius);
   glm::vec2 offset = position - middle;
   glm::vec2 core = glm::clamp(offset, -half, half);
-  glm::vec2 fromCore = offset - core;
-  float length = glm::length(fromCore);
-  if (length > CORNER_RADIUS) {
-    fromCore *= CORNER_RADIUS / length;
+  glm::vec2 from_core = offset - core;
+  float length = glm::length(from_core);
+  if (length > kCornerRadius) {
+    from_core *= kCornerRadius / length;
   }
-  return middle + core + fromCore;
+  return middle + core + from_core;
 }
+
+}  // namespace bibo::world

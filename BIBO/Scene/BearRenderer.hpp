@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_SCENE_BEARRENDERER_HPP_
+#define BIBO_SCENE_BEARRENDERER_HPP_
 #include <GL/glew.h>
 
 #include <cstddef>
@@ -27,66 +28,68 @@ struct BearRenderContext {
  * vertices are skinned on the CPU (BearCharacter) and uploaded once per frame;
  * the strands are generated on the GPU from them (bear_fur.vert), so there is
  * no geometry per strand in memory, only where it grows (Fur.hpp,
- * generateStrands). Far away fewer, wider strands are drawn (level of detail).
+ * GenerateStrands). Far away fewer, wider strands are drawn (level of detail).
  */
 class BearRenderer {
  public:
-  static constexpr int STRAND_SEGMENTS = 4;
+  static constexpr int kStrandSegments = 4;
   // Width of a strand at its root (world units)
-  static constexpr float STRAND_WIDTH = 0.0075f;
+  static constexpr float kStrandWidth = 0.0075f;
 
-  BearRenderer(const resources::SkinnedModel& model, std::size_t strandCount);
+  BearRenderer(const resources::SkinnedModel& model, std::size_t strand_count);
   ~BearRenderer();
   BearRenderer(const BearRenderer&) = delete;
   BearRenderer& operator=(const BearRenderer&) = delete;
 
   /**
-   * @param furOffsets Bend of the guide hairs (fur::GuideHairs)
+   * @param fur_offsets Bend of the guide hairs (fur::GuideHairs)
    */
-  void upload(const std::vector<glm::vec3>& positions,
+  void Upload(const std::vector<glm::vec3>& positions,
               const std::vector<glm::vec3>& normals,
-              const std::vector<glm::vec3>& furOffsets,
-              const std::vector<glm::vec3>& combDirections);
+              const std::vector<glm::vec3>& fur_offsets,
+              const std::vector<glm::vec3>& comb_directions);
   /**
    * Only the surface (e.g. into the shadow map), the shader needs a "position"
    * attribute at location 0
    */
-  void drawSurface(Shader* shader);
+  void DrawSurface(Shader* shader);
   /**
    * Skin, eyes and fur with lighting and shadows
    * @param center Center of the bear (for the level of detail)
    */
-  void drawShaded(const BearRenderContext& context, glm::vec3 center);
+  void DrawShaded(const BearRenderContext& context, glm::vec3 center);
   /**
    * Length of the longest fur (world units), e.g. longer for a bigger bear
-   * (default: fur::MAX_LENGTH)
+   * (default: fur::kMaxLength)
    */
-  void setMaxFurLength(float length) { maxFurLength = length; }
+  void SetMaxFurLength(float length) { max_fur_length_ = length; }
 
-  std::size_t getStrandCount() const { return strandCount; }
+  std::size_t GetStrandCount() const { return strand_count_; }
   /**
-   * Strands drawn by the last drawShaded (fewer when the bear is far away)
+   * Strands drawn by the last DrawShaded (fewer when the bear is far away)
    */
-  std::size_t getDrawnStrandCount() const { return drawnStrandCount; }
+  std::size_t GetDrawnStrandCount() const { return drawn_strand_count_; }
 
  private:
-  std::unique_ptr<Shader> skinShader;
-  std::unique_ptr<Shader> furShader;
-  GLuint vertexArray = 0;
+  std::unique_ptr<Shader> skin_shader_;
+  std::unique_ptr<Shader> fur_shader_;
+  GLuint vertex_array_ = 0;
   // no attributes, but core profile needs a bound vertex array
-  GLuint strandVertexArray = 0;
+  GLuint strand_vertex_array_ = 0;
   // per vertex: position, normal, fur bend, comb direction (vec4 each)
-  GLuint skinBuffer = 0;
-  GLuint colorBuffer = 0;
-  GLuint surfaceBuffer = 0;
-  GLuint indexBuffer = 0;
-  GLuint strandBuffer = 0;
-  GLsizei indexCount = 0;
-  std::size_t vertexCount = 0;
-  std::size_t strandCount = 0;
-  std::size_t drawnStrandCount = 0;
-  float maxFurLength = fur::MAX_LENGTH;
-  std::vector<glm::vec4> staging;
+  GLuint skin_buffer_ = 0;
+  GLuint color_buffer_ = 0;
+  GLuint surface_buffer_ = 0;
+  GLuint index_buffer_ = 0;
+  GLuint strand_buffer_ = 0;
+  GLsizei index_count_ = 0;
+  std::size_t vertex_count_ = 0;
+  std::size_t strand_count_ = 0;
+  std::size_t drawn_strand_count_ = 0;
+  float max_fur_length_ = fur::kMaxLength;
+  std::vector<glm::vec4> staging_;
 };
 }  // namespace scene
 }  // namespace bibo
+
+#endif  // BIBO_SCENE_BEARRENDERER_HPP_

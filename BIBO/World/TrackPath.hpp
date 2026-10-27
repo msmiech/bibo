@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_TRACKPATH_HPP_
+#define BIBO_WORLD_TRACKPATH_HPP_
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -19,16 +20,16 @@ class TrackPath {
     glm::vec3 position;     // on the floor, in the middle of the canyon
     glm::vec2 tangent;      // direction of the track in the ground plane
     float distance = 0.0f;  // along the track from the start
-    float floorLeft = 0.0f,
+    float floor_left = 0.0f,
           // width of the flat floor to the left and right of the center
-        floorRight = 0.0f;
-    float wallLeft = 0.0f,
+        floor_right = 0.0f;
+    float wall_left = 0.0f,
           // height of the walls above the floor (highest point close to the
           // track)
-        wallRight = 0.0f;
+        wall_right = 0.0f;
     // the trail winds a bit on the floor (and around the pools): offset of its
     // middle to the right
-    float trailOffset = 0.0f;
+    float trail_offset = 0.0f;
   };
 
   /**
@@ -38,17 +39,18 @@ class TrackPath {
     float distance = 0.0f;  // along the track
     // from the center line, positive to the right (of the driving direction)
     float lateral = 0.0f;
-    float trailLateral = 0.0f;    // from the middle of the trail
-    float floorHalfWidth = 0.0f;  // width of the floor on the side of the point
-    float floorHeight = 0.0f;
-    // false if the point is far from the track (further than SEARCH_RADIUS)
+    float trail_lateral = 0.0f;  // from the middle of the trail
+    float floor_half_width =
+        0.0f;  // width of the floor on the side of the point
+    float floor_height = 0.0f;
+    // false if the point is far from the track (further than kSearchRadius)
     bool found = false;
   };
 
-  static constexpr float SAMPLE_SPACING = 1.0f;
-  static constexpr float TRAIL_HALF_WIDTH = 2.3f;
+  static constexpr float kSampleSpacing = 1.0f;
+  static constexpr float kTrailHalfWidth = 2.3f;
   // Points further from the track are not looked up exactly
-  static constexpr float SEARCH_RADIUS = 48.0f;
+  static constexpr float kSearchRadius = 48.0f;
 
   /**
    * @param start Start (and finish) of the lap
@@ -58,39 +60,41 @@ class TrackPath {
    * track): the trail goes around them where it can
    */
   TrackPath(const TrackTerrain& terrain, glm::vec2 start,
-            glm::vec2 startDirection, const std::vector<glm::vec2>& waypoints,
-            float waterLevel);
+            glm::vec2 start_direction, const std::vector<glm::vec2>& waypoints,
+            float water_level);
 
-  const std::vector<Sample>& getSamples() const { return samples; }
-  float getLength() const { return length; }
+  const std::vector<Sample>& GetSamples() const { return samples_; }
+  float GetLength() const { return length_; }
   /**
    * Interpolated sample at a distance along the track (wraps around)
    */
-  Sample at(float distance) const;
-  Nearest nearest(glm::vec2 position) const;
+  Sample At(float distance) const;
+  Nearest FindNearest(glm::vec2 position) const;
 
  private:
-  void measure(const TrackTerrain& terrain, Sample& sample) const;
+  void Measure(const TrackTerrain& terrain, Sample& sample) const;
   /**
    * @return true if the trail with the offset (and half width) is out of the
    * water at the sample
    */
-  bool dryTrail(const TrackTerrain& terrain, float waterLevel,
-                const Sample& sample, float offset, float halfWidth) const;
-  void avoidWater(const TrackTerrain& terrain, float waterLevel,
+  bool DryTrail(const TrackTerrain& terrain, float water_level,
+                const Sample& sample, float offset, float half_width) const;
+  void AvoidWater(const TrackTerrain& terrain, float water_level,
                   std::vector<float>& offsets) const;
-  void buildBuckets();
+  void BuildBuckets();
 
-  std::vector<Sample> samples;
-  float length = 0.0f;
+  std::vector<Sample> samples_;
+  float length_ = 0.0f;
 
   // Segments of the center line sorted into a grid for the nearest point
   // queries
-  static constexpr float BUCKET_SIZE = 16.0f;
-  glm::vec2 bucketOrigin;
-  int bucketColumns = 0, bucketRows = 0;
+  static constexpr float kBucketSize = 16.0f;
+  glm::vec2 bucket_origin_;
+  int bucket_columns_ = 0, bucket_rows_ = 0;
   // indices of the segments (from sample i to i + 1) that come close
-  std::vector<std::vector<int>> buckets;
+  std::vector<std::vector<int>> buckets_;
 };
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_TRACKPATH_HPP_

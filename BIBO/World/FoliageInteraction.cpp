@@ -3,114 +3,114 @@
 #include <algorithm>
 #include <cmath>
 
-using namespace bibo;
-using namespace bibo::world;
+namespace bibo::world {
 
 namespace {
 // A body leaves an imprint every time it moved this part of its radius
-const float IMPRINT_SPACING = 0.5f;
+const float kImprintSpacing = 0.5f;
 // Faster than this it was moved (e.g. back to the start), it did not walk
-const float TELEPORT_SPEED = 40.0f;
+const float kTeleportSpeed = 40.0f;
 // At this speed (m/s) the plants lean fully in the direction of the movement
-const float RUN_SPEED = 7.0f;
-const std::size_t MAX_TRAIL = 96;
+const float kRunSpeed = 7.0f;
+const std::size_t kMaxTrail = 96;
 
-float horizontalDistance(glm::vec3 a, glm::vec3 b) {
+float HorizontalDistance(glm::vec3 a, glm::vec3 b) {
   return glm::length(glm::vec2(a.x - b.x, a.z - b.z));
 }
 }  // namespace
 
-float FoliageInteraction::push(float age) {
-  if (age < HOLD_TIME) {
+float FoliageInteraction::Push(float age) {
+  if (age < kHoldTime) {
     return 1.0f;
   }
-  float t = age - HOLD_TIME;
-  if (t >= SPRING_TIME) {
+  float t = age - kHoldTime;
+  if (t >= kSpringTime) {
     return 0.0f;
   }
   // Damped swing: back past upright after about half a second, then it settles
   // (and fades out to exactly 0 at the end)
-  return std::exp(-3.0f * t) * std::cos(6.0f * t) * (1.0f - t / SPRING_TIME);
+  return std::exp(-3.0f * t) * std::cos(6.0f * t) * (1.0f - t / kSpringTime);
 }
 
-void FoliageInteraction::update(float timeDelta,
+void FoliageInteraction::Update(float time_delta,
                                 const std::vector<Body>& bodies,
                                 glm::vec3 camera) {
-  for (Imprint& imprint : trail) {
-    imprint.age += timeDelta;
+  for (Imprint& imprint : trail_) {
+    imprint.age += time_delta;
   }
-  std::erase_if(trail, [](const Imprint& imprint) {
-    return imprint.age >= HOLD_TIME + SPRING_TIME;
+  std::erase_if(trail_, [](const Imprint& imprint) {
+    return imprint.age >= kHoldTime + kSpringTime;
   });
 
-  if (tracked.size() != bodies.size()) {
-    tracked.assign(bodies.size(), Tracked());
+  if (tracked_.size() != bodies.size()) {
+    tracked_.assign(bodies.size(), Tracked());
   }
   for (std::size_t i = 0; i < bodies.size(); ++i) {
     const Body& body = bodies[i];
-    Tracked& track = tracked[i];
-    if (track.valid && timeDelta > 0.0f) {
-      glm::vec3 velocity = (body.center - track.position) / timeDelta;
-      if (glm::length(velocity) > TELEPORT_SPEED) {
+    Tracked& track = tracked_[i];
+    if (track.valid && time_delta > 0.0f) {
+      glm::vec3 velocity = (body.center - track.position) / time_delta;
+      if (glm::length(velocity) > kTeleportSpeed) {
         // The plants where it was spring back up
         Imprint imprint;
         imprint.center = track.position;
         imprint.radius = body.radius;
-        trail.push_back(imprint);
+        trail_.push_back(imprint);
         track.valid = false;
       } else {
-        glm::vec2 motion = glm::vec2(velocity.x, velocity.z) / RUN_SPEED;
+        glm::vec2 motion = glm::vec2(velocity.x, velocity.z) / kRunSpeed;
         float length = glm::length(motion);
         if (length > 1.0f) {
           motion /= length;
         }
         // Smoothed, the position of an animal jitters a bit from frame to frame
         track.motion =
-            glm::mix(track.motion, motion, std::min(1.0f, timeDelta * 8.0f));
+            glm::mix(track.motion, motion, std::min(1.0f, time_delta * 8.0f));
       }
     }
     if (!track.valid) {
-      track.lastImprint = body.center;
+      track.last_imprint = body.center;
       track.motion = glm::vec2(0.0f);
       track.valid = true;
     }
     track.position = body.center;
-    if (horizontalDistance(body.center, track.lastImprint) >
-            IMPRINT_SPACING * body.radius ||
-        std::abs(body.center.y - track.lastImprint.y) > body.radius) {
+    if (HorizontalDistance(body.center, track.last_imprint) >
+            kImprintSpacing * body.radius ||
+        std::abs(body.center.y - track.last_imprint.y) > body.radius) {
       Imprint imprint;
-      imprint.center = track.lastImprint;
+      imprint.center = track.last_imprint;
       imprint.radius = body.radius;
       imprint.motion = track.motion;
-      trail.push_back(imprint);
-      track.lastImprint = body.center;
+      trail_.push_back(imprint);
+      track.last_imprint = body.center;
     }
   }
-  if (trail.size() > MAX_TRAIL) {
-    trail.erase(trail.begin(), trail.begin() + static_cast<std::ptrdiff_t>(
-                                                   trail.size() - MAX_TRAIL));
+  if (trail_.size() > kMaxTrail) {
+    trail_.erase(trail_.begin(),
+                 trail_.begin() +
+                     static_cast<std::ptrdiff_t>(trail_.size() - kMaxTrail));
   }
 
   // The bodies first, then the imprints that still push, the closest to the
   // camera first
-  selected.clear();
+  selected_.clear();
   std::vector<std::pair<float, Imprint>> candidates;
   for (std::size_t i = 0; i < bodies.size(); ++i) {
     float distance =
-        horizontalDistance(bodies[i].center, camera) - bodies[i].radius;
-    if (distance < RANGE) {
+        HorizontalDistance(bodies[i].center, camera) - bodies[i].radius;
+    if (distance < kRange) {
       Imprint imprint;
       imprint.center = bodies[i].center;
       imprint.radius = bodies[i].radius;
-      imprint.motion = tracked[i].motion;
+      imprint.motion = tracked_[i].motion;
       imprint.age = -1.0f;
       candidates.push_back({distance - 1e6f, imprint});
     }
   }
-  for (const Imprint& imprint : trail) {
+  for (const Imprint& imprint : trail_) {
     float distance =
-        horizontalDistance(imprint.center, camera) - imprint.radius;
-    if (distance < RANGE && push(imprint.age) != 0.0f) {
+        HorizontalDistance(imprint.center, camera) - imprint.radius;
+    if (distance < kRange && Push(imprint.age) != 0.0f) {
       candidates.push_back({distance + 4.0f * imprint.age, imprint});
     }
   }
@@ -118,19 +118,21 @@ void FoliageInteraction::update(float timeDelta,
             [](const auto& a, const auto& b) { return a.first < b.first; });
   for (std::size_t i = 0;
        i < candidates.size() &&
-       i < static_cast<std::size_t>(render::MAX_FOLIAGE_INTERACTORS);
+       i < static_cast<std::size_t>(render::kMaxFoliageInteractors);
        ++i) {
-    selected.push_back(candidates[i].second);
+    selected_.push_back(candidates[i].second);
   }
 }
 
-void FoliageInteraction::fillFrameUniforms(
+void FoliageInteraction::FillFrameUniforms(
     render::FrameUniforms& uniforms) const {
-  for (std::size_t i = 0; i < selected.size(); ++i) {
-    const Imprint& imprint = selected[i];
-    uniforms.foliageInteractors[i] = glm::vec4(imprint.center, imprint.radius);
-    uniforms.foliagePushes[i] =
-        glm::vec4(push(imprint.age), imprint.motion, 0.0f);
+  for (std::size_t i = 0; i < selected_.size(); ++i) {
+    const Imprint& imprint = selected_[i];
+    uniforms.foliage_interactors[i] = glm::vec4(imprint.center, imprint.radius);
+    uniforms.foliage_pushes[i] =
+        glm::vec4(Push(imprint.age), imprint.motion, 0.0f);
   }
-  uniforms.wind.w = static_cast<float>(selected.size());
+  uniforms.wind.w = static_cast<float>(selected_.size());
 }
+
+}  // namespace bibo::world

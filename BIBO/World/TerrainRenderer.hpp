@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_WORLD_TERRAINRENDERER_HPP_
+#define BIBO_WORLD_TERRAINRENDERER_HPP_
 #include <GL/glew.h>
 
 #include <memory>
@@ -21,7 +22,7 @@ class TerrainRenderer {
  public:
   // Seconds that a chunk takes to fade from its old level of detail to the new
   // one
-  static constexpr float FADE_TIME = 0.75f;
+  static constexpr float kFadeTime = 0.75f;
 
   TerrainRenderer();
   ~TerrainRenderer();
@@ -33,51 +34,53 @@ class TerrainRenderer {
    * out from now on.
    * @param time Of the world (seconds)
    */
-  void apply(const WorldStreamer::MeshUpdate& update, float time);
+  void Apply(const WorldStreamer::MeshUpdate& update, float time);
   /**
    * @param frustum Chunks outside of it are not drawn (nullptr: all)
    * @param time Of the world (seconds), for the fades between the levels of
    * detail
    * @return Number of drawn chunks
    */
-  int draw(const scene::ViewFrustum* frustum, float time);
+  int Draw(const scene::ViewFrustum* frustum, float time);
   /**
    * Into a shadow map (depth only)
    */
-  void drawShadow(const render::ShadowCascade& cascade);
-  int getChunkCount() const { return static_cast<int>(chunks.size()); }
+  void DrawShadow(const render::ShadowCascade& cascade);
+  int GetChunkCount() const { return static_cast<int>(chunks_.size()); }
   /**
    * @return Chunks that fade from their old level of detail to the new one
    * right now
    */
-  int getFadingCount() const { return static_cast<int>(fading.size()); }
+  int GetFadingCount() const { return static_cast<int>(fading_.size()); }
   /**
    * @return Triangles drawn by the last draw
    */
-  std::size_t getDrawnTriangles() const { return drawnTriangles; }
+  std::size_t GetDrawnTriangles() const { return drawn_triangles_; }
 
  private:
   struct GpuChunk {
-    GLuint vertexArray = 0, vertexBuffer = 0, indexBuffer = 0;
-    GLsizei indexCount = 0;
+    GLuint vertex_array = 0, vertex_buffer = 0, index_buffer = 0;
+    GLsizei index_count = 0;
     Box bounds;
     int lod = 0;
-    float uploadTime = 0.0f;
+    float upload_time = 0.0f;
   };
   // The mesh that a chunk had before, while it fades out
   struct FadingChunk {
     GpuChunk old;
     float start = 0.0f;
   };
-  void release(GpuChunk& chunk);
-  bool drawChunk(const GpuChunk& chunk, const scene::ViewFrustum* frustum);
+  void Release(GpuChunk& chunk);
+  bool DrawChunk(const GpuChunk& chunk, const scene::ViewFrustum* frustum);
 
-  std::unique_ptr<Shader> shader;
-  std::unique_ptr<Shader> ditherShader;
-  std::unique_ptr<Shader> depthShader;
-  std::unordered_map<ChunkKey, GpuChunk, ChunkKeyHash> chunks;
-  std::unordered_map<ChunkKey, FadingChunk, ChunkKeyHash> fading;
-  std::size_t drawnTriangles = 0;
+  std::unique_ptr<Shader> shader_;
+  std::unique_ptr<Shader> dither_shader_;
+  std::unique_ptr<Shader> depth_shader_;
+  std::unordered_map<ChunkKey, GpuChunk, ChunkKeyHash> chunks_;
+  std::unordered_map<ChunkKey, FadingChunk, ChunkKeyHash> fading_;
+  std::size_t drawn_triangles_ = 0;
 };
 }  // namespace world
 }  // namespace bibo
+
+#endif  // BIBO_WORLD_TERRAINRENDERER_HPP_

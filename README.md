@@ -247,6 +247,23 @@ pre-commit install
 
 If the hook changed files, the commit stops: look at the changes, `git add` them and commit again.
 All files can be formatted with `pre-commit run --all-files`. Most editors pick up `.clang-format` and `.editorconfig` by themselves.
+
+The names follow the Google style as well, checked by [clang-tidy](https://clang.llvm.org/extra/clang-tidy/) in the CI (`.clang-tidy`):
+types and functions `CamelCase`, variables, parameters and the members of structs `snake_case`, the private and protected
+members of classes `snake_case_`, constants and enumerators `kCamelCase`, namespaces `snake_case`.
+There are no `using namespace` directives: the sources are in the namespace of their header and bring in other names with
+using-declarations (`using glm::vec3;`), the headers write the names out (`std::vector`). Headers have `#define` guards
+(`BIBO_SCENE_SCENE_HPP_` for `BIBO/Scene/Scene.hpp`).
+Names that a library dictates (e.g. `StringMaker::convert` of Catch2) are marked with `// NOLINTNEXTLINE(readability-identifier-naming)`.
+To run clang-tidy locally, configure a build folder with a compile database and run it on the sources:
+
+```bash
+cmake -S . -B build-tidy -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_CXX_SCAN_FOR_MODULES=OFF
+clang-tidy -p build-tidy BIBO/Scene/Scene.cpp
+```
+
+(`-DCMAKE_CXX_SCAN_FOR_MODULES=OFF`: otherwise the compile commands refer to module files that only exist during a build.)
+
 The commit that reformatted the whole code is listed in `.git-blame-ignore-revs`, so that `git blame` skips it (`git config blame.ignoreRevsFile .git-blame-ignore-revs`; GitHub does this by itself).
 
 ## Implementation Details

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BIBO_SCENE_GEOMETRY_HPP_
+#define BIBO_SCENE_GEOMETRY_HPP_
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -9,74 +10,72 @@
 #include "SceneObject.hpp"
 #include "ViewFrustum.hpp"
 
-using namespace glm;
-using namespace std;
-using namespace bibo::resources;
-
 namespace bibo {
 namespace scene {
 class Geometry : public SceneObject {
-  unique_ptr<Model> model;
-  physics::PhysicsWorld* physicsWorld = nullptr;
-  physics::BodyHandle physicsBody = physics::INVALID_BODY;
+  std::unique_ptr<resources::Model> model_;
+  physics::PhysicsWorld* physics_world_ = nullptr;
+  physics::BodyHandle physics_body_ = physics::kInvalidBody;
   // From the body to the model: what the pose of the body does not have (e.g.
   // the scale of the model)
-  mat4 bodyToModel = mat4(1.0f);
+  glm::mat4 body_to_model_ = glm::mat4(1.0f);
   // The game uses the meshes (e.g. for the physics and the materials), it
   // cannot run without them
-  void requireMeshes(const char* nodeName);
+  void RequireMeshes(const char* node_name);
 
  public:
   /**
    * The program exits if the node does not exist or has no meshes.
-   * @param assimpScene Loaded once for all geometries, see
-   * util::loadSceneFromFile
-   * @param normalMapTexture nullptr for geometries without normal map
+   * @param assimp_scene Loaded once for all geometries, see
+   * util::LoadSceneFromFile
+   * @param normal_map_texture nullptr for geometries without normal map
    */
-  Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window,
-           const aiScene* assimpScene, const char* nodeName, Texture* texture,
-           Texture* normalMapTexture = nullptr);
-  Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window,
-           const char* file, const char* nodeName, Texture* texture);
-  Geometry(mat4 modelMatrix, Shader* shader, GLFWwindow& window,
-           const char* file, const char* nodeName, Texture* texture,
-           Texture* normalMapTexture);
+  Geometry(glm::mat4 model_matrix, Shader* shader, GLFWwindow& window,
+           const aiScene* assimp_scene, const char* node_name, Texture* texture,
+           Texture* normal_map_texture = nullptr);
+  Geometry(glm::mat4 model_matrix, Shader* shader, GLFWwindow& window,
+           const char* file, const char* node_name, Texture* texture);
+  Geometry(glm::mat4 model_matrix, Shader* shader, GLFWwindow& window,
+           const char* file, const char* node_name, Texture* texture,
+           Texture* normal_map_texture);
 
   virtual ~Geometry();
   Geometry(const Geometry&) = delete;
   Geometry& operator=(const Geometry&) = delete;
 
-  virtual void update(float time_delta);
-  virtual void draw(Shader* shader);
+  virtual void Update(float time_delta);
+  virtual void Draw(Shader* shader);
   /**
    * @return false if the geometry is completely outside of the view frustum and
    * does not need to be drawn
    */
-  virtual bool isVisible(const ViewFrustum& frustum);
+  virtual bool IsVisible(const ViewFrustum& frustum);
 
-  Model* getModel();
+  resources::Model* GetModel();
   /**
    * The geometry follows the position and rotation of the physics body from now
    * on. Its current model matrix relative to the body (e.g. its scale) is kept,
    * so the body may be anywhere in or around the model.
    */
-  void setPhysicsBody(physics::PhysicsWorld* physicsWorld,
+  void SetPhysicsBody(physics::PhysicsWorld* physics_world,
                       physics::BodyHandle body);
-  Texture* normalMap;
-  bool hasNormalMap;
+  Texture* normal_map;
+  bool has_normal_map;
   // Layer of the generated materials (world::MaterialTextures) instead of the
   // texture, -1: the texture
-  int materialLayer = -1;
+  int material_layer = -1;
   // How often the generated material repeats per unit of the model
-  float materialScale = 1.0f;
-  bool getHasNormalMap();
+  float material_scale = 1.0f;
+  bool GetHasNormalMap();
 
  protected:
   /**
-   * For geometries that create and draw their meshes themselves (getModel
-   * returns nullptr, draw, update and isVisible must be overridden)
+   * For geometries that create and draw their meshes themselves (GetModel
+   * returns nullptr, draw, update and IsVisible must be overridden)
    */
-  Geometry(mat4 modelMatrix, GLFWwindow& window);
+  Geometry(glm::mat4 model_matrix, GLFWwindow& window);
 };
 }  // namespace scene
 }  // namespace bibo
+
+#endif  // BIBO_SCENE_GEOMETRY_HPP_

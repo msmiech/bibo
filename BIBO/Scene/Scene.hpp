@@ -320,7 +320,7 @@ class Scene : public render::RenderableScene {
   int TakeSplashes();
 
   // render::RenderableScene (the frame is rendered by render::Renderer)
-  render::CameraView CameraView() override;
+  render::CameraView GetCameraView() override;
   void FillFrameUniforms(render::FrameUniforms& uniforms) override;
   void PrepareFrame() override;
   void DrawShadowCasters(const render::ShadowCascade& cascade) override;

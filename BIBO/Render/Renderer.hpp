@@ -43,7 +43,7 @@ struct CameraView {
 class RenderableScene {
  public:
   virtual ~RenderableScene() = default;
-  virtual CameraView CameraView() = 0;
+  virtual CameraView GetCameraView() = 0;
   /**
    * Sun, sky, fog, wind, time (the renderer sets the camera, the shadows and
    * the settings)

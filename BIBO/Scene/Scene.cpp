@@ -1229,7 +1229,7 @@ void Scene::Restart() {
   PlaceAnimals();
 }
 
-render::CameraView Scene::CameraView() {
+render::CameraView Scene::GetCameraView() {
   render::CameraView view;
   view.view = camera_->GetViewMatrix();
   view.projection = camera_->GetProjectionMatrix();

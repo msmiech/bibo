@@ -188,7 +188,7 @@ void Renderer::Render(RenderableScene& scene, const RenderSettings& settings,
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
   // 1. Uniforms of the frame
-  CameraView camera = scene.CameraView();
+  CameraView camera = scene.GetCameraView();
   glm::vec3 to_sun(0.0f, 1.0f, 0.0f);
   FrameUniforms uniforms;
   scene.FillFrameUniforms(uniforms);

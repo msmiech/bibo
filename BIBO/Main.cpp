@@ -81,7 +81,7 @@ void PlayDemoFrame(int frame);
 void RenderText(Shader* shader, const string& text, GLfloat x, GLfloat y,
                 GLfloat scale, vec3 color);
 void ResizeScreenBuffers();
-render::RenderSettings RenderSettings();
+render::RenderSettings CurrentRenderSettings();
 void ApplyGraphicsSettings();
 bool PauseGame();
 void ResumeGame();
@@ -1141,7 +1141,7 @@ void JoystickCallback(int joystick, int event) {
   }
 }
 
-render::RenderSettings RenderSettings() {
+render::RenderSettings CurrentRenderSettings() {
   render::RenderSettings result;
   result.hdr = settings.hdr;
   result.bloom = settings.bloom;
@@ -1156,7 +1156,7 @@ void Draw() {
   // Shadow maps, the scene in HDR, bloom, exposure and tone mapping
   // (render::Renderer)
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  renderer->Render(*game_scene, RenderSettings(), time_delta);
+  renderer->Render(*game_scene, CurrentRenderSettings(), time_delta);
   // The HUD on top of the final image
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
   TextRendering();

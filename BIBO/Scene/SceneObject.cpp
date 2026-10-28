@@ -1,66 +1,50 @@
 #include "SceneObject.hpp"
+
 #include <cmath>
 
+namespace bibo::scene {
 
-using namespace bibo::scene;
+using glm::mat4;
+using glm::vec3;
+using glm::vec4;
 
+SceneObject::SceneObject(GLFWwindow& window)
+    : model_matrix(mat4(1.0f)), window_(&window) {}
+SceneObject::SceneObject(mat4 model_matrix, GLFWwindow& window)
+    : model_matrix(model_matrix), window_(&window) {}
 
+vec3 SceneObject::GetPosition() { return vec3(model_matrix[3]); }
 
-SceneObject::SceneObject(GLFWwindow& window) : modelMatrix(mat4(1.0f)), window(&window)
-{
-	
+void SceneObject::SetPosition(vec3 position) {
+  model_matrix[3] = vec4(position, model_matrix[3].w);
 }
-SceneObject::SceneObject(mat4 modelMatrix, GLFWwindow& window) : modelMatrix(modelMatrix), window(&window)
-{
-	
-}
-
-
-SceneObject::~SceneObject() {
-
-}
-
-vec3 SceneObject::getPosition()
-{
-	return vec3(modelMatrix[3]);
-}
-
-
-void SceneObject::setPosition(vec3 position)
-{
-	modelMatrix[3].x = position.x;
-	modelMatrix[3].y = position.y;
-	modelMatrix[3].z = position.z;
-}
-
 
 /**
-* This method is based on https://www.opengl.org/discussion_boards/showthread.php/159215-Is-it-possible-to-extract-rotation-translation-scale-given-a-matrix
-*/
-vec3 SceneObject::getDirection()
-{
-	float sinPitch, cosPitch, sinRoll, cosRoll, sinYaw, cosYaw;
+ * Based on
+ * https://www.opengl.org/discussion_boards/showthread.php/159215-Is-it-possible-to-extract-rotation-translation-scale-given-a-matrix
+ */
+vec3 SceneObject::GetDirection() {
+  float sin_pitch, cos_pitch, sin_roll, cos_roll, sin_yaw, cos_yaw;
 
-	sinPitch = -modelMatrix[2][0];
-	cosPitch = sqrt(1 - sinPitch*sinPitch);
+  sin_pitch = -model_matrix[2][0];
+  cos_pitch = sqrt(1 - sin_pitch * sin_pitch);
 
-	if (std::abs(cosPitch) > 0.00001f)
-	{
-		sinRoll = modelMatrix[2][1] / cosPitch;
-		cosRoll = modelMatrix[2][2] / cosPitch;
-		sinYaw = modelMatrix[1][0] / cosPitch;
-		cosYaw = modelMatrix[0][0] / cosPitch;
-	}
-	else
-	{
-		sinRoll = -modelMatrix[1][2];
-		cosRoll = modelMatrix[1][1];
-		sinYaw = 0;
-		cosYaw = 1;
-	}
+  if (std::abs(cos_pitch) > 0.00001f) {
+    sin_roll = model_matrix[2][1] / cos_pitch;
+    cos_roll = model_matrix[2][2] / cos_pitch;
+    sin_yaw = model_matrix[1][0] / cos_pitch;
+    cos_yaw = model_matrix[0][0] / cos_pitch;
+  } else {
+    sin_roll = -model_matrix[1][2];
+    cos_roll = model_matrix[1][1];
+    sin_yaw = 0;
+    cos_yaw = 1;
+  }
 
-	float yaw = atan2(sinYaw, cosYaw); //in radians
-	float pitch = atan2(sinPitch, cosPitch);
-	float roll = atan2(sinRoll, cosRoll);
-	return vec3(yaw, pitch, roll);
+  float yaw = atan2(sin_yaw, cos_yaw);
+  float pitch = atan2(sin_pitch, cos_pitch);
+  float roll = atan2(sin_roll, cos_roll);
+  return vec3(yaw, pitch, roll);
 }
+
+}  // namespace bibo::scene

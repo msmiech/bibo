@@ -1,0 +1,7 @@
+# Google C++ style (https://google.github.io/styleguide/cppguide.html), applied by the pre-commit hook (see README.md)
+BasedOnStyle: Google
+# The same pointer and reference alignment in every file instead of guessing it from each file ("int* p", "int& r")
+DerivePointerAlignment: false
+PointerAlignment: Left
+# Every file ends with a line break
+InsertNewlineAtEOF: true

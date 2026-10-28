@@ -1,60 +1,62 @@
-#pragma once
+#ifndef BIBO_RESOURCES_SHADER_HPP_
+#define BIBO_RESOURCES_SHADER_HPP_
 
-#include <string>
 #include <GL/glew.h>
 
-using namespace std;
+#include <string>
 
 namespace bibo {
 
-	/**
-	Reads mainShader file
-	*/
-	class Shader
-	{
-	public:
-		/**
-		@param vertexShader Path to vertex mainShader file *.vert
-		@param fragmentShader Path to fragment mainShader file *.frag
-		@param defines Names separated by spaces that are defined in both shaders (variants of a shader, e.g. "LOD_DITHER")
-		**/
-		Shader(const string& vertexShader,
-			const string& fragmentShader,
-			const string& defines = "");
-		~Shader();
+/**
+ * Program of a vertex and a fragment shader file (the game exits with the log
+ * of the compiler if they do not compile)
+ */
+class Shader {
+ public:
+  /**
+   * @param vertex_shader Path of the *.vert file
+   * @param fragment_shader Path of the *.frag file
+   * @param defines Names separated by spaces that are defined in both shaders
+   * (variants of a shader, e.g. "LOD_DITHER")
+   */
+  Shader(const std::string& vertex_shader, const std::string& fragment_shader,
+         const std::string& defines = "");
+  ~Shader();
+  Shader(const Shader&) = delete;
+  Shader& operator=(const Shader&) = delete;
 
-		/**
-		* useShader() formerly
-		* sometimes only "Use()"
-		*/
-		void enable() const;
+  // Makes it the current program
+  void Enable() const;
 
-		GLint getUniformLocation(const char* strUniform);
-		GLint getAttribLocation(const char* strAttrib);
-		GLuint programHandle;
+  GLint GetUniformLocation(const char* name);
+  // Prints an error if the attribute does not exist
+  GLint GetAttribLocation(const char* name);
+  GLuint program_handle = 0;
 
-		/**
-		* Reads a shader file and replaces the lines #include "file" with the content of the file
-		* (relative to the folder of the including file, e.g. the shared lighting code in Shader/include)
-		* @param error Description of a missing file
-		* @return The source code, empty if a file is missing
-		*/
-		static string preprocess(const string& path, string& error);
-		/**
-		* @param defines Names separated by spaces
-		* @return The code with a line #define NAME for every name after the #version line
-		*/
-		static string addDefines(const string& code, const string& defines);
+  /**
+   * Reads a shader file and replaces the lines #include "file" with the content
+   * of the file (relative to the folder of the including file, e.g. the shared
+   * lighting code in Shader/include)
+   * @param error Description of a missing file
+   * @return The source code, empty if a file is missing
+   */
+  static std::string Preprocess(const std::string& path, std::string& error);
+  /**
+   * @param defines Names separated by spaces
+   * @return The code with a line #define NAME for every name after the #version
+   * line
+   */
+  static std::string AddDefines(const std::string& code,
+                                const std::string& defines);
 
-	private:
-		void loadShader(const string& shader, 
-						GLenum shaderType,
-						GLuint& handle,
-						const string& defines);
-		void link();
+ private:
+  void LoadShader(const std::string& shader, GLenum shader_type, GLuint& handle,
+                  const std::string& defines);
+  void Link();
 
-		GLuint vertexHandle;
-		GLuint fragmentHandle;
+  GLuint vertex_handle_ = 0;
+  GLuint fragment_handle_ = 0;
+};
+}  // namespace bibo
 
-	};
-}
+#endif  // BIBO_RESOURCES_SHADER_HPP_

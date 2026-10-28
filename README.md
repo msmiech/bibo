@@ -95,7 +95,7 @@ and [tools/record_gameplay.sh](tools/record_gameplay.sh) converts the frames wit
 * Settings for the detail of the world (how far the levels of detail and the vegetation reach)
 
 ## Building
-The game is built with [CMake](https://cmake.org) 3.25 or newer, the [Ninja](https://ninja-build.org) build tool and any C++17 compiler (Clang, GCC, MinGW-w64 or MSVC).
+The game is built with [CMake](https://cmake.org) 3.25 or newer, the [Ninja](https://ninja-build.org) build tool and a C++20 compiler (GCC 10, Clang 18, MinGW-w64 or MSVC 2019 16.10 or newer).
 All libraries are downloaded and built automatically the first time the project is configured (about 180 MB, internet access required),
 so apart from the tools only the OpenGL and windowing headers of the operating system are needed.
 Running the game requires a graphics card with OpenGL 4.3 support.
@@ -233,10 +233,43 @@ cmake --build build-asan --parallel
 UBSAN_OPTIONS=halt_on_error=1 xvfb-run -a ctest --test-dir build-asan --output-on-failure
 ```
 
+## Code style
+The C++ code is formatted in the [Google C++ style](https://google.github.io/styleguide/cppguide.html) by [clang-format](https://clang.llvm.org/docs/ClangFormat.html) (`.clang-format`).
+A [pre-commit](https://pre-commit.com) hook formats the staged files before every commit, always with the same clang-format version (`.pre-commit-config.yaml`), and the CI checks the format of all files.
+Set it up once per clone (needs Python, e.g. installed with [uv](https://docs.astral.sh/uv/)):
+
+```bash
+uv tool install --python 3.13 pre-commit
+pre-commit install
+```
+
+(`--python 3.13`: PyYAML, which pre-commit needs, may not have a prebuilt package for the newest Python yet.)
+
+If the hook changed files, the commit stops: look at the changes, `git add` them and commit again.
+All files can be formatted with `pre-commit run --all-files`. Most editors pick up `.clang-format` and `.editorconfig` by themselves.
+
+The names follow the Google style as well, checked by [clang-tidy](https://clang.llvm.org/extra/clang-tidy/) in the CI (`.clang-tidy`):
+types and functions `CamelCase`, variables, parameters and the members of structs `snake_case`, the private and protected
+members of classes `snake_case_`, constants and enumerators `kCamelCase`, namespaces `snake_case`.
+There are no `using namespace` directives: the sources are in the namespace of their header and bring in other names with
+using-declarations (`using glm::vec3;`), the headers write the names out (`std::vector`). Headers have `#define` guards
+(`BIBO_SCENE_SCENE_HPP_` for `BIBO/Scene/Scene.hpp`).
+Names that a library dictates (e.g. `StringMaker::convert` of Catch2) are marked with `// NOLINTNEXTLINE(readability-identifier-naming)`.
+To run clang-tidy locally, configure a build folder with a compile database and run it on the sources:
+
+```bash
+cmake -S . -B build-tidy -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_CXX_SCAN_FOR_MODULES=OFF
+clang-tidy -p build-tidy BIBO/Scene/Scene.cpp
+```
+
+(`-DCMAKE_CXX_SCAN_FOR_MODULES=OFF`: otherwise the compile commands refer to module files that only exist during a build.)
+
+The commit that reformatted the whole code is listed in `.git-blame-ignore-revs`, so that `git blame` skips it (`git config blame.ignoreRevsFile .git-blame-ignore-revs`; GitHub does this by itself).
+
 ## Implementation Details
 ### Language and Compiler
 This project was originally written in C++11 using Microsoft Visual Studio 2013.
-It now uses C++17 and CMake, and builds with GCC, Clang, MinGW-w64 and MSVC on Windows and Linux.
+It now uses C++20 and CMake, and builds with GCC, Clang, MinGW-w64 and MSVC on Windows and Linux.
 For hardware graphics (modern) OpenGL 4.3 (core profile) is used.
 It was developed for Windows 8.1 and Windows 10 and tested using Nvidia GeForce graphics hardware
 ### The world

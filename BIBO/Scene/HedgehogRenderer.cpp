@@ -1,38 +1,34 @@
 #include "HedgehogRenderer.hpp"
+
 #include <vector>
 
-using namespace bibo;
-using namespace bibo::scene;
+namespace bibo::scene {
 
-namespace
-{
-	FurryRenderer::Strands hedgehogStrands()
-	{
-		FurryRenderer::Strands strands;
-		strands.furCount = HedgehogRenderer::FUR_COUNT;
-		strands.spineCount = HedgehogRenderer::SPINE_COUNT;
-		strands.spineLength = HedgehogRenderer::SPINE_LENGTH;
-		strands.spineWidth = HedgehogRenderer::SPINE_WIDTH;
-		strands.furSeed = 78;
-		strands.spineSeed = 77;
-		return strands;
-	}
-
-	FurryRenderer::Bounds hedgehogBounds()
-	{
-		FurryRenderer::Bounds bounds;
-		bounds.center = glm::vec3(0.0f, HEDGEHOG_BODY_HEIGHT, 0.0f);
-		bounds.radius = 0.75f;
-		return bounds;
-	}
+namespace {
+FurryRenderer::Strands HedgehogStrands() {
+  return {.fur_count = HedgehogRenderer::kFurCount,
+          .spine_count = HedgehogRenderer::kSpineCount,
+          .spine_length = HedgehogRenderer::kSpineLength,
+          .spine_width = HedgehogRenderer::kSpineWidth,
+          .fur_seed = 78,
+          .spine_seed = 77};
 }
 
-HedgehogRenderer::HedgehogRenderer(std::size_t count) : FurryRenderer(HedgehogModel::build(), count, hedgehogStrands(), hedgehogBounds())
-{
+FurryRenderer::Bounds HedgehogBounds() {
+  return {.center = glm::vec3(0.0f, kHedgehogBodyHeight, 0.0f),
+          .radius = 0.75f};
+}
+}  // namespace
+
+HedgehogRenderer::HedgehogRenderer(std::size_t count)
+    : FurryRenderer(HedgehogModel::Build(), count, HedgehogStrands(),
+                    HedgehogBounds()) {}
+
+void HedgehogRenderer::SetPose(std::size_t index, const glm::mat4& body,
+                               const std::array<glm::mat4, 4>& feet,
+                               float bristle) {
+  std::vector<glm::mat4> parts = {body, feet[0], feet[1], feet[2], feet[3]};
+  FurryRenderer::SetPose(index, parts, bristle);
 }
 
-void HedgehogRenderer::setPose(std::size_t index, const glm::mat4& body, const std::array<glm::mat4, 4>& feet, float bristle)
-{
-	std::vector<glm::mat4> parts = { body, feet[0], feet[1], feet[2], feet[3] };
-	FurryRenderer::setPose(index, parts, bristle);
-}
+}  // namespace bibo::scene

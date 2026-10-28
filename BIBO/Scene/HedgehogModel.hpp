@@ -1,29 +1,40 @@
-#pragma once
+#ifndef BIBO_SCENE_HEDGEHOGMODEL_HPP_
+#define BIBO_SCENE_HEDGEHOGMODEL_HPP_
 #include "FurryModel.hpp"
 
-namespace bibo
-{
-	namespace scene
-	{
-		//Where the feet of the hedgehog are under its body (model space, front left; the others mirrored)
-		constexpr float HEDGEHOG_FOOT_SIDE = 0.16f;
-		constexpr float HEDGEHOG_FOOT_FRONT = 0.13f;
-		constexpr float HEDGEHOG_FOOT_BACK = -0.2f;
-		//Center and radius of the round body (without the spines), for the collisions
-		constexpr float HEDGEHOG_BODY_HEIGHT = 0.25f;
-		constexpr float HEDGEHOG_BODY_RADIUS = 0.33f;
+namespace bibo {
+namespace scene {
+// Where the feet of the hedgehog are under its body (model space, front left;
+// the others mirrored)
+constexpr float kHedgehogFootSide = 0.16f;
+constexpr float kHedgehogFootFront = 0.13f;
+constexpr float kHedgehogFootBack = -0.2f;
+// Center and radius of the round body (without the spines), for the collisions
+constexpr float kHedgehogBodyHeight = 0.25f;
+constexpr float kHedgehogBodyRadius = 0.33f;
 
-		/**
-		* The hedgehog for the renderer of the bear (FurryModel): a round body with a pointed snout, spines on the back and the sides,
-		* short fur on the face and the belly, small dark eyes, a wet nose, round ears and four feet with claws. The feet are in the
-		* space of their foot (origin on the ground under it), the rest in the space of the body. Model space: +Z forward, +Y up,
-		* the origin on the ground under the body, about 1 long (scaled up in the world, Hedgehog::SCALE). Generated, the same every time.
-		*/
-		struct HedgehogModel : FurryModel
-		{
-			enum Part { BODY = 0, FOOT_FRONT_LEFT = 1, FOOT_FRONT_RIGHT, FOOT_HIND_LEFT, FOOT_HIND_RIGHT, PART_COUNT };
+/**
+ * The hedgehog for the renderer of the bear (FurryModel): a round body with a
+ * pointed snout, spines on the back and the sides, short fur on the face and
+ * the belly, small dark eyes, a wet nose, round ears and four feet with claws.
+ * The feet are in the space of their foot (origin on the ground under it), the
+ * rest in the space of the body. Model space: +Z forward, +Y up, the origin on
+ * the ground under the body, about 1 long (scaled up in the world,
+ * Hedgehog::kScale). Generated, the same every time.
+ */
+struct HedgehogModel : FurryModel {
+  enum Part {
+    kBody = 0,
+    kFootFrontLeft = 1,
+    kFootFrontRight,
+    kFootHindLeft,
+    kFootHindRight,
+    kPartCount
+  };
 
-			static HedgehogModel build();
-		};
-	}
-}
+  static HedgehogModel Build();
+};
+}  // namespace scene
+}  // namespace bibo
+
+#endif  // BIBO_SCENE_HEDGEHOGMODEL_HPP_

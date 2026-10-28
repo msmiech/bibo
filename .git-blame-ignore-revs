@@ -1,0 +1,5 @@
+# Commits that only reformat the code, skipped by git blame
+# (git config blame.ignoreRevsFile .git-blame-ignore-revs; GitHub reads this file by itself)
+
+# Format all C++ code in the Google style
+95d70b8449ba0e87b323050aa2abd2105bce84a6

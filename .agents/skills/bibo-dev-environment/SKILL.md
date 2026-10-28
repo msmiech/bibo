@@ -24,7 +24,7 @@ If a heredoc trips over the quoting of the shell, write the script to a file out
 Read and write files with `encoding='utf-8'`; the sources are UTF-8 and use tabs for indentation.
 
 ## Build
-Toolchain: CMake ≥ 3.25, Ninja, a C++17 compiler (LLVM-MinGW `c++`/`cc` on Windows). See README.md › Building.
+Toolchain: CMake ≥ 3.25, Ninja, a C++20 compiler (LLVM-MinGW `c++`/`cc` on Windows). See README.md › Building.
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -35,6 +35,26 @@ A fresh worktree does not need to download the dependencies again: point FetchCo
 already configured (`<checkout>/build/_deps/<name>-src`) for each of ASSIMP, CATCH2, FREETYPE, GLEW, GLFW, GLM, JOLTPHYSICS,
 MINIAUDIO, RMLUI and STB, e.g. `-DFETCHCONTENT_SOURCE_DIR_GLFW=<checkout>/build/_deps/glfw-src` (add `-DCMAKE_CXX_COMPILER=c++ -DCMAKE_C_COMPILER=cc` with LLVM-MinGW).
 A dependency that is new in the branch is not there yet: leave its option out and let CMake download it.
+
+## Format
+The C++ code is in the Google style (`.clang-format`). Format before committing, with the pinned clang-format of the
+pre-commit hook (a different clang-format version may format differently, and the CI checks it):
+
+```bash
+uvx --python 3.13 pre-commit run --all-files    # or only the changed files: --files <file>...
+```
+
+`--python 3.13`: PyYAML, which pre-commit needs, may have no prebuilt package for the newest Python yet.
+Includes are sorted within their group; one that must stay first (`<Jolt/Jolt.h>`) is wrapped in `// clang-format off`/`on`.
+
+Names in the Google style (`.clang-tidy`, checked by the CI): `CamelCase` types and functions, `snake_case` variables and
+struct members, `snake_case_` private/protected class members, `kCamelCase` constants and enumerators. No `using namespace`:
+a source is wrapped in the namespace of its header (`namespace bibo::scene {`) and adds using-declarations for other names,
+headers qualify (`std::`, `glm::`). Headers have `#define` guards named after the path (`BIBO_SCENE_SCENE_HPP_`).
+A function must not be named like a type (`FinishLine FinishLine()` does not compile in the class or namespace scope):
+use a verb (`MakeFinishLine`, `FindNearest`). Check with a Debug build folder configured with
+`-DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_CXX_SCAN_FOR_MODULES=OFF` and `clang-tidy -p <folder> <source>`
+(LLVM-MinGW ships `clang-tidy`).
 
 ## Tests
 ```bash

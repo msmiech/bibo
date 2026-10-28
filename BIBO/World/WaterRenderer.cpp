@@ -1,74 +1,69 @@
 #include "WaterRenderer.hpp"
 
-using namespace bibo;
-using namespace bibo::world;
+namespace bibo::world {
 
-namespace
-{
-	const float WATER_EXTENT = 2400.0f;
-	const float SNOW_BOX_WIDTH = 70.0f, SNOW_BOX_HEIGHT = 40.0f;
-	const float SNOW_FALL_SPEED = 1.1f;
+namespace {
+const float kWaterExtent = 2400.0f;
+const float kSnowBoxWidth = 70.0f, kSnowBoxHeight = 40.0f;
+const float kSnowFallSpeed = 1.1f;
+}  // namespace
+
+WaterRenderer::WaterRenderer()
+    : shader_(
+          std::make_unique<Shader>("Shader/water.vert", "Shader/water.frag")) {
+  glGenVertexArrays(1, &vertex_array_);
 }
 
-WaterRenderer::WaterRenderer() : shader(std::make_unique<Shader>("Shader/water.vert", "Shader/water.frag"))
-{
-	glGenVertexArrays(1, &vertexArray);
+WaterRenderer::~WaterRenderer() { glDeleteVertexArrays(1, &vertex_array_); }
+
+void WaterRenderer::Draw(bool transparent) {
+  shader_->Enable();
+  glUniform1f(shader_->GetUniformLocation("extent"), kWaterExtent);
+  glUniform1i(shader_->GetUniformLocation("transparent"), transparent);
+  GLboolean blend = glIsEnabled(GL_BLEND),
+            cull_face = glIsEnabled(GL_CULL_FACE);
+  if (transparent) {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  }
+  glDisable(GL_CULL_FACE);  // also seen from below (from under the water)
+  glBindVertexArray(vertex_array_);
+  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+  glBindVertexArray(0);
+  blend ? glEnable(GL_BLEND) : glDisable(GL_BLEND);
+  cull_face ? glEnable(GL_CULL_FACE) : glDisable(GL_CULL_FACE);
 }
 
-WaterRenderer::~WaterRenderer()
-{
-	glDeleteVertexArrays(1, &vertexArray);
+SnowRenderer::SnowRenderer(int flakes)
+    : shader_(std::make_unique<Shader>("Shader/snow.vert", "Shader/snow.frag")),
+      flakes_(flakes) {
+  glGenVertexArrays(1, &vertex_array_);
 }
 
-void WaterRenderer::draw(bool transparent)
-{
-	shader->enable();
-	glUniform1f(shader->getUniformLocation("extent"), WATER_EXTENT);
-	glUniform1i(shader->getUniformLocation("transparent"), transparent);
-	GLboolean blend = glIsEnabled(GL_BLEND), cullFace = glIsEnabled(GL_CULL_FACE);
-	if (transparent)
-	{
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	}
-	glDisable(GL_CULL_FACE); //also seen from below (from under the water)
-	glBindVertexArray(vertexArray);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	glBindVertexArray(0);
-	blend ? glEnable(GL_BLEND) : glDisable(GL_BLEND);
-	cullFace ? glEnable(GL_CULL_FACE) : glDisable(GL_CULL_FACE);
+SnowRenderer::~SnowRenderer() { glDeleteVertexArrays(1, &vertex_array_); }
+
+void SnowRenderer::Draw() {
+  if (flakes_ <= 0) {
+    return;
+  }
+  shader_->Enable();
+  glUniform3f(shader_->GetUniformLocation("boxSize"), kSnowBoxWidth,
+              kSnowBoxHeight, kSnowBoxWidth);
+  glUniform1f(shader_->GetUniformLocation("fallSpeed"), kSnowFallSpeed);
+  GLboolean blend = glIsEnabled(GL_BLEND),
+            cull_face = glIsEnabled(GL_CULL_FACE);
+  GLboolean depth_mask;
+  glGetBooleanv(GL_DEPTH_WRITEMASK, &depth_mask);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glDisable(GL_CULL_FACE);
+  glDepthMask(GL_FALSE);
+  glBindVertexArray(vertex_array_);
+  glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, flakes_);
+  glBindVertexArray(0);
+  glDepthMask(depth_mask);
+  blend ? glEnable(GL_BLEND) : glDisable(GL_BLEND);
+  cull_face ? glEnable(GL_CULL_FACE) : glDisable(GL_CULL_FACE);
 }
 
-SnowRenderer::SnowRenderer(int flakes) : shader(std::make_unique<Shader>("Shader/snow.vert", "Shader/snow.frag")), flakes(flakes)
-{
-	glGenVertexArrays(1, &vertexArray);
-}
-
-SnowRenderer::~SnowRenderer()
-{
-	glDeleteVertexArrays(1, &vertexArray);
-}
-
-void SnowRenderer::draw()
-{
-	if (flakes <= 0)
-	{
-		return;
-	}
-	shader->enable();
-	glUniform3f(shader->getUniformLocation("boxSize"), SNOW_BOX_WIDTH, SNOW_BOX_HEIGHT, SNOW_BOX_WIDTH);
-	glUniform1f(shader->getUniformLocation("fallSpeed"), SNOW_FALL_SPEED);
-	GLboolean blend = glIsEnabled(GL_BLEND), cullFace = glIsEnabled(GL_CULL_FACE);
-	GLboolean depthMask;
-	glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMask);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glDisable(GL_CULL_FACE);
-	glDepthMask(GL_FALSE);
-	glBindVertexArray(vertexArray);
-	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, flakes);
-	glBindVertexArray(0);
-	glDepthMask(depthMask);
-	blend ? glEnable(GL_BLEND) : glDisable(GL_BLEND);
-	cullFace ? glEnable(GL_CULL_FACE) : glDisable(GL_CULL_FACE);
-}
+}  // namespace bibo::world

@@ -223,6 +223,9 @@ add_library(bibo_core STATIC
 	BIBO/Resources/SkinnedModel.hpp
 	BIBO/Resources/Texture.cpp
 	BIBO/Resources/Texture.hpp
+	BIBO/Scene/Actor.hpp
+	BIBO/Scene/Actors.cpp
+	BIBO/Scene/Actors.hpp
 	BIBO/Scene/Bear.cpp
 	BIBO/Scene/Bear.hpp
 	BIBO/Scene/BearCharacter.cpp
@@ -243,6 +246,7 @@ add_library(bibo_core STATIC
 	BIBO/Scene/CreatureRenderer.hpp
 	BIBO/Scene/Dialog.cpp
 	BIBO/Scene/Dialog.hpp
+	BIBO/Scene/Events.hpp
 	BIBO/Scene/Fur.cpp
 	BIBO/Scene/Fur.hpp
 	BIBO/Scene/FurryModel.cpp
@@ -258,6 +262,9 @@ add_library(bibo_core STATIC
 	BIBO/Scene/HedgehogModel.hpp
 	BIBO/Scene/HedgehogRenderer.cpp
 	BIBO/Scene/HedgehogRenderer.hpp
+	BIBO/Scene/Quest.hpp
+	BIBO/Scene/QuestDirector.cpp
+	BIBO/Scene/QuestDirector.hpp
 	BIBO/Scene/RaccoonModel.cpp
 	BIBO/Scene/RaccoonModel.hpp
 	BIBO/Scene/Raccoon.cpp
@@ -272,10 +279,12 @@ add_library(bibo_core STATIC
 	BIBO/Scene/SalmonQuest.hpp
 	BIBO/Scene/Scene.cpp
 	BIBO/Scene/Scene.hpp
-	BIBO/Scene/SceneObject.cpp
-	BIBO/Scene/SceneObject.hpp
+	BIBO/Scene/SceneRenderer.cpp
+	BIBO/Scene/SceneRenderer.hpp
+	BIBO/Scene/StoneCircle.hpp
 	BIBO/Scene/StonesQuest.cpp
 	BIBO/Scene/StonesQuest.hpp
+	BIBO/Scene/TalkPartner.hpp
 	BIBO/Scene/ViewFrustum.cpp
 	BIBO/Scene/ViewFrustum.hpp
 	BIBO/UI/Menu.cpp

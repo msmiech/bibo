@@ -17,7 +17,9 @@ using bibo::test::GlContext;
 
 using bibo::Shader;
 using bibo::physics::PhysicsWorld;
+using bibo::scene::AnimalEvent;
 using bibo::scene::Scene;
+using bibo::scene::SceneEvent;
 
 namespace {
 /**
@@ -97,7 +99,8 @@ TEST_CASE("The bear waits at the start of the race without losing",
     bibo::render::Renderer renderer(800, 600);
     Framebuffer framebuffer(800, 600);
     framebuffer.Clear();
-    renderer.Render(scene, bibo::render::RenderSettings(), 1.0f / 60.0f);
+    renderer.Render(scene.GetRenderer(), bibo::render::RenderSettings(),
+                    1.0f / 60.0f);
     CHECK_THAT(gl.Errors(), Catch::Matchers::IsEmpty());
 
     // A bright day: the image is neither black nor white
@@ -116,7 +119,8 @@ TEST_CASE("The bear waits at the start of the race without losing",
   {
     bibo::render::Renderer renderer(800, 600);
     Framebuffer framebuffer(800, 600);
-    renderer.Render(scene, bibo::render::RenderSettings(), 1.0f / 60.0f);
+    renderer.Render(scene.GetRenderer(), bibo::render::RenderSettings(),
+                    1.0f / 60.0f);
     bibo::world::World::Statistics statistics =
         scene.GetWorld().GetStatistics();
     CAPTURE(statistics.drawn_chunks, statistics.meshes,
@@ -135,21 +139,21 @@ TEST_CASE("The bear waits at the start of the race without losing",
     settings.shadows = false;
     settings.normal_mapping = false;
     settings.transparency = false;
-    scene.SetViewFrustumCullingEnabled(false);
-    CHECK_FALSE(scene.IsViewFrustumCullingEnabled());
+    scene.GetRenderer().SetViewFrustumCullingEnabled(false);
+    CHECK_FALSE(scene.GetRenderer().IsViewFrustumCullingEnabled());
     bibo::render::Renderer renderer(800, 600);
     Framebuffer framebuffer(800, 600);
-    renderer.Render(scene, settings, 1.0f / 60.0f);
+    renderer.Render(scene.GetRenderer(), settings, 1.0f / 60.0f);
     settings.wireframe = true;
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    renderer.Render(scene, settings, 1.0f / 60.0f);
+    renderer.Render(scene.GetRenderer(), settings, 1.0f / 60.0f);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     CHECK_THAT(gl.Errors(), Catch::Matchers::IsEmpty());
     // Without culling the whole world is drawn
     bibo::world::World::Statistics statistics =
         scene.GetWorld().GetStatistics();
     CHECK(statistics.drawn_chunks == statistics.meshes);
-    scene.SetViewFrustumCullingEnabled(true);
+    scene.GetRenderer().SetViewFrustumCullingEnabled(true);
   }
 
   // View frustum culling only skips geometries that would not cover any pixel
@@ -164,25 +168,26 @@ TEST_CASE("The bear waits at the start of the race without losing",
     Framebuffer framebuffer(800, 600);
     glDisable(GL_DEPTH_TEST);
     silhouette_shader.Enable();
-    REQUIRE(scene.IsViewFrustumCullingEnabled());
+    REQUIRE(scene.GetRenderer().IsViewFrustumCullingEnabled());
     // Looking back over the start: the stone ring far ahead on the track is
     // behind the camera
     scene.GetCamera().Rotate(glm::pi<float>(), 0.0f);
 
     framebuffer.Clear();
-    scene.RenderFromCamera(&silhouette_shader);
-    const int drawn_with_culling = scene.GetDrawnGeometryCount();
+    scene.GetRenderer().RenderFromCamera(&silhouette_shader);
+    const int drawn_with_culling = scene.GetRenderer().GetDrawnGeometryCount();
     const std::vector<unsigned char> with_culling = framebuffer.Pixels();
 
-    scene.SetViewFrustumCullingEnabled(false);
+    scene.GetRenderer().SetViewFrustumCullingEnabled(false);
     framebuffer.Clear();
-    scene.RenderFromCamera(&silhouette_shader);
-    const int drawn_without_culling = scene.GetDrawnGeometryCount();
+    scene.GetRenderer().RenderFromCamera(&silhouette_shader);
+    const int drawn_without_culling =
+        scene.GetRenderer().GetDrawnGeometryCount();
     const std::vector<unsigned char> without_culling = framebuffer.Pixels();
 
     CAPTURE(drawn_with_culling, drawn_without_culling,
-            scene.GetGeometryCount());
-    CHECK(drawn_without_culling == scene.GetGeometryCount());
+            scene.GetRenderer().GetGeometryCount());
+    CHECK(drawn_without_culling == scene.GetRenderer().GetGeometryCount());
     CHECK(drawn_with_culling > 0);
     CHECK(drawn_with_culling < drawn_without_culling);
     REQUIRE(with_culling.size() == without_culling.size());
@@ -262,8 +267,8 @@ TEST_CASE(
   CHECK(quest.IsOffered());
   CHECK_FALSE(quest.CanTalk());  // the bear starts a few steps away
   // The beaver is in front of the bear, a bit to the side
-  glm::vec3 to_beaver =
-      scene.GetBeaver().GetPosition() - scene.GetBear().GetPosition();
+  glm::vec3 to_beaver = scene.GetActors().GetBeaver().GetPosition() -
+                        scene.GetBear().GetPosition();
   CAPTURE(to_beaver);
   CHECK(to_beaver.z < -3.0f);
   CHECK(glm::length(glm::vec2(to_beaver.x, to_beaver.z)) < 15.0f);
@@ -271,8 +276,8 @@ TEST_CASE(
   // Walks there (relative to the camera, like the player)
   bibo::input::PlayerInput input;
   for (int i = 0; i < 8 * 60 && !quest.CanTalk(); ++i) {
-    glm::vec3 direction =
-        scene.GetBeaver().GetPosition() - scene.GetBear().GetPosition();
+    glm::vec3 direction = scene.GetActors().GetBeaver().GetPosition() -
+                          scene.GetBear().GetPosition();
     direction.y = 0.0f;
     direction = glm::normalize(direction);
     bibo::scene::Camera& camera = scene.GetCamera();
@@ -294,12 +299,12 @@ TEST_CASE(
     scene.Update(frame, i % 30 == 0 ? press : bibo::input::PlayerInput());
   }
   REQUIRE(quest.GetStage() == RaceQuest::Stage::kWalkingToStart);
-  std::vector<RaceQuest::Event> events = scene.TakeEvents();
-  CHECK(
-      std::count(events.begin(), events.end(), RaceQuest::Event::kBeaverSound) >
-      3);  // it chatters while its words appear
-  CHECK(std::count(events.begin(), events.end(), RaceQuest::Event::kAccepted) ==
-        1);
+  std::vector<SceneEvent> events = scene.TakeEvents();
+  CHECK(std::count(events.begin(), events.end(),
+                   SceneEvent(RaceQuest::Event::kBeaverSound)) >
+        3);  // it chatters while its words appear
+  CHECK(std::count(events.begin(), events.end(),
+                   SceneEvent(RaceQuest::Event::kAccepted)) == 1);
   CHECK(scene.GetCamera().IsInShot());  // the cutscene
 
   // The cutscene: the bear walks up to the line by itself and turns along the
@@ -355,14 +360,16 @@ TEST_CASE(
   const SalmonQuest& fishing = scene.GetSalmonQuest();
   const RaceQuest& race = scene.GetRaceQuest();
   const bibo::scene::WaterPool& pool =
-      scene.GetSalmon().GetPools()[scene.GetMishkaPool()];
-  glm::vec3 mishka = scene.GetMishka().GetPosition();
+      scene.GetActors()
+          .GetSalmon()
+          .GetPools()[scene.GetActors().GetMishkaPool()];
+  glm::vec3 mishka = scene.GetActors().GetMishka().GetPosition();
   CHECK(glm::distance(glm::vec2(mishka.x, mishka.z),
                       glm::vec2(pool.center.x, pool.center.z)) <
         pool.radius + 8.0f);
   CHECK(fishing.IsOffered());
   CHECK(fishing.GetPoolCount() ==
-        static_cast<int>(scene.GetSalmon().GetPools().size()));
+        static_cast<int>(scene.GetActors().GetSalmon().GetPools().size()));
 
   // The bear is put on dry ground on the floor of the track next to Mishka
   const bibo::world::WorldGenerator& generator =
@@ -411,11 +418,11 @@ TEST_CASE(
     }
     REQUIRE(fishing.GetStage() == SalmonQuest::Stage::kFishing);
     CHECK(fishing.IsActive());
-    std::vector<SalmonQuest::Event> events = scene.TakeSalmonEvents();
+    std::vector<SceneEvent> events = scene.TakeEvents();
     CHECK(std::count(events.begin(), events.end(),
-                     SalmonQuest::Event::kBearSound) > 3);
+                     SceneEvent(SalmonQuest::Event::kBearSound)) > 3);
     CHECK(std::count(events.begin(), events.end(),
-                     SalmonQuest::Event::kAccepted) == 1);
+                     SceneEvent(SalmonQuest::Event::kAccepted)) == 1);
     scene.Update(frame);
     CHECK_FALSE(race.IsOffered());
     CHECK(scene.GetScore() == 0);
@@ -430,14 +437,15 @@ TEST_CASE(
     put_bear();
     // Outside of the race it is
     bibo::physics::RayHit hit;
-    glm::vec3 collider = scene.GetMishka().GetColliderCenter();
-    glm::vec3 across =
-        glm::vec3(scene.GetMishka().GetColliderRadius() + 0.5f, 0.0f, 0.0f);
+    glm::vec3 collider = scene.GetActors().GetMishka().GetColliderCenter();
+    glm::vec3 across = glm::vec3(
+        scene.GetActors().GetMishka().GetColliderRadius() + 0.5f, 0.0f, 0.0f);
     CHECK(physics_world.CastRay(collider + across, -2.0f * across, hit));
     int jumps = 0;
     for (int i = 0; i < 4 * 60; ++i) {
       scene.Update(frame);
-      jumps += static_cast<int>(scene.GetSalmon().GetJumps().size());
+      jumps +=
+          static_cast<int>(scene.GetActors().GetSalmon().GetJumps().size());
     }
     CHECK(jumps > 0);
 
@@ -446,8 +454,9 @@ TEST_CASE(
     scene.Restart();
     bibo::input::PlayerInput input;
     for (int i = 0; i < 8 * 60 && !race.CanTalk(); ++i) {
-      glm::vec3 direction = glm::normalize(scene.GetBeaver().GetPosition() -
-                                           scene.GetBear().GetPosition());
+      glm::vec3 direction =
+          glm::normalize(scene.GetActors().GetBeaver().GetPosition() -
+                         scene.GetBear().GetPosition());
       bibo::scene::Camera& camera = scene.GetCamera();
       input.move = 0.4f * glm::vec2(glm::dot(direction, camera.GetRight()),
                                     glm::dot(direction, camera.GetForward()));
@@ -471,7 +480,7 @@ TEST_CASE(
     for (int i = 0; i < 4 * 60 && race.GetStage() == RaceQuest::Stage::kRacing;
          ++i) {
       scene.Update(frame);
-      REQUIRE(scene.GetSalmon().GetJumps().empty());
+      REQUIRE(scene.GetActors().GetSalmon().GetJumps().empty());
     }
     CHECK(race.GetStage() == RaceQuest::Stage::kRacing);
   }
@@ -493,9 +502,10 @@ TEST_CASE(
   const bibo::world::WorldGenerator& generator =
       scene.GetWorld().GetGenerator();
   CHECK(quest.IsOffered());
-  CHECK(scene.GetChonk().GetActivity() == Raccoon::Activity::kSitting);
+  CHECK(scene.GetActors().GetChonk().GetActivity() ==
+        Raccoon::Activity::kSitting);
   // Chonk sits beside the first part of a foot path, on dry land
-  glm::vec3 chonk = scene.GetChonk().GetPosition();
+  glm::vec3 chonk = scene.GetActors().GetChonk().GetPosition();
   CHECK(generator.GetLandmarks().PathDistance(glm::vec2(chonk.x, chonk.z)) <
         bibo::world::Landmarks::kPathHalfWidth + 4.0f);
   CHECK(chonk.y > generator.GetSeaLevel());
@@ -538,25 +548,26 @@ TEST_CASE(
   };
 
   REQUIRE(put_bear(chonk, 3.5f));
-  REQUIRE(scene.GetTalkPartner() == Scene::TalkPartner::kChonk);
+  REQUIRE(scene.GetTalkPartner() == &scene.GetActors().GetChonk());
   CHECK(quest.CanTalk());
   talk();
   REQUIRE(quest.GetStage() == StonesQuest::Stage::kExploring);
-  std::vector<StonesQuest::Event> events = scene.TakeStonesEvents();
+  std::vector<SceneEvent> events = scene.TakeEvents();
   CHECK(std::count(events.begin(), events.end(),
-                   StonesQuest::Event::kAccepted) == 1);
+                   SceneEvent(StonesQuest::Event::kAccepted)) == 1);
   // Chonk chitters while its words appear
-  CHECK(scene.TakeRaccoonChatters() > 3);
+  CHECK(std::count(events.begin(), events.end(),
+                   SceneEvent(AnimalEvent::kRaccoonChatter)) > 3);
   CHECK_FALSE(scene.GetRaceQuest().IsOffered());  // one quest at a time
   // The bear faced Chonk from close by while they talked
   glm::vec3 offset = chonk - scene.GetBear().GetPosition();
   CHECK(glm::length(glm::vec2(offset.x, offset.z)) < 4.2f);
 
   // At the stones: the flat stone in the middle
-  glm::vec3 stones = scene.GetStonesCenter();
+  glm::vec3 stones = scene.GetActors().GetStoneCircle().GetPosition();
   REQUIRE(put_bear(stones, 2.5f));
   CHECK(quest.HasArrived());
-  REQUIRE(scene.GetTalkPartner() == Scene::TalkPartner::kStones);
+  REQUIRE(scene.GetTalkPartner() == &scene.GetActors().GetStoneCircle());
   talk();
   REQUIRE(quest.GetStage() == StonesQuest::Stage::kReturning);
   CHECK(quest.HasReport());
@@ -567,9 +578,9 @@ TEST_CASE(
   CHECK(quest.HasCompleted());
   CHECK_FALSE(quest.IsActive());
   CHECK(quest.GetReport() == StonesQuest::Report::kTruth);
-  events = scene.TakeStonesEvents();
+  events = scene.TakeEvents();
   CHECK(std::count(events.begin(), events.end(),
-                   StonesQuest::Event::kCompleted) == 1);
+                   SceneEvent(StonesQuest::Event::kCompleted)) == 1);
   CHECK(scene.GetRaceQuest().IsOffered());
 
   SECTION("Restarting keeps the completed quest, Chonk is back at its place") {
@@ -577,6 +588,6 @@ TEST_CASE(
     scene.Update(frame);
     CHECK(quest.HasCompleted());
     CHECK_FALSE(quest.IsOffered());
-    CHECK(scene.GetChonk().GetPosition() == chonk);
+    CHECK(scene.GetActors().GetChonk().GetPosition() == chonk);
   }
 }

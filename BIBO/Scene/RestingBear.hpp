@@ -6,8 +6,10 @@
 #include <vector>
 
 #include "../Resources/SkinnedModel.hpp"
+#include "Actor.hpp"
 #include "BearRig.hpp"
 #include "Fur.hpp"
+#include "TalkPartner.hpp"
 
 namespace bibo {
 namespace scene {
@@ -22,7 +24,7 @@ namespace scene {
  * skinned vertices and the fur; the scene draws it (BearRenderer) and gives it
  * a collision sphere.
  */
-class RestingBear {
+class RestingBear : public Animal, public TalkPartner {
  public:
   static constexpr std::size_t kStrandCount = 45000;
   // Bigger than the player's bear cub
@@ -51,7 +53,7 @@ class RestingBear {
   /**
    * One sound while talking: the mouth opens and closes
    */
-  void Speak();
+  void Speak() override;
 
   /**
    * Paints the fur of a model like the coat of a moon bear (Asiatic black
@@ -60,23 +62,25 @@ class RestingBear {
    */
   static void PaintCoat(resources::SkinnedModel& model);
 
-  glm::vec3 GetPosition() const { return position_; }
+  glm::vec3 GetPosition() const override { return position_; }
   glm::vec3 GetDirection() const { return direction_; }
   /**
    * Between its eyes (world space), e.g. for the bear to look at
    */
-  glm::vec3 GetFacePosition() const { return Scaled(rig_.GetHeadPosition()); }
+  glm::vec3 GetFacePosition() const override {
+    return Scaled(rig_.GetHeadPosition());
+  }
   /**
    * Where the exclamation mark floats (above its head), it bobs up and down and
    * turns slowly
    */
-  glm::vec3 GetMarkerPosition() const;
-  glm::quat GetMarkerRotation() const;
+  glm::vec3 GetMarkerPosition() const override;
+  glm::quat GetMarkerRotation() const override;
   /**
    * Its collision sphere (the bear cannot walk through it)
    */
-  glm::vec3 GetColliderCenter() const { return collider_center_; }
-  float GetColliderRadius() const { return 0.95f * kScale; }
+  glm::vec3 GetColliderCenter() const override { return collider_center_; }
+  float GetColliderRadius() const override { return 0.95f * kScale; }
   /**
    * Sphere around the whole bear (with its fur)
    */

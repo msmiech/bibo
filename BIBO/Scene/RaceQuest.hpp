@@ -8,6 +8,7 @@
 #include "../World/TrackPath.hpp"
 #include "Dialog.hpp"
 #include "GameRules.hpp"
+#include "Quest.hpp"
 
 namespace bibo {
 namespace scene {
@@ -26,7 +27,7 @@ namespace scene {
  * Only the rules and the conversation, the scene tells it where the bear is and
  * moves the bear and the camera.
  */
-class RaceQuest {
+class RaceQuest : public Quest {
  public:
   enum class Stage {
     kIdle,            // the bear roams freely, the beaver offers the race
@@ -86,7 +87,7 @@ class RaceQuest {
   /**
    * What the bear does in this frame
    */
-  struct Situation {
+  struct Situation : QuestSituation {
     glm::vec3 bear = glm::vec3(0.0f);  // center of the bear
     // within kTalkDistance, and the bear can talk (not tumbling)
     bool near_beaver = false;
@@ -94,9 +95,6 @@ class RaceQuest {
     bool on_track = true;
     // at the starting line, looking along the track (end of the cutscene)
     bool at_start = false;
-    bool interact = false;  // the player wants to talk (pressed in this frame)
-    bool busy = false;      // on another quest, the race is not offered
-    DialogInput dialog;
   };
 
   /**
@@ -110,16 +108,22 @@ class RaceQuest {
    * Ends a race or a conversation without a result (e.g. when the game is
    * restarted), the best time is kept
    */
-  void Abort();
+  void Abort() override;
 
   Stage GetStage() const { return stage_; }
+  /**
+   * @return true from the conversation until the race ended
+   */
+  bool IsActive() const override { return stage_ != Stage::kIdle; }
   /**
    * @return true if the player moves the bear (not in a conversation or the
    * cutscene)
    */
-  bool IsPlayerInControl() const {
+  bool IsPlayerInControl() const override {
     return stage_ == Stage::kIdle || stage_ == Stage::kRacing;
   }
+  bool IsCheeredOn() const override { return stage_ == Stage::kRacing; }
+  const char* GetSpeaker() const override { return kSpeaker; }
   /**
    * @return true if the beaver offers the race (the exclamation mark above it)
    */
@@ -132,7 +136,12 @@ class RaceQuest {
     return stage_ == Stage::kIdle && near_beaver_ &&
            (!dialog_.IsOpen() || dialog_.IsPassing());
   }
-  const Dialog& GetDialog() const { return dialog_; }
+  bool CanTalkTo(int partner) const override { return CanTalk(); }
+  int GetConversationPartner() const override {
+    return stage_ == Stage::kTalking ? 0 : -1;
+  }
+  Marker GetMarker(int partner) const override;
+  const Dialog& GetDialog() const override { return dialog_; }
 
   /**
    * Where the bear stands at the starting line (on the ground plane, y is the
@@ -184,6 +193,10 @@ class RaceQuest {
    * @return What happened since the last call
    */
   std::vector<Event> TakeEvents();
+  /**
+   * How the beaver and the raccoons react to an event
+   */
+  static Reaction React(Event event);
 
   /**
    * @return The time as minutes, seconds and hundredths, e.g. "1:23.45"

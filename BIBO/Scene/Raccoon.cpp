@@ -156,7 +156,10 @@ void Raccoon::SetTalking(bool talking) {
   }
 }
 
-void Raccoon::Speak() { mouth_time_ = 0.0f; }
+void Raccoon::Speak() {
+  mouth_time_ = 0.0f;
+  ++chatters_;
+}
 
 int Raccoon::TakeChatters() {
   int result = chatters_;

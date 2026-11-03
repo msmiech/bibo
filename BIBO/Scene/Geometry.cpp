@@ -13,38 +13,25 @@ using resources::Model;
 using std::make_unique;
 using std::string;
 
-Geometry::Geometry(mat4 model_matrix, Shader* shader, GLFWwindow& window,
+Geometry::Geometry(mat4 model_matrix, Shader* shader,
                    const aiScene* assimp_scene, const char* node_name,
                    Texture* texture, Texture* normal_map_texture)
-    : SceneObject(model_matrix, window),
-      model_(make_unique<Model>(shader, assimp_scene, node_name, texture)),
+    : model_(make_unique<Model>(shader, assimp_scene, node_name, texture)),
       normal_map(normal_map_texture) {
   has_normal_map = normal_map_texture != nullptr;
   RequireMeshes(node_name);
   this->model_matrix = model_->GetTranformationMat() * model_matrix;
 }
 
-Geometry::Geometry(mat4 model_matrix, Shader* shader, GLFWwindow& window,
-                   const char* file_path, const char* node_name,
-                   Texture* texture)
-    : Geometry(model_matrix, shader, window, file_path, node_name, texture,
-               nullptr) {}
-
-Geometry::Geometry(mat4 model_matrix, Shader* shader, GLFWwindow& window,
-                   const char* file_path, const char* node_name,
-                   Texture* texture, Texture* normal_map_texture)
-    : SceneObject(model_matrix, window),
-      model_(make_unique<Model>(shader, file_path, node_name, texture)),
+Geometry::Geometry(mat4 model_matrix, Shader* shader, const char* file_path,
+                   const char* node_name, Texture* texture,
+                   Texture* normal_map_texture)
+    : model_(make_unique<Model>(shader, file_path, node_name, texture)),
       normal_map(normal_map_texture) {
   has_normal_map = normal_map_texture != nullptr;
   RequireMeshes(node_name);
   this->model_matrix = model_->GetTranformationMat() * model_matrix;
 }
-
-Geometry::Geometry(mat4 model_matrix, GLFWwindow& window)
-    : SceneObject(model_matrix, window),
-      normal_map(nullptr),
-      has_normal_map(false) {}
 
 void Geometry::RequireMeshes(const char* node_name) {
   if (model_->meshes.empty()) {
@@ -55,7 +42,7 @@ void Geometry::RequireMeshes(const char* node_name) {
 
 Geometry::~Geometry() {}
 
-void Geometry::Update(float time_delta) {
+void Geometry::Update() {
   if (!physics_world_ || physics_body_ == physics::kInvalidBody) return;
   model_matrix = physics_world_->GetTransform(physics_body_) * body_to_model_;
 }

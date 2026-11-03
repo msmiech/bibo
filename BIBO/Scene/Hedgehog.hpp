@@ -8,6 +8,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <random>
 
+#include "Actor.hpp"
+
 namespace bibo {
 namespace world {
 class WorldGenerator;
@@ -21,7 +23,7 @@ namespace scene {
  * one (an obstacle). Only the behavior, the scene draws it (HedgehogRenderer)
  * and moves its collision sphere.
  */
-class Hedgehog {
+class Hedgehog : public Animal {
  public:
   /**
    * Can a hedgehog stand at a point of the ground plane?
@@ -63,11 +65,11 @@ class Hedgehog {
   /**
    * Back home, as at the start
    */
-  void Reset();
+  void Reset() override;
   /**
    * The bear ran into it: it hops up in surprise
    */
-  void Startle();
+  void Startle() override;
   /**
    * Where the bear is: when it comes close, the hedgehog scurries away from it
    * (in the next update)
@@ -82,8 +84,8 @@ class Hedgehog {
   /**
    * Its collision sphere (around the round body, without the spines)
    */
-  glm::vec3 GetColliderCenter() const;
-  float GetColliderRadius() const;
+  glm::vec3 GetColliderCenter() const override;
+  float GetColliderRadius() const override;
   bool IsWalking() const { return walking_; }
   bool IsScurrying() const { return scurrying_; }
 

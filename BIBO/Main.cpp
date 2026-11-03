@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <variant>
 #include <vector>
 
 #include "Audio/MusicPlayer.hpp"
@@ -42,10 +43,13 @@ using bibo::kFullscreen;
 using bibo::kWindowed;
 using bibo::Settings;
 using bibo::Shader;
+using bibo::scene::AnimalEvent;
 using bibo::scene::Dialog;
 using bibo::scene::RaceQuest;
 using bibo::scene::SalmonQuest;
 using bibo::scene::Scene;
+using bibo::scene::SceneEvent;
+using bibo::scene::SceneRenderer;
 using bibo::scene::StonesQuest;
 using glm::ivec2;
 using glm::mat4;
@@ -86,8 +90,7 @@ void ApplyGraphicsSettings();
 bool PauseGame();
 void ResumeGame();
 void RestartGame();
-void PlaySounds(const vector<SalmonQuest::Event>& salmon_events,
-                const vector<StonesQuest::Event>& stones_events);
+void PlaySounds(const vector<SceneEvent>& events);
 void UpdateHud();
 void OnMenuAction(ui::MenuAction action);
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action,
@@ -745,30 +748,26 @@ void GameLoop() {
     if (game_state == kPlaying) {
       main_shader->Enable();
       Update(std::min(time_delta, kMaxTimeStep));
-      vector<SalmonQuest::Event> salmon_events = game_scene->TakeSalmonEvents();
-      for (SalmonQuest::Event event : salmon_events) {
-        if (event == SalmonQuest::Event::kEaten) {
+      vector<SceneEvent> events = game_scene->TakeEvents();
+      for (const SceneEvent& event : events) {
+        if (event == SceneEvent(SalmonQuest::Event::kEaten)) {
           last_message = "A salmon for Mishka's quest! +" +
                          to_string(SalmonQuest::kSalmonPoints) + " points (" +
                          to_string(game_scene->GetSalmonEaten()) + "/" +
                          to_string(game_scene->GetPoolCount()) + ")";
           message_time_left = 3;
-        }
-      }
-      vector<StonesQuest::Event> stones_events = game_scene->TakeStonesEvents();
-      for (StonesQuest::Event event : stones_events) {
-        if (event == StonesQuest::Event::kArrived) {
+        } else if (event == SceneEvent(StonesQuest::Event::kArrived)) {
           last_message =
               "You found the stone circle! Inspect the flat stone in the "
               "middle.";
           message_time_left = 4;
-        } else if (event == StonesQuest::Event::kInspected) {
+        } else if (event == SceneEvent(StonesQuest::Event::kInspected)) {
           last_message = string("Go back and tell ") + StonesQuest::kSpeaker +
                          " what is happening at the stones.";
           message_time_left = 4;
         }
       }
-      PlaySounds(salmon_events, stones_events);
+      PlaySounds(events);
     }
     UpdateHud();
     // Do drawing of game here
@@ -819,75 +818,93 @@ void Update(float time_delta) {
                                                !game_scene->IsCameraLocked()));
 }
 
+// The sound of something that happened on the race
+void PlaySound(RaceQuest::Event event) {
+  switch (event) {
+    case RaceQuest::Event::kBeaverSound:
+      // The beaver chatters while its words appear (it does not speak), never
+      // the same sound twice in a row
+      beaver_sound += 1 + (beaver_sound * 7u + 3u) % 3u;
+      music->Play(audio::SoundEffect::kBeaver, static_cast<int>(beaver_sound),
+                  0.85f);
+      break;
+    case RaceQuest::Event::kCountdownTick:
+      music->Play(audio::SoundEffect::kCountdown);
+      break;
+    case RaceQuest::Event::kStart:
+      music->Play(audio::SoundEffect::kGo);
+      break;
+    case RaceQuest::Event::kCheckpoint:
+      music->Play(audio::SoundEffect::kCheckpoint, 0, 0.7f);
+      break;
+    case RaceQuest::Event::kCompleted:
+      music->Play(audio::SoundEffect::kSuccess);
+      break;
+    case RaceQuest::Event::kFailed:
+      music->Play(audio::SoundEffect::kFailure);
+      break;
+    default:
+      break;
+  }
+}
+
+// ... while fishing for Mishka
+void PlaySound(SalmonQuest::Event event) {
+  switch (event) {
+    case SalmonQuest::Event::kBearSound:
+      // Mishka grumbles while its words appear, never the same sound twice in
+      // a row
+      bear_sound += 1 + (bear_sound * 5u + 1u) % 3u;
+      music->Play(audio::SoundEffect::kBear,
+                  static_cast<int>(bear_sound % audio::SoundEffectVariants(
+                                                    audio::SoundEffect::kBear)),
+                  0.9f);
+      break;
+    case SalmonQuest::Event::kEaten:
+      music->Play(audio::SoundEffect::kCheckpoint, 0, 0.7f);
+      break;
+    case SalmonQuest::Event::kCompleted:
+      music->Play(audio::SoundEffect::kSuccess);
+      break;
+    default:
+      break;
+  }
+}
+
+// ... on the quest of the standing stones (Chonk chitters, see PlaySounds)
+void PlaySound(StonesQuest::Event event) {
+  switch (event) {
+    case StonesQuest::Event::kArrived:
+      music->Play(audio::SoundEffect::kCheckpoint, 0, 0.7f);
+      break;
+    case StonesQuest::Event::kCompleted:
+      music->Play(audio::SoundEffect::kSuccess);
+      break;
+    default:
+      break;
+  }
+}
+
 // The sounds of what happened in the scene
-void PlaySounds(const vector<SalmonQuest::Event>& salmon_events,
-                const vector<StonesQuest::Event>& stones_events) {
-  vector<RaceQuest::Event> events = game_scene->TakeEvents();
-  int splashes = game_scene->TakeSplashes();
-  int chatters = game_scene->TakeRaccoonChatters();
+void PlaySounds(const vector<SceneEvent>& events) {
   if (!music) {
     return;
   }
-  for (RaceQuest::Event event : events) {
-    switch (event) {
-      case RaceQuest::Event::kBeaverSound:
-        // The beaver chatters while its words appear (it does not speak), never
-        // the same sound twice in a row
-        beaver_sound += 1 + (beaver_sound * 7u + 3u) % 3u;
-        music->Play(audio::SoundEffect::kBeaver, static_cast<int>(beaver_sound),
-                    0.85f);
-        break;
-      case RaceQuest::Event::kCountdownTick:
-        music->Play(audio::SoundEffect::kCountdown);
-        break;
-      case RaceQuest::Event::kStart:
-        music->Play(audio::SoundEffect::kGo);
-        break;
-      case RaceQuest::Event::kCheckpoint:
-        music->Play(audio::SoundEffect::kCheckpoint, 0, 0.7f);
-        break;
-      case RaceQuest::Event::kCompleted:
-        music->Play(audio::SoundEffect::kSuccess);
-        break;
-      case RaceQuest::Event::kFailed:
-        music->Play(audio::SoundEffect::kFailure);
-        break;
-      default:
-        break;
-    }
-  }
-  for (SalmonQuest::Event event : salmon_events) {
-    switch (event) {
-      case SalmonQuest::Event::kBearSound:
-        // Mishka grumbles while its words appear, never the same sound twice in
-        // a row
-        bear_sound += 1 + (bear_sound * 5u + 1u) % 3u;
-        music->Play(
-            audio::SoundEffect::kBear,
-            static_cast<int>(bear_sound % audio::SoundEffectVariants(
-                                              audio::SoundEffect::kBear)),
-            0.9f);
-        break;
-      case SalmonQuest::Event::kEaten:
-        music->Play(audio::SoundEffect::kCheckpoint, 0, 0.7f);
-        break;
-      case SalmonQuest::Event::kCompleted:
-        music->Play(audio::SoundEffect::kSuccess);
-        break;
-      default:
-        break;
-    }
-  }
-  for (StonesQuest::Event event : stones_events) {
-    switch (event) {
-      case StonesQuest::Event::kArrived:
-        music->Play(audio::SoundEffect::kCheckpoint, 0, 0.7f);
-        break;
-      case StonesQuest::Event::kCompleted:
-        music->Play(audio::SoundEffect::kSuccess);
-        break;
-      default:
-        break;
+  int chatters = 0;
+  bool splash = false;
+  for (const SceneEvent& event : events) {
+    if (const RaceQuest::Event* race = std::get_if<RaceQuest::Event>(&event)) {
+      PlaySound(*race);
+    } else if (const SalmonQuest::Event* salmon =
+                   std::get_if<SalmonQuest::Event>(&event)) {
+      PlaySound(*salmon);
+    } else if (const StonesQuest::Event* stones =
+                   std::get_if<StonesQuest::Event>(&event)) {
+      PlaySound(*stones);
+    } else if (std::get<AnimalEvent>(event) == AnimalEvent::kSplash) {
+      splash = true;
+    } else {
+      ++chatters;
     }
   }
   // Chonk chitters while its words appear, the raccoons that cheer when they
@@ -900,7 +917,7 @@ void PlaySounds(const vector<SalmonQuest::Event>& salmon_events,
                                              audio::SoundEffect::kRaccoon)),
         0.7f);
   }
-  if (splashes > 0) {
+  if (splash) {
     music->Play(audio::SoundEffect::kSplash, 0, 0.8f);
   }
 }
@@ -909,42 +926,13 @@ void PlaySounds(const vector<SalmonQuest::Event>& salmon_events,
  * @return The conversation that is shown: with the beaver, Mishka, Chonk or at
  * the stones (a real conversation before a line in passing)
  */
-const Dialog& ShownDialog() {
-  const Dialog* dialogs[] = {&game_scene->GetRaceQuest().GetDialog(),
-                             &game_scene->GetSalmonQuest().GetDialog(),
-                             &game_scene->GetStonesQuest().GetDialog()};
-  for (const Dialog* dialog : dialogs) {
-    if (dialog->IsOpen() && !dialog->IsPassing()) {
-      return *dialog;
-    }
-  }
-  for (const Dialog* dialog : dialogs) {
-    if (dialog->IsOpen()) {
-      return *dialog;
-    }
-  }
-  return *dialogs[0];
-}
+const Dialog& ShownDialog() { return game_scene->GetQuests().GetShownDialog(); }
 
 /**
  * @return What the button does near an animal (or the flat stone), empty if
  * there is nothing to talk to
  */
-string TalkPrompt() {
-  switch (game_scene->GetTalkPartner()) {
-    case Scene::TalkPartner::kBeaver:
-      return string("Talk to ") + RaceQuest::kSpeaker;
-    case Scene::TalkPartner::kMishka:
-      return string("Talk to ") + SalmonQuest::kSpeaker;
-    case Scene::TalkPartner::kChonk:
-      return string("Talk to ") + StonesQuest::kSpeaker;
-    case Scene::TalkPartner::kStones:
-      return "Inspect the flat stone";
-    case Scene::TalkPartner::kNone:
-      break;
-  }
-  return "";
-}
+string TalkPrompt() { return game_scene->GetQuests().GetTalkPrompt(); }
 
 /**
  * @return Where the goal of the stones quest is: how far and an arrow in its
@@ -953,8 +941,8 @@ string TalkPrompt() {
 string ObjectiveWay() {
   const StonesQuest& stones = game_scene->GetStonesQuest();
   vec3 goal = stones.GetStage() == StonesQuest::Stage::kReturning
-                  ? game_scene->GetChonk().GetPosition()
-                  : game_scene->GetStonesCenter();
+                  ? game_scene->GetActors().GetChonk().GetPosition()
+                  : game_scene->GetActors().GetStoneCircle().GetPosition();
   vec3 offset = goal - game_scene->GetBear().GetPosition();
   offset.y = 0.0f;
   float distance = length(offset);
@@ -1156,7 +1144,8 @@ void Draw() {
   // Shadow maps, the scene in HDR, bloom, exposure and tone mapping
   // (render::Renderer)
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  renderer->Render(*game_scene, CurrentRenderSettings(), time_delta);
+  renderer->Render(game_scene->GetRenderer(), CurrentRenderSettings(),
+                   time_delta);
   // The HUD on top of the final image
   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
   TextRendering();
@@ -1308,8 +1297,9 @@ void TextRendering() {
                window_width / 3.f, window_height - 1.f * window_height / 10.f,
                0.6f, vec3(0.9, 0.5f, 0.5f));
     // Fewer objects are drawn with view frustum culling (F8)
-    string drawn_objects = to_string(game_scene->GetDrawnGeometryCount()) +
-                           "/" + to_string(game_scene->GetGeometryCount());
+    const SceneRenderer& scene_renderer = game_scene->GetRenderer();
+    string drawn_objects = to_string(scene_renderer.GetDrawnGeometryCount()) +
+                           "/" + to_string(scene_renderer.GetGeometryCount());
     RenderText(text_shader.get(), "Objects: " + drawn_objects,
                window_width * 0.62f, window_height - 1.f * window_height / 10.f,
                0.6f, vec3(0.9, 0.5f, 0.5f));
@@ -1459,9 +1449,10 @@ void FKeyCallback(GLFWwindow* window, int key, int scancode, int action,
   }
 
   if (key == GLFW_KEY_F8 && action == GLFW_PRESS) {
+    SceneRenderer& scene_renderer = game_scene->GetRenderer();
     bool view_frustum_culling_enabled =
-        !game_scene->IsViewFrustumCullingEnabled();
-    game_scene->SetViewFrustumCullingEnabled(view_frustum_culling_enabled);
+        !scene_renderer.IsViewFrustumCullingEnabled();
+    scene_renderer.SetViewFrustumCullingEnabled(view_frustum_culling_enabled);
     last_message = "View Frustum Culling enabled: " +
                    to_string(view_frustum_culling_enabled);
     message_time_left = 3;

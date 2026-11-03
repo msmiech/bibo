@@ -83,9 +83,8 @@ TEST_CASE("A geometry is placed where its node is in the track",
   const mat4 node_matrix = NodeModelMatrix(TrackNode("Rock1"));
 
   SECTION("Loaded from the file") {
-    Geometry rock(mat4(1.0f), &shader, gl.Window(),
-                  AssetPath(kTrackFile).string().c_str(), "Rock1",
-                  texture.get());
+    Geometry rock(mat4(1.0f), &shader, AssetPath(kTrackFile).string().c_str(),
+                  "Rock1", texture.get());
     CHECK_THAT(rock.model_matrix, IsNear(node_matrix, 1e-4f));
     CHECK(rock.GetPosition() == vec3(rock.model_matrix[3]));
     CHECK_FALSE(rock.GetHasNormalMap());
@@ -95,16 +94,14 @@ TEST_CASE("A geometry is placed where its node is in the track",
       "The given model matrix is applied before the transformation of the "
       "node") {
     const mat4 scaled = glm::scale(mat4(1.0f), vec3(2.0f));
-    Geometry rock(scaled, &shader, gl.Window(), &TrackScene(), "Rock1",
-                  texture.get());
+    Geometry rock(scaled, &shader, &TrackScene(), "Rock1", texture.get());
     CHECK_THAT(rock.model_matrix, IsNear(node_matrix * scaled, 1e-4f));
   }
 
   SECTION("With normal map") {
     auto normal_map = Texture::CreateCheckerboard(16, 2, 2);
-    Geometry rock(mat4(1.0f), &shader, gl.Window(),
-                  AssetPath(kTrackFile).string().c_str(), "Rock1",
-                  texture.get(), normal_map.get());
+    Geometry rock(mat4(1.0f), &shader, AssetPath(kTrackFile).string().c_str(),
+                  "Rock1", texture.get(), normal_map.get());
     CHECK(rock.GetHasNormalMap());
 
     shader.Enable();
@@ -122,15 +119,14 @@ TEST_CASE(
                 AssetPath("Shader/main_shader.frag").string());
   auto texture = Texture::CreateCheckerboard(16, 2, 0);
   bibo::physics::PhysicsWorld world;
-  Geometry rock(mat4(1.0f), &shader, gl.Window(), &TrackScene(), "Rock1",
-                texture.get());
+  Geometry rock(mat4(1.0f), &shader, &TrackScene(), "Rock1", texture.get());
   const mat4 node_matrix = rock.model_matrix;
 
   SECTION("A static body that is not turned (like the rocks)") {
     rock.SetPhysicsBody(&world,
                         world.CreateStaticSphere(
                             rock.GetPosition() + vec3(0.1f, 0.2f, 0.0f), 0.7f));
-    rock.Update(1.0f / 60.0f);
+    rock.Update();
     CHECK_THAT(rock.model_matrix, IsNear(node_matrix, 1e-4f));
   }
 
@@ -140,7 +136,7 @@ TEST_CASE(
     rock.SetPhysicsBody(&world, body);
     world.ResetBody(body, rock.GetPosition() + vec3(0.0f, 3.0f, 0.0f),
                     glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
-    rock.Update(1.0f / 60.0f);
+    rock.Update();
     CHECK_THAT(
         rock.model_matrix,
         IsNear(glm::translate(mat4(1.0f), vec3(0.0f, 3.0f, 0.0f)) * node_matrix,
@@ -180,8 +176,7 @@ TEST_CASE("A geometry is visible if its bounding sphere is in the view frustum",
   GlContext gl;
   Shader shader(AssetPath("Shader/main_shader.vert").string(),
                 AssetPath("Shader/main_shader.frag").string());
-  Geometry rock(mat4(1.0f), &shader, gl.Window(), &TrackScene(), "Rock1",
-                nullptr);
+  Geometry rock(mat4(1.0f), &shader, &TrackScene(), "Rock1", nullptr);
   const vec3 rock_center =
       vec3(rock.model_matrix *
            glm::vec4(rock.GetModel()->GetBoundingSphereCenter(), 1.0f));

@@ -1,13 +1,12 @@
 #include "Bear.hpp"
 
+#include "../Resources/Model.hpp"
 #include "../Util/Console.hpp"
 #include "../Util/Util.hpp"
 
 namespace bibo::scene {
 
-using glm::mat4;
 using glm::vec3;
-using glm::vec4;
 
 const char* const Bear::kModelFile = "Model/BearCub/BearCub.glb";
 
@@ -42,16 +41,13 @@ std::unique_ptr<resources::SkinnedModel> LoadModel() {
 }
 }  // namespace
 
-Bear::Bear(GLFWwindow& window, const aiScene* assimp_scene,
-           physics::PhysicsWorld* physics_world,
+Bear::Bear(const aiScene* assimp_scene, physics::PhysicsWorld* physics_world,
            physics::CharacterController::HitCallback on_hit)
-    : Geometry(mat4(1.0f), window), model_(LoadModel()) {
+    : model_(LoadModel()) {
   // The bear starts looking along -z
   character_ = std::make_unique<BearCharacter>(
       *physics_world, *model_, StartPosition(assimp_scene),
       vec3(0.0f, 0.0f, -1.0f), std::move(on_hit));
-  renderer_ = std::make_unique<BearRenderer>(*model_, kStrandCount);
-  model_matrix[3] = vec4(character_->GetPosition(), 1.0f);
 }
 
 Bear::~Bear() = default;
@@ -60,44 +56,13 @@ physics::CharacterControllerDesc Bear::ControllerDesc(vec3 position) {
   return BearCharacter::ControllerDesc(position);
 }
 
-void Bear::Update(float time_delta) {
-  character_->Update(time_delta, input_);
-  model_matrix[3] = vec4(character_->GetPosition(), 1.0f);
-}
+void Bear::Update(float time_delta) { character_->Update(time_delta, input_); }
 
-void Bear::UploadIfChanged() {
-  if (uploaded_version_ != character_->GetVersion()) {
-    renderer_->Upload(character_->GetPositions(), character_->GetNormals(),
-                      character_->GetFurOffsets(),
-                      character_->GetCombDirections());
-    uploaded_version_ = character_->GetVersion();
-  }
-}
+vec3 Bear::GetPosition() const { return character_->GetPosition(); }
 
-void Bear::Draw(Shader* shader) {
-  UploadIfChanged();
-  renderer_->DrawSurface(shader);
-}
+vec3 Bear::GetDirection() const { return character_->GetDirection(); }
 
-void Bear::DrawShaded(const BearRenderContext& context) {
-  UploadIfChanged();
-  renderer_->DrawShaded(context, character_->GetBoundsCenter());
-}
-
-vec3 Bear::GetPosition() { return character_->GetPosition(); }
-
-vec3 Bear::GetDirection() { return character_->GetDirection(); }
-
-bool Bear::IsVisible(const ViewFrustum& frustum) {
-  return frustum.SphereInFrustum(character_->GetBoundsCenter(),
-                                 character_->GetBoundsRadius()) !=
-         ViewFrustum::kOutside;
-}
-
-void Bear::Reset() {
-  character_->Reset();
-  model_matrix[3] = vec4(character_->GetPosition(), 1.0f);
-}
+void Bear::Reset() { character_->Reset(); }
 
 void Bear::KnockDown(const physics::CharacterController::Hit& hit) {
   character_->KnockDown(hit);

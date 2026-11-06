@@ -54,7 +54,7 @@ float YawOf(vec3 direction) { return std::atan2(direction.x, direction.z); }
 }  // namespace
 
 Camera::Camera(vec3 position, vec3 direction, vec3 up, GLFWwindow& window)
-    : SceneObject(window), position_(position), up_(up) {
+    : window_(&window), position_(position), up_(up) {
   glfwGetWindowSize(&window, &window_width_, &window_height_);
   SetDirection(direction);
 }

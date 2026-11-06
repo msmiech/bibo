@@ -234,4 +234,22 @@ std::vector<RaceQuest::Event> RaceQuest::TakeEvents() {
   return result;
 }
 
+Quest::Marker RaceQuest::GetMarker(int partner) const {
+  if (!IsOffered()) {
+    return Marker::kNone;
+  }
+  return HasCompleted() ? Marker::kRepeatable : Marker::kNew;
+}
+
+Quest::Reaction RaceQuest::React(Event event) {
+  Reaction reaction;
+  reaction.speak = event == Event::kBeaverSound;
+  reaction.cheer = event == Event::kAccepted || event == Event::kCompleted;
+  // The raccoons beside the track cheer at every checkpoint and at the finish
+  reaction.celebrate =
+      event == Event::kCheckpoint || event == Event::kCompleted;
+  reaction.completed = event == Event::kCompleted;
+  return reaction;
+}
+
 }  // namespace bibo::scene

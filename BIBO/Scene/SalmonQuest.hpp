@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "Dialog.hpp"
+#include "Quest.hpp"
 
 namespace bibo {
 namespace scene {
@@ -20,7 +21,7 @@ namespace scene {
  *
  * Only the rules and the conversation, the scene tells it what the bear does.
  */
-class SalmonQuest {
+class SalmonQuest : public Quest {
  public:
   enum class Stage {
     kIdle,     // not fishing, Mishka offers the quest
@@ -54,15 +55,12 @@ class SalmonQuest {
   /**
    * What the bear does in this frame
    */
-  struct Situation {
+  struct Situation : QuestSituation {
     // within kTalkDistance, and the bear can talk (not tumbling, swimming or
     // eating)
     bool near_mishka = false;
-    bool interact = false;  // the player wants to talk (pressed in this frame)
-    bool busy = false;      // on another quest, the quest is not offered
     // the bear ate up a salmon of this pool in this frame, -1 if none
     int eaten_pool = -1;
-    DialogInput dialog;
   };
 
   explicit SalmonQuest(int pool_count);
@@ -72,18 +70,20 @@ class SalmonQuest {
    * Ends the quest or a conversation without a result (e.g. when the game is
    * restarted), the best time is kept
    */
-  void Abort();
+  void Abort() override;
 
   Stage GetStage() const { return stage_; }
   /**
    * @return true from accepting the quest until it is complete or the player
    * stopped (also while talking to Mishka meanwhile)
    */
-  bool IsActive() const { return active_; }
+  bool IsActive() const override { return active_; }
   /**
    * @return true if the player moves the bear (not in a conversation)
    */
-  bool IsPlayerInControl() const { return stage_ != Stage::kTalking; }
+  bool IsPlayerInControl() const override { return stage_ != Stage::kTalking; }
+  bool IsCheeredOn() const override { return stage_ == Stage::kFishing; }
+  const char* GetSpeaker() const override { return kSpeaker; }
   /**
    * @return true if Mishka offers the quest (the exclamation mark above it)
    */
@@ -96,7 +96,12 @@ class SalmonQuest {
     return stage_ != Stage::kTalking && !busy_ && near_mishka_ &&
            (!dialog_.IsOpen() || dialog_.IsPassing());
   }
-  const Dialog& GetDialog() const { return dialog_; }
+  bool CanTalkTo(int partner) const override { return CanTalk(); }
+  int GetConversationPartner() const override {
+    return stage_ == Stage::kTalking ? 0 : -1;
+  }
+  Marker GetMarker(int partner) const override;
+  const Dialog& GetDialog() const override { return dialog_; }
 
   int GetPoolCount() const { return static_cast<int>(done_.size()); }
   /**
@@ -136,6 +141,10 @@ class SalmonQuest {
    * @return What happened since the last call
    */
   std::vector<Event> TakeEvents();
+  /**
+   * How Mishka and the raccoons react to an event
+   */
+  static Reaction React(Event event);
 
  private:
   void SetStage(Stage new_stage);

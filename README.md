@@ -272,6 +272,14 @@ This project was originally written in C++11 using Microsoft Visual Studio 2013.
 It now uses C++20 and CMake, and builds with GCC, Clang, MinGW-w64 and MSVC on Windows and Linux.
 For hardware graphics (modern) OpenGL 4.3 (core profile) is used.
 It was developed for Windows 8.1 and Windows 10 and tested using Nvidia GeForce graphics hardware
+### The scene
+**The scene** (`BIBO/Scene/Scene.cpp`) puts the game together every frame: the quests, then the bear and the animals, the camera and the world. It moves the bear in the conversations and the cutscene.
+**The quests** (`BIBO/Scene/Quest.hpp`, `BIBO/Scene/QuestDirector.cpp`): the race, fishing and the stones quest share one interface (whether the bear is on the quest, who it talks to on it, the exclamation marks),
+so the quest director runs them all the same way: one quest at a time, the player talks to the closest partner (an animal, or a place like the flat stone, `TalkPartner`),
+the animals speak and cheer when something happens on their quest.
+**The actors** (`BIBO/Scene/Actors.cpp`, `BIBO/Scene/Actor.hpp`): the bear and the animals. Every animal is an actor, so its collision sphere follows it in the physics world, it pushes the plants aside and it starts again on a restart, all the same way.
+**Events** (`BIBO/Scene/Events.hpp`): what happens on the quests and to the animals goes into one queue, in order, for the sounds and the messages.
+**Drawing** (`BIBO/Scene/SceneRenderer.cpp`): the renderers of the bear and the animals, the objects of the track and the exclamation marks; the animal classes only hold their behavior.
 ### The world
 The island is generated when the game starts (`BIBO/World`), nothing of it is stored in files, and it is the same every time.
 

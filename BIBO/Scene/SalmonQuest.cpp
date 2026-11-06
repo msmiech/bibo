@@ -188,4 +188,20 @@ std::vector<SalmonQuest::Event> SalmonQuest::TakeEvents() {
   return result;
 }
 
+Quest::Marker SalmonQuest::GetMarker(int partner) const {
+  if (!IsOffered()) {
+    return Marker::kNone;
+  }
+  return HasCompleted() ? Marker::kRepeatable : Marker::kNew;
+}
+
+Quest::Reaction SalmonQuest::React(Event event) {
+  Reaction reaction;
+  reaction.speak = event == Event::kBearSound;
+  // The raccoons cheer for every salmon of the quest
+  reaction.celebrate = event == Event::kEaten || event == Event::kCompleted;
+  reaction.completed = event == Event::kCompleted;
+  return reaction;
+}
+
 }  // namespace bibo::scene

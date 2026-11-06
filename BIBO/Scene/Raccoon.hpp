@@ -7,6 +7,9 @@
 #include <random>
 #include <vector>
 
+#include "Actor.hpp"
+#include "TalkPartner.hpp"
+
 namespace bibo {
 namespace scene {
 /**
@@ -19,7 +22,7 @@ namespace scene {
  * with its paws. Only the behavior, the scene draws it (FurryRenderer with the
  * RaccoonModel).
  */
-class Raccoon {
+class Raccoon : public Animal, public TalkPartner {
  public:
   /**
    * Can a raccoon walk at a point of the ground plane?
@@ -67,23 +70,23 @@ class Raccoon {
   /**
    * A big jump with both paws up (if it is out of the woods)
    */
-  void Cheer();
+  void Cheer() override;
   /**
    * Talking (the dialog is open): it gestures with its paws and does not wash
    * them
    */
-  void SetTalking(bool talking);
+  void SetTalking(bool talking) override;
   /**
    * One sound while talking: the mouth opens and closes, the head nods
    */
-  void Speak();
+  void Speak() override;
   /**
    * Back to how it was at the start (hidden, or at its place)
    */
-  void Reset();
+  void Reset() override;
 
   Activity GetActivity() const { return activity_; }
-  bool IsVisible() const { return activity_ != Activity::kHidden; }
+  bool IsVisible() const override { return activity_ != Activity::kHidden; }
   /**
    * Seconds since the activity changed
    */
@@ -91,7 +94,7 @@ class Raccoon {
   /**
    * On the ground under its middle
    */
-  glm::vec3 GetPosition() const { return position_; }
+  glm::vec3 GetPosition() const override { return position_; }
   glm::vec3 GetDirection() const {
     return glm::vec3(std::sin(yaw_), 0.0f, std::cos(yaw_));
   }
@@ -104,21 +107,21 @@ class Raccoon {
   /**
    * Between its eyes (world space)
    */
-  glm::vec3 GetFacePosition() const;
+  glm::vec3 GetFacePosition() const override;
   /**
    * Where the exclamation mark floats (above its head), it bobs up and down; it
    * turns slowly
    */
-  glm::vec3 GetMarkerPosition() const;
-  glm::quat GetMarkerRotation() const;
+  glm::vec3 GetMarkerPosition() const override;
+  glm::quat GetMarkerRotation() const override;
   /**
    * Its collision sphere (the bear cannot walk through Chonk)
    */
-  glm::vec3 GetColliderCenter() const;
-  float GetColliderRadius() const;
+  glm::vec3 GetColliderCenter() const override;
+  float GetColliderRadius() const override;
   /**
-   * @return The number of chatters since the last call (when it hops and
-   * cheers)
+   * @return The number of chatters since the last call (when it talks, hops
+   * and cheers)
    */
   int TakeChatters();
 
@@ -209,6 +212,7 @@ class RaccoonFans {
    */
   void Reset();
   const std::vector<Raccoon>& GetRaccoons() const { return raccoons_; }
+  std::vector<Raccoon>& GetRaccoons() { return raccoons_; }
   int GetWatchingCount() const;
   /**
    * @return The number of chatters of all raccoons since the last call

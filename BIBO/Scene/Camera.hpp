@@ -1,12 +1,14 @@
 #ifndef BIBO_SCENE_CAMERA_HPP_
 #define BIBO_SCENE_CAMERA_HPP_
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
 #include <functional>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <numbers>
 
-#include "SceneObject.hpp"
 #include "ViewFrustum.hpp"
 
 namespace bibo {
@@ -21,7 +23,7 @@ namespace scene {
  * The camera looks along (cos(pitch) sin(yaw), -sin(pitch), cos(pitch)
  * cos(yaw)): yaw 0 looks along +z, a positive pitch looks down.
  */
-class Camera : public SceneObject {
+class Camera {
  public:
   /**
    * What the locked camera follows
@@ -55,13 +57,12 @@ class Camera : public SceneObject {
          GLFWwindow& window);
   ~Camera();
 
-  void Draw(Shader* shader) override {};
   /**
    * L locks and unlocks the camera, the unlocked camera flies with WASD
    */
-  void Update(float time_delta) override;
-  glm::vec3 GetPosition() override { return position_; };
-  glm::vec3 GetDirection() override { return direction_; };
+  void Update(float time_delta);
+  glm::vec3 GetPosition() const { return position_; }
+  glm::vec3 GetDirection() const { return direction_; }
 
   /**
    * Puts the camera somewhere and looks at the target (e.g. for screenshots of
@@ -160,6 +161,8 @@ class Camera : public SceneObject {
   bool IsLocked();
 
  private:
+  // For the keys of the free flying camera
+  GLFWwindow* window_;
   /**
    * Points the camera along yaw and pitch
    */

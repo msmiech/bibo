@@ -234,4 +234,31 @@ std::vector<StonesQuest::Event> StonesQuest::TakeEvents() {
   return result;
 }
 
+int StonesQuest::GetConversationPartner() const {
+  if (stage_ == Stage::kInspecting) {
+    return kFlatStone;
+  }
+  return stage_ == Stage::kTalking ? kChonk : -1;
+}
+
+std::string StonesQuest::GetPrompt(int partner) const {
+  return partner == kFlatStone ? "Inspect the flat stone"
+                               : Quest::GetPrompt(partner);
+}
+
+Quest::Marker StonesQuest::GetMarker(int partner) const {
+  // Chonk offers its quest and waits for the report, the goal is the stone
+  // circle
+  bool shown = partner == kFlatStone ? stage_ == Stage::kExploring
+                                     : IsOffered() || HasReport();
+  return shown ? Marker::kNew : Marker::kNone;
+}
+
+Quest::Reaction StonesQuest::React(Event event) {
+  Reaction reaction;
+  reaction.speak = event == Event::kChonkSound;
+  reaction.cheer = event == Event::kAccepted || event == Event::kCompleted;
+  return reaction;
+}
+
 }  // namespace bibo::scene

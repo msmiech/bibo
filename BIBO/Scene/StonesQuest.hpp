@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "Dialog.hpp"
+#include "Quest.hpp"
 
 namespace bibo {
 namespace scene {
@@ -20,7 +21,7 @@ namespace scene {
  *
  * Only the rules and the conversations, the scene tells it what the bear does.
  */
-class StonesQuest {
+class StonesQuest : public Quest {
  public:
   enum class Stage {
     kIdle,  // Chonk offers the quest (or it was completed)
@@ -49,6 +50,8 @@ class StonesQuest {
   enum class Report { kNone, kTruth, kHaunted };
 
   static constexpr const char* kSpeaker = "Chonk";
+  // The partners of the quest (see GetPartnerCount)
+  static constexpr int kChonk = 0, kFlatStone = 1;
   // Who "talks" when the bear inspects the flat stone
   static constexpr const char* kStones = "The stone circle";
   // The player can talk to Chonk within this distance (horizontally from Chonk
@@ -61,16 +64,13 @@ class StonesQuest {
   /**
    * What the bear does in this frame
    */
-  struct Situation {
+  struct Situation : QuestSituation {
     // within kTalkDistance, and the bear can talk (not tumbling, swimming or
     // eating)
     bool near_chonk = false;
     bool at_stones = false;  // in the stone circle
     // within kInspectDistance of the flat stone, and it can talk
     bool near_stone = false;
-    bool interact = false;  // the player wants to talk (pressed in this frame)
-    bool busy = false;      // on another quest, the quest is not offered
-    DialogInput dialog;
   };
 
   void Update(float time_delta, const Situation& situation);
@@ -78,17 +78,29 @@ class StonesQuest {
    * Ends the quest or a conversation (e.g. when the game is restarted), a
    * completed quest stays completed
    */
-  void Abort();
+  void Abort() override;
 
   Stage GetStage() const { return stage_; }
   /**
    * @return true from accepting the quest until the report (also while talking
    * to Chonk meanwhile)
    */
-  bool IsActive() const { return active_; }
-  bool IsPlayerInControl() const {
+  bool IsActive() const override { return active_; }
+  bool IsPlayerInControl() const override {
     return stage_ != Stage::kTalking && stage_ != Stage::kInspecting;
   }
+  const char* GetSpeaker() const override { return kSpeaker; }
+  /**
+   * Chonk (kChonk) and the flat stone in the middle of the stone circle
+   * (kFlatStone)
+   */
+  int GetPartnerCount() const override { return 2; }
+  bool CanTalkTo(int partner) const override {
+    return partner == kFlatStone ? CanInspect() : CanTalk();
+  }
+  int GetConversationPartner() const override;
+  std::string GetPrompt(int partner) const override;
+  Marker GetMarker(int partner) const override;
   /**
    * @return true if Chonk offers the quest (the exclamation mark above it)
    */
@@ -120,7 +132,7 @@ class StonesQuest {
    * @return true once the bear was in the stone circle on this quest
    */
   bool HasArrived() const { return arrived_; }
-  const Dialog& GetDialog() const { return dialog_; }
+  const Dialog& GetDialog() const override { return dialog_; }
   /**
    * @return What the player should do now on the quest (empty when it is not
    * active)
@@ -133,6 +145,10 @@ class StonesQuest {
   Report GetReport() const { return report_; }
 
   std::vector<Event> TakeEvents();
+  /**
+   * How Chonk reacts to an event
+   */
+  static Reaction React(Event event);
 
  private:
   void StartConversation();

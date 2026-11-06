@@ -1,5 +1,7 @@
 #ifndef BIBO_SCENE_GEOMETRY_HPP_
 #define BIBO_SCENE_GEOMETRY_HPP_
+#include <GL/glew.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -7,12 +9,17 @@
 
 #include "../Physics/Physics.hpp"
 #include "../Resources/Model.hpp"
-#include "SceneObject.hpp"
+#include "../Resources/Shader.hpp"
 #include "ViewFrustum.hpp"
 
 namespace bibo {
 namespace scene {
-class Geometry : public SceneObject {
+/**
+ * An object of the track (the finish line, the crate, ...): a node of the track
+ * file with its texture, drawn where its model matrix puts it. It can follow a
+ * physics body (e.g. the crate that the bear pushes around).
+ */
+class Geometry {
   std::unique_ptr<resources::Model> model_;
   physics::PhysicsWorld* physics_world_ = nullptr;
   physics::BodyHandle physics_body_ = physics::kInvalidBody;
@@ -30,26 +37,28 @@ class Geometry : public SceneObject {
    * util::LoadSceneFromFile
    * @param normal_map_texture nullptr for geometries without normal map
    */
-  Geometry(glm::mat4 model_matrix, Shader* shader, GLFWwindow& window,
-           const aiScene* assimp_scene, const char* node_name, Texture* texture,
+  Geometry(glm::mat4 model_matrix, Shader* shader, const aiScene* assimp_scene,
+           const char* node_name, Texture* texture,
            Texture* normal_map_texture = nullptr);
-  Geometry(glm::mat4 model_matrix, Shader* shader, GLFWwindow& window,
-           const char* file, const char* node_name, Texture* texture);
-  Geometry(glm::mat4 model_matrix, Shader* shader, GLFWwindow& window,
-           const char* file, const char* node_name, Texture* texture,
-           Texture* normal_map_texture);
+  Geometry(glm::mat4 model_matrix, Shader* shader, const char* file,
+           const char* node_name, Texture* texture,
+           Texture* normal_map_texture = nullptr);
 
-  virtual ~Geometry();
+  ~Geometry();
   Geometry(const Geometry&) = delete;
   Geometry& operator=(const Geometry&) = delete;
 
-  virtual void Update(float time_delta);
-  virtual void Draw(Shader* shader);
+  /**
+   * Follows its physics body (if it has one)
+   */
+  void Update();
+  void Draw(Shader* shader);
   /**
    * @return false if the geometry is completely outside of the view frustum and
    * does not need to be drawn
    */
-  virtual bool IsVisible(const ViewFrustum& frustum);
+  bool IsVisible(const ViewFrustum& frustum);
+  glm::vec3 GetPosition() const { return glm::vec3(model_matrix[3]); }
 
   resources::Model* GetModel();
   /**
@@ -59,6 +68,7 @@ class Geometry : public SceneObject {
    */
   void SetPhysicsBody(physics::PhysicsWorld* physics_world,
                       physics::BodyHandle body);
+  glm::mat4 model_matrix;
   Texture* normal_map;
   bool has_normal_map;
   // Layer of the generated materials (world::MaterialTextures) instead of the
@@ -67,13 +77,6 @@ class Geometry : public SceneObject {
   // How often the generated material repeats per unit of the model
   float material_scale = 1.0f;
   bool GetHasNormalMap();
-
- protected:
-  /**
-   * For geometries that create and draw their meshes themselves (GetModel
-   * returns nullptr, draw, update and IsVisible must be overridden)
-   */
-  Geometry(glm::mat4 model_matrix, GLFWwindow& window);
 };
 }  // namespace scene
 }  // namespace bibo

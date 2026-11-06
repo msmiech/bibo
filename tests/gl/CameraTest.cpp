@@ -6,7 +6,6 @@
 #include "TestSupport.hpp"
 
 using bibo::scene::Camera;
-using bibo::scene::SceneObject;
 using bibo::scene::ViewFrustum;
 using bibo::test::Clipped;
 using bibo::test::GlContext;
@@ -21,18 +20,6 @@ using glm::vec4;
 
 namespace {
 const vec3 kUp(0.0f, 1.0f, 0.0f);
-
-class Target : public SceneObject {
- public:
-  Target(mat4 model_matrix, vec3 direction, GLFWwindow& window)
-      : SceneObject(model_matrix, window), direction_(direction) {}
-  void Update(float) override {}
-  void Draw(bibo::Shader*) override {}
-  vec3 GetDirection() override { return direction_; }
-
- private:
-  vec3 direction_;
-};
 
 vec3 ToView(Camera& camera, vec3 world_position) {
   return vec3(camera.GetViewMatrix() * vec4(world_position, 1.0f));
@@ -141,18 +128,6 @@ TEST_CASE("The camera is locked to the bear and does not move on its own",
   camera.Update(0.5f);  // no keys pressed
   CHECK(camera.IsLocked());
   CHECK(camera.GetPosition() == position);
-}
-
-TEST_CASE("Scene objects can be moved without changing their rotation",
-          "[gl]") {
-  GlContext gl;
-  const mat4 rotated = glm::rotate(mat4(1.0f), glm::radians(30.0f), kUp);
-  Target object(rotated, vec3(0.0f), gl.Window());
-
-  object.SetPosition(vec3(1.0f, 2.0f, 3.0f));
-
-  CHECK(object.GetPosition() == vec3(1.0f, 2.0f, 3.0f));
-  CHECK(glm::mat3(object.model_matrix) == glm::mat3(rotated));
 }
 
 TEST_CASE(

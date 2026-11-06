@@ -6,6 +6,9 @@
 #include <random>
 #include <vector>
 
+#include "Actor.hpp"
+#include "TalkPartner.hpp"
+
 namespace bibo {
 namespace scene {
 /**
@@ -17,7 +20,7 @@ namespace scene {
  * every now and then. Only the behavior, the scene draws it (FurryRenderer with
  * the BeaverModel).
  */
-class Beaver {
+class Beaver : public Animal, public TalkPartner {
  public:
   // Size of the model (BeaverModel) in the world
   static constexpr float kScale = 2.3f;
@@ -38,42 +41,42 @@ class Beaver {
   /**
    * Back to how it was at the start
    */
-  void Reset();
+  void Reset() override;
   /**
    * Talking (the dialog is open): it gestures with its arms and does not nibble
    */
-  void SetTalking(bool talking);
+  void SetTalking(bool talking) override;
   /**
    * One sound while talking: the mouth opens and closes, the head nods
    */
-  void Speak();
+  void Speak() override;
   /**
    * Happy: it hops, raises its arms and slaps its tail on the ground
    */
-  void Cheer();
+  void Cheer() override;
 
-  glm::vec3 GetPosition() const { return position_; }
+  glm::vec3 GetPosition() const override { return position_; }
   /**
    * Where the exclamation mark floats (above its head), it bobs up and down
    */
-  glm::vec3 GetMarkerPosition() const;
+  glm::vec3 GetMarkerPosition() const override;
   /**
    * The marker turns slowly around the vertical axis
    */
-  glm::quat GetMarkerRotation() const;
+  glm::quat GetMarkerRotation() const override;
   /**
    * Its collision sphere (the bear cannot walk through it)
    */
-  glm::vec3 GetColliderCenter() const;
-  float GetColliderRadius() const;
+  glm::vec3 GetColliderCenter() const override;
+  float GetColliderRadius() const override;
   /**
    * The point the camera looks at in a conversation (its face)
    */
-  glm::vec3 GetHeadPosition() const;
+  glm::vec3 GetHeadPosition() const override;
   /**
    * Between its eyes (world space), e.g. for the bear to look at
    */
-  glm::vec3 GetFacePosition() const;
+  glm::vec3 GetFacePosition() const override;
   /**
    * @return 0 (closed) to 1 (wide open)
    */

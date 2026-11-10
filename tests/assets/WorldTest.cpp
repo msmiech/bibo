@@ -30,6 +30,7 @@ using bibo::world::ChunkKey;
 using bibo::world::ChunkKeyHash;
 using bibo::world::ChunkMesh;
 using bibo::world::ColumnKey;
+using bibo::world::ColumnKeyHash;
 using bibo::world::FootPath;
 using bibo::world::Instance;
 using bibo::world::kLodCount;
@@ -764,6 +765,23 @@ TEST_CASE("The world is streamed with the level of detail of the distance",
     }
     CHECK(large);
     CHECK(small);
+  }
+
+  SECTION("What was generated right away is not generated again") {
+    streamer->EnsureCollision(start, 10.0f);
+    REQUIRE(streamer->Finish(start, start, 120.0f));
+    std::unordered_map<ColumnKey, int, ColumnKeyHash> large;
+    for (const WorldStreamer::VegetationUpdate& update :
+         streamer->TakeVegetationUpdates()) {
+      if (update.layer == Layer::kLarge) {
+        ++large[update.key];
+      }
+    }
+    REQUIRE_FALSE(large.empty());
+    for (const auto& entry : large) {
+      CAPTURE(entry.first.x, entry.first.z);
+      CHECK(entry.second == 1);
+    }
   }
 
   SECTION("The physics follows the bear, the grass the camera") {

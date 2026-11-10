@@ -178,6 +178,9 @@ void WorldStreamer::Integrate(Result& result) {
   }
   ColumnState& column = columns_[result.index];
   if (result.kind == Result::kLarge) {
+    if (column.large_done) {
+      return;  // EnsureCollision scattered the column while the job was running
+    }
     column.large_done = true;
     column.shape = result.shape;
     vegetation_updates_.push_back(
@@ -310,6 +313,9 @@ void WorldStreamer::EnsureCollision(glm::vec3 focus, float radius) {
         DistanceToBox(focus, columns_[i].box) < radius) {
       Result result = MakeColumn(i, Layer::kLarge, 0);
       Integrate(result);
+      // Update does not start a job for it anymore (the result of one that is
+      // already running is ignored)
+      columns_[i].large_requested = true;
     }
   }
   UpdatePhysics(focus);

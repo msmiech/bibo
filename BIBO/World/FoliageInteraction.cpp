@@ -48,6 +48,17 @@ void FoliageInteraction::Update(float time_delta,
   for (std::size_t i = 0; i < bodies.size(); ++i) {
     const Body& body = bodies[i];
     Tracked& track = tracked_[i];
+    if (!body.present) {
+      if (track.valid) {
+        // The plants where it was spring back up
+        Imprint imprint;
+        imprint.center = track.position;
+        imprint.radius = body.radius;
+        trail_.push_back(imprint);
+        track.valid = false;
+      }
+      continue;
+    }
     if (track.valid && time_delta > 0.0f) {
       glm::vec3 velocity = (body.center - track.position) / time_delta;
       if (glm::length(velocity) > kTeleportSpeed) {
@@ -98,7 +109,7 @@ void FoliageInteraction::Update(float time_delta,
   for (std::size_t i = 0; i < bodies.size(); ++i) {
     float distance =
         HorizontalDistance(bodies[i].center, camera) - bodies[i].radius;
-    if (distance < kRange) {
+    if (bodies[i].present && distance < kRange) {
       Imprint imprint;
       imprint.center = bodies[i].center;
       imprint.radius = bodies[i].radius;

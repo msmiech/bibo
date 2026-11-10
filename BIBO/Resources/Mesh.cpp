@@ -47,7 +47,7 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture)
     }
 
     auto normal_index = shader->GetAttribLocation("normal");
-    if (normal_index != 0xFFFFFFFF) {
+    if (normal_index != -1) {
       glGenBuffers(1, &vbo_[kNormalBuffer]);
       glBindBuffer(GL_ARRAY_BUFFER, vbo_[kNormalBuffer]);
       glBufferData(GL_ARRAY_BUFFER, 3 * mesh->mNumVertices * sizeof(GLfloat),
@@ -191,7 +191,7 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture)
     }
 
     auto tangent_location = shader->GetAttribLocation("tangentIN");
-    if (tangent_location != 0xFFFFFFFF) {
+    if (tangent_location != -1) {
       glGenBuffers(1, &vbo_[kTangentBuffer]);
       glBindBuffer(GL_ARRAY_BUFFER, vbo_[kTangentBuffer]);
       glBufferData(GL_ARRAY_BUFFER, 3 * mesh->mNumVertices * sizeof(GLfloat),
@@ -205,7 +205,7 @@ Mesh::Mesh(Shader* shader, aiMesh* mesh, Material material, Texture* texture)
     }
 
     auto bitangent_location = shader->GetAttribLocation("bitangentIN");
-    if (bitangent_location != 0xFFFFFFFF) {
+    if (bitangent_location != -1) {
       glGenBuffers(1, &vbo_[kBitangentBuffer]);
       glBindBuffer(GL_ARRAY_BUFFER, vbo_[kBitangentBuffer]);
       glBufferData(GL_ARRAY_BUFFER, 3 * mesh->mNumVertices * sizeof(GLfloat),

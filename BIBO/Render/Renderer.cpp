@@ -94,8 +94,9 @@ Renderer::Renderer(int width, int height)
   for (int i = 0; i < 2; ++i) {
     exposure_textures_[i] = CreateTexture(GL_R32F, 1, 1, 1, GL_NEAREST);
     exposure_framebuffers_[i] = CreateFramebuffer(exposure_textures_[i]);
-    const float one = 1.0f;
-    glClearBufferfv(GL_COLOR, 0, &one);
+    // glClearBufferfv reads four components, also for a texture with one
+    const float one[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    glClearBufferfv(GL_COLOR, 0, one);
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   CreateTargets();

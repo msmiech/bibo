@@ -582,8 +582,9 @@ bool PauseGame() {
 void ResumeGame() {
   game_state = kPlaying;
   menu->Hide();
-  // The button that pressed Start or Resume in the menu may be the jump button
-  controls->BlockJumpUntilReleased();
+  // The button that pressed Start or Resume in the menu is not meant for the
+  // game: it may be the jump button, or the one that answers a conversation
+  controls->IgnoreMenuPress();
 }
 
 void RestartGame() {
@@ -1419,16 +1420,16 @@ void FKeyCallback(GLFWwindow* window, int key, int scancode, int action,
     string mipmap_msg;
     switch (settings.mipmapping) {
       case 0:
-        mipmap_msg = "OFF";
+        mipmap_msg = "off";
         break;
       case 1:
-        mipmap_msg = "Nearest Neighbor";
+        mipmap_msg = "nearest neighbor";
         break;
       case 2:
-        mipmap_msg = "Bilinear";
+        mipmap_msg = "linear";
         break;
     }
-    last_message = "Texture sampling: " + mipmap_msg;
+    last_message = "Mipmapping: " + mipmap_msg;
     message_time_left = 3;
   }
 

@@ -2,6 +2,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <cmath>
+#include <utility>
 #include <vector>
 
 #include "Render/FrameUniforms.hpp"
@@ -104,6 +105,54 @@ TEST_CASE(
       CHECK(imprint.motion == glm::vec2(0.0f));
     }
   }
+}
+
+TEST_CASE(
+    "A body that comes and goes does not disturb the others, the plants "
+    "spring back up where it was",
+    "[foliage]") {
+  FoliageInteraction foliage;
+  vec3 walker(0.0f);
+  const vec3 visitor(0.0f, 0.0f, 20.0f);
+  auto walk = [&](float seconds, bool visitor_present) {
+    for (float t = 0.0f; t < seconds; t += kStep) {
+      walker.x += 4.0f * kStep;
+      foliage.Update(kStep, {{walker, 1.0f}, {visitor, 1.0f, visitor_present}},
+                     walker);
+    }
+  };
+  auto visitors = [&]() {
+    int bodies = 0, imprints = 0;
+    for (const FoliageInteraction::Imprint& imprint : foliage.GetSelected()) {
+      if (imprint.center.z > 10.0f) {
+        ++(imprint.age < 0.0f ? bodies : imprints);
+      }
+    }
+    return std::pair<int, int>(bodies, imprints);
+  };
+
+  // Not there yet: it pushes nothing
+  walk(1.0f, false);
+  CHECK(visitors() == std::pair<int, int>(0, 0));
+  float lean = foliage.GetSelected()[0].motion.x;
+  CHECK(lean > 0.3f);
+
+  // It appears: the walker is still the same body (its plants keep leaning,
+  // it did not jump anywhere)
+  std::size_t trail = foliage.GetTrailLength();
+  walk(kStep, true);
+  CHECK(visitors() == std::pair<int, int>(1, 0));
+  CHECK(foliage.GetSelected()[0].center == walker);
+  CHECK(foliage.GetSelected()[0].motion.x >= lean - 0.01f);
+  CHECK(foliage.GetTrailLength() <= trail + 1);
+
+  // It hides again: one imprint where it stood
+  walk(0.5f, true);
+  walk(kStep, false);
+  CHECK(visitors() == std::pair<int, int>(0, 1));
+  CHECK(foliage.GetSelected()[0].motion.x >= lean - 0.01f);
+  walk(0.5f, false);
+  CHECK(visitors().first == 0);
 }
 
 TEST_CASE(

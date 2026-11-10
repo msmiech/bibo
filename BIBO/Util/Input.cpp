@@ -231,6 +231,13 @@ PlayerInput Input::ReadPlayerInput(float time_delta, const Settings& settings,
     jump_blocked_ = result.jump;
     result.jump = false;
   }
+  if (presses_ignored_) {
+    // The states of the keys were read above, so a key that is still held is
+    // not pressed again in the next call
+    presses_ignored_ = false;
+    result.interact = result.confirm = result.cancel = result.recenter = false;
+    result.navigate = 0;
+  }
   return result;
 }
 

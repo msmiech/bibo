@@ -23,6 +23,10 @@ class FoliageInteraction {
   struct Body {
     glm::vec3 center;
     float radius;
+    // false: it is not there right now (e.g. a raccoon that went back into the
+    // woods). It keeps its place in the list, so that the others stay the same
+    // bodies.
+    bool present = true;
   };
 
   /**
@@ -46,8 +50,10 @@ class FoliageInteraction {
   static constexpr float kRange = 60.0f;
 
   /**
-   * Follows the bodies (in the same order every frame) and lets the imprints
-   * age
+   * Follows the bodies and lets the imprints age
+   * @param bodies The same body at the same index in every frame (a body that
+   * comes and goes stays in the list, see Body::present). If their number
+   * changes, all of them are followed anew.
    */
   void Update(float time_delta, const std::vector<Body>& bodies,
               glm::vec3 camera);

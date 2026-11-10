@@ -31,7 +31,7 @@ jobs:
       - name: Check the format
         run: pipx run pre-commit==4.7.0 run --all-files --show-diff-on-failure --color always
 
-  # The names, using-directives and using-declarations follow the Google C++ style (.clang-tidy)
+  # The names, using-directives and using-declarations follow the Google C++ style, no mistakes that compile (.clang-tidy)
   tidy:
     name: Code style (clang-tidy)
     runs-on: ubuntu-24.04
@@ -106,8 +106,12 @@ jobs:
               libglfw3-dev libglm-dev libassimp-dev libfreetype-dev libglew-dev
           fi
 
+      # Warnings in the code of the game and of the tests are errors (not on Windows: MSYS2 always has the newest compilers,
+      # whose new warnings would break the build without a change of the code)
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type || 'Release' }} -DBIBO_USE_SYSTEM_LIBS=${{ matrix.system_libs }}
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type || 'Release' }}
+          -DBIBO_USE_SYSTEM_LIBS=${{ matrix.system_libs }} -DBIBO_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build build --parallel
@@ -116,23 +120,13 @@ jobs:
       - name: Test
         run: xvfb-run -a -s "-screen 0 1280x720x24" ctest --test-dir build --output-on-failure --timeout 300
 
-      # Runs the game for a while on a virtual X server with Mesa's software renderer (llvmpipe, OpenGL 4.5).
-      # Catches shaders that only compile on the lenient Nvidia driver, missing assets and crashes during start up.
+      # Plays a short demo (main menu, a few steps, pause menu, quit) on a virtual X server with Mesa's software renderer
+      # (llvmpipe, OpenGL 4.5). Catches shaders that only compile on the lenient Nvidia driver, missing assets, crashes,
+      # a game that hangs and, with the sanitizers, memory errors and leaks up to the clean up at the end.
       - name: Smoke test (software OpenGL)
-        working-directory: build
-        run: |
-          status=0
-          xvfb-run -a -s "-screen 0 1280x720x24" timeout 30 ./BIBO 800 600 0 < /dev/null > smoke.log 2>&1 || status=$?
-          cat smoke.log
-          # 124: the game was still running when timeout stopped it
-          if [ "$status" -ne 124 ]; then
-            echo "::error::BIBO exited with code $status"
-            exit 1
-          fi
-          if grep -E "Failed|Could not|ERROR|not complete|below 4.3" smoke.log; then
-            echo "::error::BIBO reported errors during start up"
-            exit 1
-          fi
+        env:
+          SMOKE_TIMEOUT: 900 # seconds; with the sanitizers loading and every frame take much longer
+        run: xvfb-run -a -s "-screen 0 1280x720x24" bash tools/smoke_test.sh build
 
   windows:
     name: Windows MSYS2 (${{ matrix.name }})

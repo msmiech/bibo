@@ -89,11 +89,14 @@ class Input {
   PlayerInput ReadPlayerInput(float time_delta, const Settings& settings,
                               bool free_camera);
   /**
-   * No jump until the jump buttons are released (e.g. A on the gamepad and
-   * SPACE also press the buttons of the menus, the button that resumes the game
-   * would make the bear jump right away)
+   * The button that closed a menu (e.g. A, B or ENTER on Resume) is not meant
+   * for the game: no jump until the jump buttons are released, and the buttons
+   * that count once per press (talk, confirm, cancel, navigate, recenter) are
+   * ignored in the next ReadPlayerInput. Otherwise resuming the game would
+   * make the bear jump or answer the conversation that was open when the game
+   * was paused.
    */
-  void BlockJumpUntilReleased() { jump_blocked_ = true; }
+  void IgnoreMenuPress() { jump_blocked_ = presses_ignored_ = true; }
 
   /**
    * The mouse turns the camera (cursor hidden and unlimited) or is a normal
@@ -146,6 +149,7 @@ class Input {
   float scroll_ = 0.0f;
   bool middle_button_was_pressed_ = false;
   bool jump_blocked_ = false;
+  bool presses_ignored_ = false;  // see IgnoreMenuPress
 };
 }  // namespace input
 }  // namespace bibo

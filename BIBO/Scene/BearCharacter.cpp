@@ -314,8 +314,6 @@ void BearCharacter::UpdateControl(float time_delta,
       fish_ = Fish::kNone;
     } else if (rig_.GetIdleTime() < BearRig::kEatBites[2]) {
       input = BearInput();
-      jump_was_held_ =
-          player_input.jump;  // a jump needs a new press afterwards
     } else if (!last_bite_taken_) {
       last_bite_taken_ = true;
       ++eaten_fish_;
@@ -370,7 +368,9 @@ void BearCharacter::UpdateControl(float time_delta,
   // The jump starts when the button is pressed (or was pressed shortly before
   // landing), also shortly after running over an edge
   bool jump_pressed = input.jump && !jump_was_held_;
-  jump_was_held_ = input.jump;
+  // The button of the player, also while the bear does not listen to it (it
+  // eats): a button held since then needs a new press to jump
+  jump_was_held_ = player_input.jump;
   jump_buffer_ = jump_pressed ? kJumpBufferTime
                               : std::max(0.0f, jump_buffer_ - time_delta);
   air_time_ = standing_on_ground_ || swimming_ ? 0.0f : air_time_ + time_delta;

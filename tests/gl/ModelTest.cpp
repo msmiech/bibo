@@ -64,6 +64,60 @@ TEST_CASE("The meshes of every node of the game are uploaded completely",
   CHECK_THAT(gl.Errors(), Catch::Matchers::IsEmpty());
 }
 
+namespace {
+/**
+ * A triangle for a scene that is built by hand (the scene owns it)
+ */
+aiMesh* NewTriangle() {
+  aiMesh* mesh = new aiMesh();
+  mesh->mPrimitiveTypes = aiPrimitiveType_TRIANGLE;
+  mesh->mNumVertices = 3;
+  mesh->mVertices = new aiVector3D[3]{aiVector3D(0.0f, 0.0f, 0.0f),
+                                      aiVector3D(1.0f, 0.0f, 0.0f),
+                                      aiVector3D(0.0f, 1.0f, 0.0f)};
+  mesh->mNumFaces = 1;
+  mesh->mFaces = new aiFace[1];
+  mesh->mFaces[0].mNumIndices = 3;
+  mesh->mFaces[0].mIndices = new unsigned int[3]{0, 1, 2};
+  return mesh;
+}
+
+aiNode* NewNode(const char* name, unsigned int mesh, aiNode* child = nullptr) {
+  aiNode* node = new aiNode(name);
+  node->mNumMeshes = 1;
+  node->mMeshes = new unsigned int[1]{mesh};
+  if (child) {
+    node->mNumChildren = 1;
+    node->mChildren = new aiNode*[1]{child};
+    child->mParent = node;
+  }
+  return node;
+}
+}  // namespace
+
+TEST_CASE(
+    "A node with a mesh and children gives its own mesh and the ones of its "
+    "children, also without materials",
+    "[gl][model]") {
+  GlContext gl;
+  Shader shader(AssetPath("Shader/main_shader.vert").string(),
+                AssetPath("Shader/main_shader.frag").string());
+  // Root > Parent (mesh 0) > Child (mesh 1); the scene has no materials
+  aiScene scene;
+  scene.mNumMeshes = 2;
+  scene.mMeshes = new aiMesh*[2]{NewTriangle(), NewTriangle()};
+  scene.mRootNode = new aiNode("Root");
+  scene.mRootNode->mNumChildren = 1;
+  scene.mRootNode->mChildren =
+      new aiNode*[1]{NewNode("Parent", 0, NewNode("Child", 1))};
+  scene.mRootNode->mChildren[0]->mParent = scene.mRootNode;
+
+  CHECK(Model(&shader, &scene, "Parent", nullptr).meshes.size() == 2);
+  CHECK(Model(&shader, &scene, "Child", nullptr).meshes.size() == 1);
+  // The root node has no mesh of its own, only its direct children count
+  CHECK(Model(&shader, &scene, nullptr, nullptr).meshes.size() == 1);
+}
+
 TEST_CASE("A node that does not exist gives an empty model", "[gl][model]") {
   GlContext gl;
   Shader shader(AssetPath("Shader/main_shader.vert").string(),

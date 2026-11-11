@@ -395,7 +395,7 @@ std::vector<glm::mat4> Raccoon::GetPose() const {
   return parts;
 }
 
-RaccoonFans::RaccoonFans(Raccoon::Ground ground, Finder finder,
+RaccoonFans::RaccoonFans(const Raccoon::Ground& ground, Finder finder,
                          std::uint32_t seed)
     : finder_(std::move(finder)), seed_(seed) {
   for (std::size_t i = 0; i < kCount; ++i) {

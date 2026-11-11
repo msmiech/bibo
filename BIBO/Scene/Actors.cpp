@@ -492,10 +492,12 @@ vector<world::FoliageInteraction::Body> Actors::GetFoliageBodies() const {
   vector<world::FoliageInteraction::Body> bodies;
   bodies.push_back({bear_->GetCharacter().GetPosition(), kBearFoliageRadius});
   for (const Actor& actor : actors_) {
-    if (actor.foliage_scale > 0.0f && actor.animal->IsVisible()) {
-      bodies.push_back(
-          {actor.animal->GetColliderCenter(),
-           actor.foliage_scale * actor.animal->GetColliderRadius()});
+    // A hidden animal (a raccoon in the woods) keeps its place in the list,
+    // the others stay the same bodies for the plants
+    if (actor.foliage_scale > 0.0f) {
+      bodies.push_back({actor.animal->GetColliderCenter(),
+                        actor.foliage_scale * actor.animal->GetColliderRadius(),
+                        actor.animal->IsVisible()});
     }
   }
   return bodies;

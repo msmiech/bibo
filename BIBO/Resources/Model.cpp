@@ -87,69 +87,53 @@ Model::~Model() {
   }
 }
 
+namespace {
+/**
+ * The colors of the material of a mesh (the defaults if the scene has no
+ * materials)
+ */
+Material MaterialOf(const aiScene* scene, const aiMesh* mesh) {
+  Material material;
+  if (!scene->HasMaterials() || mesh->mMaterialIndex >= scene->mNumMaterials) {
+    return material;
+  }
+  const aiMaterial* assimp_material = scene->mMaterials[mesh->mMaterialIndex];
+  if (!assimp_material) {
+    return material;
+  }
+  aiColor4D color;
+  if (aiGetMaterialColor(assimp_material, AI_MATKEY_COLOR_AMBIENT, &color) ==
+      AI_SUCCESS) {
+    material.ambient = vec3(color.r, color.g, color.b);
+  }
+  if (aiGetMaterialColor(assimp_material, AI_MATKEY_COLOR_DIFFUSE, &color) ==
+      AI_SUCCESS) {
+    material.diffuse = vec3(color.r, color.g, color.b);
+  }
+  if (aiGetMaterialColor(assimp_material, AI_MATKEY_COLOR_SPECULAR, &color) ==
+      AI_SUCCESS) {
+    material.specular = vec3(color.r, color.g, color.b);
+  }
+  return material;
+}
+}  // namespace
+
 void Model::CreateMeshes(Shader* shader, const aiScene* scene, aiNode* node,
                          Texture* texture) {
-  if (node->mNumChildren == 0) {
-    for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
-      aiMesh* assimp_mesh = scene->mMeshes[node->mMeshes[i]];
-      Material mesh_material;
-      if (scene->HasMaterials() && assimp_mesh) {
-        aiMaterial* assimp_material =
-            scene->mMaterials[assimp_mesh->mMaterialIndex];
-        if (assimp_material) {
-          aiColor4D ambient;
-          if (aiGetMaterialColor(assimp_material, AI_MATKEY_COLOR_AMBIENT,
-                                 &ambient) == AI_SUCCESS) {
-            mesh_material.ambient = vec3(ambient.r, ambient.g, ambient.b);
-          }
-
-          aiColor4D diffuse;
-          if (aiGetMaterialColor(assimp_material, AI_MATKEY_COLOR_DIFFUSE,
-                                 &diffuse) == AI_SUCCESS) {
-            mesh_material.diffuse = vec3(diffuse.r, diffuse.g, diffuse.b);
-          }
-
-          aiColor4D specular;
-          if (aiGetMaterialColor(assimp_material, AI_MATKEY_COLOR_SPECULAR,
-                                 &specular) == AI_SUCCESS) {
-            mesh_material.specular = vec3(specular.r, specular.g, specular.b);
-          }
-        }
-      }
-      meshes.push_back(new Mesh(shader, assimp_mesh, mesh_material, texture));
-    }
-  } else {
-    for (unsigned int i = 0; i < node->mNumChildren; ++i) {
-      aiNode* current_node = node->mChildren[i];
-      for (unsigned int j = 0; j < current_node->mNumMeshes; ++j) {
-        Material mesh_material;
-        aiMesh* assimp_mesh = scene->mMeshes[current_node->mMeshes[j]];
-        if (assimp_mesh) {
-          aiMaterial* assimp_material =
-              scene->mMaterials[assimp_mesh->mMaterialIndex];
-          if (assimp_material) {
-            aiColor4D ambient;
-            if (aiGetMaterialColor(assimp_material, AI_MATKEY_COLOR_AMBIENT,
-                                   &ambient) == AI_SUCCESS) {
-              mesh_material.ambient = vec3(ambient.r, ambient.g, ambient.b);
-            }
-
-            aiColor4D diffuse;
-            if (aiGetMaterialColor(assimp_material, AI_MATKEY_COLOR_DIFFUSE,
-                                   &diffuse) == AI_SUCCESS) {
-              mesh_material.diffuse = vec3(diffuse.r, diffuse.g, diffuse.b);
-            }
-
-            aiColor4D specular;
-            if (aiGetMaterialColor(assimp_material, AI_MATKEY_COLOR_SPECULAR,
-                                   &specular) == AI_SUCCESS) {
-              mesh_material.specular = vec3(specular.r, specular.g, specular.b);
-            }
-          }
-        }
-        meshes.push_back(new Mesh(shader, assimp_mesh, mesh_material, texture));
+  // The meshes of the node itself and of its direct children (e.g. the objects
+  // of the scene below its root node)
+  auto add = [&](const aiNode* owner) {
+    for (unsigned int i = 0; i < owner->mNumMeshes; ++i) {
+      aiMesh* assimp_mesh = scene->mMeshes[owner->mMeshes[i]];
+      if (assimp_mesh) {
+        meshes.push_back(new Mesh(shader, assimp_mesh,
+                                  MaterialOf(scene, assimp_mesh), texture));
       }
     }
+  };
+  add(node);
+  for (unsigned int i = 0; i < node->mNumChildren; ++i) {
+    add(node->mChildren[i]);
   }
 }
 

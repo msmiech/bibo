@@ -39,8 +39,9 @@ class Model {
         Texture* tex);
   /**
    * Copies the meshes of a node of the scene (or of the root node if node_name
-   * is nullptr) to the graphics memory. The scene is not needed anymore
-   * afterwards. If the node does not exist, the model has no meshes.
+   * is nullptr) and of its direct children to the graphics memory; the
+   * transformations of the children are not applied. The scene is not needed
+   * anymore afterwards. If the node does not exist, the model has no meshes.
    */
   Model(Shader* shader, const aiScene* scene, const char* node_name,
         Texture* tex);

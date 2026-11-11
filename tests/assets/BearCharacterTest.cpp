@@ -647,6 +647,40 @@ TEST_CASE(
 }
 
 TEST_CASE(
+    "A jump button that is held while the bear eats needs a new press to "
+    "jump afterwards",
+    "[assets][bear][animals]") {
+  BearOnGround scene;
+  scene.Run(1.0f);
+  BearInput held;  // the player never lets go of the button
+  held.jump = true;
+  scene.Run(0.1f, held);
+  REQUIRE(scene.bear->IsAirborne());
+  REQUIRE(scene.bear->CatchFish());
+  for (int i = 0;
+       i < 240 && scene.bear->GetFish() == BearCharacter::Fish::kCarried; ++i) {
+    scene.Run(kFrame, held);
+  }
+  REQUIRE(scene.bear->GetFish() == BearCharacter::Fish::kEating);
+
+  // Until well after the last bite: the bear stays on the ground
+  const float ground = scene.bear->GetPosition().y;
+  float highest = ground;
+  for (float t = 0.0f; t < BearRig::kEatBites[2] + 0.5f; t += kFrame) {
+    scene.Run(kFrame, held);
+    highest = std::max(highest, scene.bear->GetPosition().y);
+  }
+  CHECK(scene.bear->TakeEatenFish() == 1);
+  CHECK(highest < ground + 0.1f);
+
+  // Released and pressed again: it jumps
+  scene.Run(kFrame);
+  scene.Run(0.1f, held);
+  CHECK(scene.bear->IsAirborne());
+  CHECK(scene.bear->GetPosition().y > ground + 0.3f);
+}
+
+TEST_CASE(
     "Mishka lies on its belly, watches what it is shown and talks with its "
     "mouth",
     "[assets][bear][animals]") {

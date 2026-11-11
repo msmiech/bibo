@@ -39,6 +39,7 @@ add_executable(bibo_tests
 	assets/WorldTest.cpp
 	# Need an OpenGL 4.3 context, skipped if there is none (e.g. no display)
 	gl/CameraTest.cpp
+	gl/ControlsTest.cpp
 	gl/ModelTest.cpp
 	gl/SceneTest.cpp
 	gl/ShaderTest.cpp
@@ -49,9 +50,7 @@ target_include_directories(bibo_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(bibo_tests PRIVATE bibo_core Catch2::Catch2WithMain)
 # The tests read the assets directly from the source tree
 target_compile_definitions(bibo_tests PRIVATE BIBO_ASSET_DIR="${PROJECT_SOURCE_DIR}")
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-	target_compile_options(bibo_tests PRIVATE -Wall)
-endif()
+bibo_enable_warnings(bibo_tests)
 
 # Every test case is a separate CTest test; the Catch2 tags (e.g. [physics], [gl]) become CTest labels.
 # Tests that are skipped (e.g. no OpenGL 4.3) are reported as skipped, not as passed or failed.

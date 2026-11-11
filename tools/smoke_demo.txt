@@ -1,0 +1,23 @@
+# Input for the smoke test (tools/smoke_test.sh): the game starts from the main menu, the bear runs a few steps and jumps,
+# the pause menu opens and closes, then the game ends by itself (so that it also releases everything it loaded).
+# Keep it short: the CI plays it with Mesa's software renderer, with the sanitizers a frame takes seconds.
+# Commands: wait <seconds>, press <key>, hold <key> <seconds>, quit (see BIBO/Util/DemoScript.hpp).
+
+# Main menu: Start
+wait 1
+press Up            # Start (the focused button may follow the mouse)
+wait 0.3
+press Enter
+wait 0.5
+
+# The game: a few steps and a jump
+hold Up 1.5
+press Space
+wait 1
+
+# The pause menu and back to the game
+press Escape
+wait 0.5
+press Escape
+wait 0.5
+quit

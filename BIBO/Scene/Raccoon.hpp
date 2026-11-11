@@ -193,7 +193,8 @@ class RaccoonFans {
                                     std::mt19937& random, glm::vec2& from,
                                     glm::vec2& spot)>;
 
-  RaccoonFans(Raccoon::Ground ground, Finder finder, std::uint32_t seed = 515u);
+  RaccoonFans(const Raccoon::Ground& ground, Finder finder,
+              std::uint32_t seed = 515u);
 
   /**
    * @param cheering The bear is on a quest (the raccoons come), otherwise they

@@ -1,4 +1,5 @@
 #include <GLFW/glfw3.h>
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "TestSupport.hpp"

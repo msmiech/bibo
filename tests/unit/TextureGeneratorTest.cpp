@@ -3,8 +3,8 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/generators/catch_generators_range.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <set>
 #include <tuple>
+#include <vector>
 
 #include "Resources/Texture.hpp"
 
@@ -114,9 +114,17 @@ TEST_CASE("The TV static is random grey noise with darker scan lines",
 
 TEST_CASE("All frames of the TV static animation are different", "[texture]") {
   // Scene::initAnimatedTextures uses the seeds 1 to 14
-  std::set<std::vector<unsigned char>> frames;
+  // Compared pair by pair: ordering the frames in a std::set made GCC 13 warn
+  // about its own memcmp (-Wstringop-overread, a false positive in libstdc++)
+  std::vector<std::vector<unsigned char>> frames;
   for (unsigned int seed = 1; seed <= 14; ++seed) {
-    frames.insert(Texture::NoisePixels(128, seed));
+    frames.push_back(Texture::NoisePixels(128, seed));
   }
-  CHECK(frames.size() == 14);
+  int equal_pairs = 0;
+  for (std::size_t a = 0; a < frames.size(); ++a) {
+    for (std::size_t b = a + 1; b < frames.size(); ++b) {
+      equal_pairs += frames[a] == frames[b] ? 1 : 0;
+    }
+  }
+  CHECK(equal_pairs == 0);
 }

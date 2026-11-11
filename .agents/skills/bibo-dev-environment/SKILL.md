@@ -69,6 +69,7 @@ uvx --python 3.13 pre-commit run --all-files    # or only the changed files: --f
 ```
 
 `--python 3.13`: PyYAML, which pre-commit needs, may have no prebuilt package for the newest Python yet.
+pre-commit only checks the files that git knows: `git add` new files first, or a new file passes locally and fails in the CI.
 The hook also rejects conflict markers, broken YAML, files over 2 MB and file names that only differ in their case.
 Includes are sorted within their group; one that must stay first (`<Jolt/Jolt.h>`) is wrapped in `// clang-format off`/`on`.
 CMake files, shell scripts and the demo scripts are indented with tabs.
@@ -108,8 +109,12 @@ Keep scratch scripts, recordings and frames outside of the repository.
 
 ## The CI
 `gh run list --workflow build.yml` and `gh run view <run> --job <job> --log` show what the other compilers said, e.g.
-`grep "warning:"` in the log of a GCC job before turning a warning into an error. The jobs and what each one guards are
-listed in AGENTS.md › Guardrails.
+`grep "warning:"` in the log of a GCC job before turning a warning into an error. Read every warning of a build, also the
+ones reported in the headers of a library (`/usr/include/c++/...`): GCC reports where a warning happens, so one caused by
+the code of the game or of a test (e.g. a `std::set` of vectors in a test, `-Wstringop-overread` in libstdc++ 13) shows
+the path of the library, with the line of the game further up under `required from` / `inlined from`.
+The CI pins its clang-tidy version (`build.yml`), the one of LLVM-MinGW may be older and report less: a clean local run
+does not prove a clean CI run. The jobs and what each one guards are listed in AGENTS.md › Guardrails.
 
 ## Helper scripts (Python)
 Python is not part of the game or of its build. It is installed (`python`, `python3`; with [uv](https://docs.astral.sh/uv/)
